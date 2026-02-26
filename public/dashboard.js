@@ -25,18 +25,8 @@ let bingDataLoaded = false;
 let bingSpendChart = null;
 let bingConversionsChart = null;
 
-// Microsoft Advertising API Configuration
-// TODO: Replace with your actual credentials
-const BING_CONFIG = {
-    clientId: '',  // Your Azure AD App Client ID
-    clientSecret: '', // Your Client Secret (if confidential app)
-    developerToken: '', // Your Developer Token from Microsoft Advertising
-    accountId: '', // Your Microsoft Advertising Account ID
-    customerId: '', // Your Customer ID
-    refreshToken: '', // OAuth Refresh Token
-    // For demo/testing, you can use the Bing Ads Sandbox
-    apiEndpoint: 'https://campaign.api.bingads.microsoft.com/Api/Advertiser/CampaignManagement/v13/CampaignManagementService.svc'
-};
+// Bing API is handled by the backend server
+const BING_API_ENABLED = true;
 
 // Ads Filters
 let filterCampaign = '';
@@ -948,14 +938,8 @@ function getBingDateRange(range) {
 
 // Main Bing data loading function
 async function loadBingData() {
-    document.getElementById('bingCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+    document.getElementById('bingCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading Bing data...</td></tr>';
     document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
-
-    // Check if credentials are configured
-    if (!BING_CONFIG.developerToken || !BING_CONFIG.accountId) {
-        showBingNotConfigured();
-        return;
-    }
 
     try {
         await Promise.all([
@@ -968,37 +952,24 @@ async function loadBingData() {
         updateLastUpdated();
     } catch (error) {
         console.error('Bing data error:', error);
-        showBingError('Error loading Bing data: ' + error.message);
+        showBingLoadingError('Error loading Bing data: ' + error.message);
     }
 }
 
-// Show "not configured" message
-function showBingNotConfigured() {
+// Show error message for Bing
+function showBingLoadingError(errorMsg) {
     const message = `
         <tr>
             <td colspan="8" class="loading">
                 <div style="padding: 20px;">
-                    <h3 style="margin-bottom: 10px;">🔷 Microsoft Bing Ads Not Configured</h3>
-                    <p style="color: #65676b; margin-bottom: 15px;">
-                        To connect your Bing Ads account, you need to configure the API credentials in <code>dashboard.js</code>:
-                    </p>
-                    <ul style="text-align: left; display: inline-block; color: #65676b;">
-                        <li>Developer Token (from Microsoft Advertising)</li>
-                        <li>Account ID</li>
-                        <li>Customer ID</li>
-                        <li>OAuth Client ID & Refresh Token</li>
-                    </ul>
-                    <p style="color: #65676b; margin-top: 15px;">
-                        <a href="https://learn.microsoft.com/en-us/advertising/guides/get-started" target="_blank" style="color: #1877f2;">
-                            📖 Microsoft Advertising API Getting Started Guide
-                        </a>
-                    </p>
+                    <h3 style="margin-bottom: 10px;">⚠️ Error Loading Bing Data</h3>
+                    <p style="color: #65676b;">${errorMsg}</p>
                 </div>
             </td>
         </tr>
     `;
     document.getElementById('bingCampaignBody').innerHTML = message;
-    document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="8" class="loading">Configure API credentials to view data</td></tr>';
+    document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="8" class="loading">${errorMsg}</td></tr>`;
     
     // Reset KPIs
     document.getElementById('bingTotalSpend').textContent = '$0.00';
@@ -1022,22 +993,21 @@ function showBingError(message) {
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
 }
 
-// Bing API call helper
-// Note: Microsoft Advertising API requires server-side OAuth token management
-// This is a placeholder for the actual API implementation
+// Bing API call helper - calls the backend proxy
 async function bingApiCall(endpoint, params = {}) {
-    // For production, you would:
-    // 1. Call your backend proxy that handles OAuth token refresh
-    // 2. The proxy would call Microsoft Advertising Reporting API
+    const response = await fetch(`/api/bing/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    });
     
-    // Example proxy endpoint:
-    // const response = await fetch(`/api/bing/${endpoint}`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(params)
-    // });
+    const data = await response.json();
     
-    throw new Error('Bing API not configured - see BING_CONFIG in dashboard.js');
+    if (data.error) {
+        throw new Error(data.error);
+    }
+    
+    return data;
 }
 
 // Load Bing KPIs
@@ -1048,25 +1018,25 @@ async function loadBingKPIs() {
     try {
         const data = await bingApiCall('account-performance', {
             startDate: dateRange.since,
-            endDate: dateRange.until,
-            columns: ['Spend', 'Impressions', 'Clicks', 'Conversions', 'Ctr', 'AverageCpc']
+            endDate: dateRange.until
         });
         
         if (data) {
             const spend = parseFloat(data.spend || 0);
             const impressions = parseInt(data.impressions || 0);
             const clicks = parseInt(data.clicks || 0);
-            const conversions = parseInt(data.conversions || 0);
+            const conversions = parseFloat(data.conversions || 0);
 
             document.getElementById('bingTotalSpend').textContent = '$' + spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById('bingTotalConversions').textContent = conversions.toLocaleString();
+            document.getElementById('bingTotalConversions').textContent = Math.round(conversions).toLocaleString();
             document.getElementById('bingCostPerConversion').textContent = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             document.getElementById('bingCpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             document.getElementById('bingCtr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
             document.getElementById('bingImpressions').textContent = impressions.toLocaleString();
         }
     } catch (e) { 
-        console.error('Bing KPI error:', e); 
+        console.error('Bing KPI error:', e);
+        throw e;
     }
 }
 
@@ -1079,8 +1049,7 @@ async function loadBingChartData() {
         const dateRange = getBingDateRange(range);
         const data = await bingApiCall('daily-performance', {
             startDate: dateRange.since,
-            endDate: dateRange.until,
-            columns: ['TimePeriod', 'Spend', 'Conversions']
+            endDate: dateRange.until
         });
         
         const dailySpend = new Array(range.days).fill(0);
@@ -1089,7 +1058,13 @@ async function loadBingChartData() {
         if (data && data.rows) {
             const dataByDate = {};
             data.rows.forEach(row => {
-                dataByDate[row.date] = row;
+                // Handle different date formats (MM/DD/YYYY or YYYY-MM-DD)
+                let dateKey = row.date;
+                if (dateKey && dateKey.includes('/')) {
+                    const parts = dateKey.split('/');
+                    dateKey = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+                dataByDate[dateKey] = row;
             });
             
             const today = getESTDate();
@@ -1100,7 +1075,7 @@ async function loadBingChartData() {
                 
                 if (dataByDate[dateStr]) {
                     dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
-                    dailyConversions[i] = parseInt(dataByDate[dateStr].conversions || 0);
+                    dailyConversions[i] = Math.round(parseFloat(dataByDate[dateStr].conversions || 0));
                 }
             }
         }
@@ -1180,15 +1155,15 @@ async function loadBingCampaignData() {
     try {
         const data = await bingApiCall('campaign-performance', {
             startDate: dateRange.since,
-            endDate: dateRange.until,
-            columns: ['CampaignName', 'CampaignStatus', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions']
+            endDate: dateRange.until
         });
 
-        const campaigns = data?.campaigns?.filter(c => c.status === 'Active') || [];
+        // Filter for active campaigns or show all if status not available
+        const campaigns = data?.campaigns || [];
         const tbody = document.getElementById('bingCampaignBody');
         
         if (campaigns.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">No active campaigns with data</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No campaigns with data for this period</td></tr>';
             return;
         }
 
@@ -1199,7 +1174,7 @@ async function loadBingCampaignData() {
             const spend = parseFloat(c.spend || 0);
             const impressions = parseInt(c.impressions || 0);
             const clicks = parseInt(c.clicks || 0);
-            const conversions = parseInt(c.conversions || 0);
+            const conversions = Math.round(parseFloat(c.conversions || 0));
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
@@ -1220,8 +1195,7 @@ async function loadBingCampaignData() {
         }).join('');
     } catch (e) { 
         console.error('Bing Campaign error:', e);
-        // Show not configured message instead of error
-        showBingNotConfigured();
+        document.getElementById('bingCampaignBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -1233,8 +1207,7 @@ async function loadBingDailyData() {
     try {
         const data = await bingApiCall('daily-performance', {
             startDate: dateRange.since,
-            endDate: dateRange.until,
-            columns: ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions']
+            endDate: dateRange.until
         });
 
         const tbody = document.getElementById('bingDailyBody');
@@ -1244,21 +1217,31 @@ async function loadBingDailyData() {
             return;
         }
 
-        // Sort by date descending
-        const sortedData = data.rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+        // Normalize dates and sort descending
+        const normalizedData = data.rows.map(day => {
+            let dateStr = day.date;
+            // Handle MM/DD/YYYY format
+            if (dateStr && dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                dateStr = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+            }
+            return { ...day, normalizedDate: dateStr };
+        });
+        
+        const sortedData = normalizedData.sort((a, b) => new Date(b.normalizedDate) - new Date(a.normalizedDate));
 
         tbody.innerHTML = sortedData.map(day => {
             const spend = parseFloat(day.spend || 0);
             const impressions = parseInt(day.impressions || 0);
             const clicks = parseInt(day.clicks || 0);
-            const conversions = parseInt(day.conversions || 0);
+            const conversions = Math.round(parseFloat(day.conversions || 0));
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             
-            // Parse date
-            const dateParts = day.date.split('-');
+            // Parse date from normalized format
+            const dateParts = day.normalizedDate.split('-');
             const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
 
             return `
@@ -1276,6 +1259,6 @@ async function loadBingDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="8" class="loading">Configure API credentials to view data</td></tr>';
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${e.message}</td></tr>`;
     }
 }

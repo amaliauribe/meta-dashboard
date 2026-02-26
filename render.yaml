@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: meta-dashboard
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MSADS_CLIENT_ID
+        sync: false
+      - key: MSADS_CLIENT_SECRET
+        sync: false
+      - key: MSADS_DEVELOPER_TOKEN
+        sync: false
+      - key: MSADS_REFRESH_TOKEN
+        sync: false
+      - key: MSADS_CUSTOMER_ID
+        sync: false
+      - key: MSADS_ACCOUNT_ID
+        sync: false
