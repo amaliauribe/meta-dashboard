@@ -1,6 +1,31 @@
+const express = require('express');
+const path = require('path');
 const fetch = require('node-fetch');
 
-// Token cache (in-memory, will reset on cold start)
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+
+// Microsoft Advertising API Configuration (from environment variables)
+const MSADS_CONFIG = {
+    clientId: process.env.MSADS_CLIENT_ID,
+    clientSecret: process.env.MSADS_CLIENT_SECRET,
+    developerToken: process.env.MSADS_DEVELOPER_TOKEN,
+    refreshToken: process.env.MSADS_REFRESH_TOKEN,
+    customerId: process.env.MSADS_CUSTOMER_ID,
+    accountId: process.env.MSADS_ACCOUNT_ID
+};
+
+// Check if Bing credentials are configured
+function isBingConfigured() {
+    return MSADS_CONFIG.clientId && 
+           MSADS_CONFIG.clientSecret && 
+           MSADS_CONFIG.developerToken && 
+           MSADS_CONFIG.refreshToken &&
+           MSADS_CONFIG.accountId;
+}
+
+// Token cache
 let accessToken = null;
 let tokenExpiry = null;
 
@@ -14,9 +39,9 @@ async function getAccessToken() {
     
     const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
     const params = new URLSearchParams({
-        client_id: process.env.MSADS_CLIENT_ID,
-        client_secret: process.env.MSADS_CLIENT_SECRET,
-        refresh_token: process.env.MSADS_REFRESH_TOKEN,
+        client_id: MSADS_CONFIG.clientId,
+        client_secret: MSADS_CONFIG.clientSecret,
+        refresh_token: MSADS_CONFIG.refreshToken,
         grant_type: 'refresh_token',
         scope: 'https://ads.microsoft.com/msads.manage offline_access'
     });
@@ -37,6 +62,7 @@ async function getAccessToken() {
     accessToken = data.access_token;
     tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
     
+    console.log('Access token refreshed successfully');
     return accessToken;
 }
 
@@ -128,8 +154,8 @@ function buildSoapEnvelope(action, body, token) {
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Header>
     <h:AuthenticationToken xmlns:h="https://bingads.microsoft.com/Reporting/v13">${token}</h:AuthenticationToken>
-    <h:DeveloperToken xmlns:h="https://bingads.microsoft.com/Reporting/v13">${process.env.MSADS_DEVELOPER_TOKEN}</h:DeveloperToken>
-    <h:CustomerId xmlns:h="https://bingads.microsoft.com/Reporting/v13">${process.env.MSADS_CUSTOMER_ID}</h:CustomerId>
+    <h:DeveloperToken xmlns:h="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.developerToken}</h:DeveloperToken>
+    <h:CustomerId xmlns:h="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.customerId}</h:CustomerId>
   </s:Header>
   <s:Body>
     <${action} xmlns="https://bingads.microsoft.com/Reporting/v13">
@@ -155,7 +181,7 @@ function buildAccountReportRequest(startDate, endDate, columns) {
         </Columns>
         <Scope>
             <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
-                <a:long>${process.env.MSADS_ACCOUNT_ID}</a:long>
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
             </AccountIds>
         </Scope>
         <Time>
@@ -189,7 +215,7 @@ function buildCampaignReportRequest(startDate, endDate, columns) {
         </Columns>
         <Scope>
             <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
-                <a:long>${process.env.MSADS_ACCOUNT_ID}</a:long>
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
             </AccountIds>
         </Scope>
         <Time>
@@ -226,4 +252,110 @@ function parseReportCsv(csvText) {
     return { headers, rows };
 }
 
-module.exports = { getAccessToken, submitAndDownloadReport };
+// API Endpoints
+
+// Get account performance (KPIs)
+app.post('/api/bing/account-performance', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
+        const report = await submitAndDownloadReport('account', startDate, endDate, columns);
+        
+        let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 };
+        
+        report.rows.forEach(row => {
+            totals.spend += parseFloat(row.Spend) || 0;
+            totals.impressions += parseInt(row.Impressions) || 0;
+            totals.clicks += parseInt(row.Clicks) || 0;
+            totals.conversions += parseFloat(row.Conversions) || 0;
+            totals.revenue += parseFloat(row.Revenue) || 0;
+        });
+        
+        res.json(totals);
+    } catch (error) {
+        console.error('Account performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get daily performance
+app.post('/api/bing/daily-performance', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
+        const report = await submitAndDownloadReport('account', startDate, endDate, columns);
+        
+        const rows = report.rows.map(row => ({
+            date: row.TimePeriod,
+            spend: parseFloat(row.Spend) || 0,
+            impressions: parseInt(row.Impressions) || 0,
+            clicks: parseInt(row.Clicks) || 0,
+            ctr: parseFloat(row.Ctr) || 0,
+            cpc: parseFloat(row.AverageCpc) || 0,
+            conversions: parseFloat(row.Conversions) || 0,
+            revenue: parseFloat(row.Revenue) || 0
+        }));
+        
+        res.json({ rows });
+    } catch (error) {
+        console.error('Daily performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get campaign performance
+app.post('/api/bing/campaign-performance', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['CampaignName', 'CampaignStatus', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
+        const report = await submitAndDownloadReport('campaign', startDate, endDate, columns);
+        
+        const campaigns = report.rows.map(row => ({
+            name: row.CampaignName,
+            status: row.CampaignStatus,
+            spend: parseFloat(row.Spend) || 0,
+            impressions: parseInt(row.Impressions) || 0,
+            clicks: parseInt(row.Clicks) || 0,
+            ctr: parseFloat(row.Ctr) || 0,
+            cpc: parseFloat(row.AverageCpc) || 0,
+            conversions: parseFloat(row.Conversions) || 0,
+            revenue: parseFloat(row.Revenue) || 0
+        }));
+        
+        res.json({ campaigns });
+    } catch (error) {
+        console.error('Campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', configured: isBingConfigured() });
+});
+
+// Serve index.html for all other routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Dashboard server running on port ${PORT}`);
+    console.log(`Bing API configured: ${isBingConfigured()}`);
+});
