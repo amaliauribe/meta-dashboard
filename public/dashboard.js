@@ -61,6 +61,21 @@ function getResults(actions) {
     return total;
 }
 
+// Get budget status color based on remaining percentage
+function getBudgetStatus(budgetRemaining, dailyBudget) {
+    if (!dailyBudget || dailyBudget === 0) return { color: 'gray', label: 'N/A' };
+    
+    const percentRemaining = (budgetRemaining / dailyBudget) * 100;
+    
+    if (percentRemaining >= 50) {
+        return { color: '#31a24c', label: '🟢', percent: percentRemaining };
+    } else if (percentRemaining >= 20) {
+        return { color: '#f7b928', label: '🟡', percent: percentRemaining };
+    } else {
+        return { color: '#e74c3c', label: '🔴', percent: percentRemaining };
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     if (sessionStorage.getItem('loggedIn')) {
@@ -128,13 +143,13 @@ async function apiCall(endpoint) {
 
 function showError(message) {
     document.getElementById('campaignBody').innerHTML = 
-        `<tr><td colspan="8" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="10" class="loading">${message}</td></tr>`;
     document.getElementById('dailyBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
 }
 
 async function loadData() {
-    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
     document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
 
     try {
@@ -189,13 +204,11 @@ async function loadChartData() {
         const dailyResults = new Array(range.days).fill(0);
 
         if (data.data) {
-            // Map data by date
             const dataByDate = {};
             data.data.forEach(day => {
                 dataByDate[day.date_start] = day;
             });
             
-            // Fill in the arrays matching our days
             for (let i = 0; i < range.days; i++) {
                 const date = new Date();
                 date.setDate(date.getDate() - (range.days - 1 - i));
@@ -299,15 +312,33 @@ async function loadCampaignData() {
     }
 
     try {
-        const data = await apiCall(
+        // Fetch campaigns with insights
+        const campaignData = await apiCall(
             `${ACCOUNT_ID}/campaigns?fields=name,status,${insightsQuery}{spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
         );
         
-        const campaigns = data.data?.filter(c => c.status === 'ACTIVE') || [];
+        // Fetch ad sets with budget info
+        const adsetData = await apiCall(
+            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=100`
+        );
+        
+        // Aggregate budget by campaign
+        const budgetByCampaign = {};
+        if (adsetData.data) {
+            adsetData.data.forEach(adset => {
+                if (!budgetByCampaign[adset.campaign_id]) {
+                    budgetByCampaign[adset.campaign_id] = { daily_budget: 0, budget_remaining: 0 };
+                }
+                budgetByCampaign[adset.campaign_id].daily_budget += parseInt(adset.daily_budget || 0);
+                budgetByCampaign[adset.campaign_id].budget_remaining += parseInt(adset.budget_remaining || 0);
+            });
+        }
+        
+        const campaigns = campaignData.data?.filter(c => c.status === 'ACTIVE') || [];
 
         const tbody = document.getElementById('campaignBody');
         if (campaigns.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">No active campaigns with data</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No active campaigns with data</td></tr>';
             return;
         }
 
@@ -323,11 +354,19 @@ async function loadCampaignData() {
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            
+            // Budget info (convert from cents to dollars)
+            const budget = budgetByCampaign[c.id] || { daily_budget: 0, budget_remaining: 0 };
+            const dailyBudget = budget.daily_budget / 100;
+            const budgetRemaining = budget.budget_remaining / 100;
+            const budgetStatus = getBudgetStatus(budgetRemaining, dailyBudget);
 
             return `
                 <tr>
                     <td>${c.name}</td>
                     <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>$${dailyBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td title="${budgetStatus.percent?.toFixed(1) || 0}% remaining">${budgetStatus.label}</td>
                     <td>${impressions.toLocaleString()}</td>
                     <td>${clicks.toLocaleString()}</td>
                     <td>${ctr}%</td>
@@ -339,7 +378,7 @@ async function loadCampaignData() {
         }).join('');
     } catch (e) { 
         console.error('Campaign error:', e);
-        document.getElementById('campaignBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading campaigns</td></tr>';
+        document.getElementById('campaignBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading campaigns</td></tr>';
     }
 }
 
@@ -358,7 +397,6 @@ async function loadDailyData() {
             return;
         }
 
-        // Sort by date descending
         const sortedData = data.data.sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
 
         tbody.innerHTML = sortedData.map(day => {
