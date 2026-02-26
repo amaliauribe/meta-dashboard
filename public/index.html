@@ -45,6 +45,15 @@
             </div>
         </header>
 
+        <!-- View Tabs -->
+        <nav class="view-tabs">
+            <button class="view-tab active" data-view="campaigns">📊 Campaigns</button>
+            <button class="view-tab" data-view="ads">🎬 Ads</button>
+        </nav>
+
+        <!-- Campaigns View -->
+        <div id="campaignsView" class="view-content">
+
         <!-- KPI Cards -->
         <section class="kpi-cards">
             <div class="kpi-card">
@@ -136,6 +145,35 @@
                 <canvas id="spendChart"></canvas>
             </div>
         </section>
+
+        </div><!-- End Campaigns View -->
+
+        <!-- Ads View -->
+        <div id="adsView" class="view-content hidden">
+            <section class="table-section">
+                <h2>🎬 Ad Creative Performance</h2>
+                <div class="table-wrapper">
+                    <table id="adsTable">
+                        <thead>
+                            <tr>
+                                <th>Creative</th>
+                                <th>Ad Name</th>
+                                <th>Campaign</th>
+                                <th>Spend</th>
+                                <th>Impr.</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>Results</th>
+                                <th>Cost/Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adsBody">
+                            <tr><td colspan="9" class="loading">Select this tab to load ads...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Ads View -->
 
         <footer>
             <p>Last updated: <span id="lastUpdate">-</span></p>

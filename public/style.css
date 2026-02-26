@@ -173,6 +173,94 @@ header h1 {
     transform: scale(1.05);
 }
 
+/* View Tabs */
+.view-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: white;
+    padding: 8px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.view-tab {
+    flex: 1;
+    padding: 14px 24px;
+    border: none;
+    background: transparent;
+    color: #65676b;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.view-tab:hover {
+    background: #f0f2f5;
+    color: #1c1e21;
+}
+
+.view-tab.active {
+    background: linear-gradient(135deg, #1877f2 0%, #0d65d9 100%);
+    color: white;
+}
+
+.view-content {
+    /* Container for each view */
+}
+
+/* Ad Creative Thumbnail */
+.ad-thumbnail {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    background: #f0f2f5;
+}
+
+.ad-thumbnail:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.ad-thumbnail-link {
+    display: inline-block;
+    position: relative;
+}
+
+.ad-thumbnail-link::after {
+    content: '▶';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 20px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.ad-thumbnail-link:hover::after {
+    opacity: 1;
+}
+
+.no-thumbnail {
+    width: 80px;
+    height: 80px;
+    background: #e4e6eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #65676b;
+    font-size: 24px;
+}
+
 /* KPI Cards */
 .kpi-cards {
     display: grid;

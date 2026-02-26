@@ -12,8 +12,10 @@ const ACCOUNT_ID = 'act_1151591609552634';
 
 // Dashboard State
 let currentRange = '7d';
+let currentView = 'campaigns';
 let spendChart = null;
 let resultsChart = null;
+let adsDataLoaded = false;
 
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
@@ -141,16 +143,48 @@ function initializeDashboard() {
         location.reload();
     });
 
+    // Date range filters
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentRange = btn.dataset.range;
-            loadData();
+            adsDataLoaded = false; // Reset ads data when date changes
+            if (currentView === 'campaigns') {
+                loadData();
+            } else {
+                loadAdsData();
+            }
         });
     });
 
-    document.getElementById('refreshBtn').addEventListener('click', loadData);
+    // View tabs (Campaigns / Ads)
+    document.querySelectorAll('.view-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentView = tab.dataset.view;
+            
+            // Show/hide views
+            document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
+            document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
+            
+            // Load data for the selected view
+            if (currentView === 'ads' && !adsDataLoaded) {
+                loadAdsData();
+            }
+        });
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        adsDataLoaded = false;
+        if (currentView === 'campaigns') {
+            loadData();
+        } else {
+            loadAdsData();
+        }
+    });
+    
     loadData();
 }
 
@@ -527,5 +561,114 @@ async function loadDailyData() {
     } catch (e) { 
         console.error('Daily error:', e);
         document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading daily data</td></tr>';
+    }
+}
+
+// Load Ads Data with Creative Thumbnails
+async function loadAdsData() {
+    const range = dateRanges[currentRange];
+    const tbody = document.getElementById('adsBody');
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading ads...</td></tr>';
+
+    try {
+        // Get ad-level insights
+        const insightsData = await apiCall(
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,campaign_name,spend,impressions,clicks,ctr,actions&${getDateRange(range)}&limit=100`
+        );
+
+        if (!insightsData.data || insightsData.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No ad data for this period</td></tr>';
+            return;
+        }
+
+        // Get creative info for each ad (batch request)
+        const adIds = insightsData.data.map(ad => ad.ad_id);
+        const creativeData = {};
+        
+        // Fetch creative IDs for all ads
+        const adsWithCreatives = await apiCall(
+            `${ACCOUNT_ID}/ads?fields=creative&ids=${adIds.join(',')}`
+        );
+        
+        // Collect unique creative IDs
+        const creativeIds = new Set();
+        if (adsWithCreatives.data) {
+            adsWithCreatives.data.forEach(ad => {
+                if (ad.creative?.id) {
+                    creativeIds.add(ad.creative.id);
+                    creativeData[ad.id] = { creativeId: ad.creative.id };
+                }
+            });
+        }
+
+        // Fetch thumbnail URLs for all creatives
+        if (creativeIds.size > 0) {
+            const creativesInfo = await apiCall(
+                `?ids=${[...creativeIds].join(',')}&fields=thumbnail_url,video_id`
+            );
+            
+            // Map creative info back to ads
+            Object.keys(creativeData).forEach(adId => {
+                const creativeId = creativeData[adId].creativeId;
+                if (creativesInfo[creativeId]) {
+                    creativeData[adId].thumbnail = creativesInfo[creativeId].thumbnail_url;
+                    creativeData[adId].videoId = creativesInfo[creativeId].video_id;
+                }
+            });
+        }
+
+        // Sort by results (descending), then by spend
+        const sortedAds = insightsData.data.sort((a, b) => {
+            const resultsA = getResults(a.actions);
+            const resultsB = getResults(b.actions);
+            if (resultsB !== resultsA) return resultsB - resultsA;
+            return parseFloat(b.spend || 0) - parseFloat(a.spend || 0);
+        });
+
+        tbody.innerHTML = sortedAds.map(ad => {
+            const spend = parseFloat(ad.spend || 0);
+            const impressions = parseInt(ad.impressions || 0);
+            const clicks = parseInt(ad.clicks || 0);
+            const ctr = ad.ctr ? parseFloat(ad.ctr).toFixed(2) : '-';
+            const results = getResults(ad.actions);
+            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            
+            const creative = creativeData[ad.ad_id] || {};
+            const thumbnailUrl = creative.thumbnail;
+            const videoId = creative.videoId;
+            
+            let thumbnailHtml;
+            if (thumbnailUrl && videoId) {
+                thumbnailHtml = `
+                    <a href="https://www.facebook.com/watch/?v=${videoId}" target="_blank" class="ad-thumbnail-link" title="Watch video">
+                        <img src="${thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
+                    </a>
+                `;
+            } else if (thumbnailUrl) {
+                thumbnailHtml = `<img src="${thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
+            } else {
+                thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
+            }
+
+            return `
+                <tr>
+                    <td>${thumbnailHtml}</td>
+                    <td>${ad.ad_name}</td>
+                    <td>${ad.campaign_name}</td>
+                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>${impressions.toLocaleString()}</td>
+                    <td>${clicks.toLocaleString()}</td>
+                    <td>${ctr}%</td>
+                    <td>${results}</td>
+                    <td>${costPerResult}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        adsDataLoaded = true;
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+    } catch (e) {
+        console.error('Ads error:', e);
+        tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
