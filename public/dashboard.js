@@ -283,10 +283,16 @@ async function loadData() {
             loadCampaignData(),
             loadDailyData()
         ]);
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+        updateLastUpdated();
     } catch (error) {
         showError('Error loading data: ' + error.message);
     }
+}
+
+function updateLastUpdated() {
+    const now = new Date().toLocaleString();
+    document.getElementById('lastUpdate').textContent = now;
+    document.getElementById('lastUpdateTop').textContent = now;
 }
 
 async function loadKPIs() {
@@ -742,7 +748,7 @@ async function loadAdsData() {
         populateAdsFilterDropdowns();
         
         renderAdsTable();
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+        updateLastUpdated();
     } catch (e) {
         console.error('Ads error:', e);
         tbody.innerHTML = `<tr><td colspan="11" class="loading">Error loading ads: ${e.message}</td></tr>`;

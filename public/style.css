@@ -207,6 +207,15 @@ header h1 {
     color: white;
 }
 
+.last-updated-top {
+    margin-left: auto;
+    font-size: 13px;
+    color: #65676b;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+}
+
 .view-content {
     /* Container for each view */
 }
