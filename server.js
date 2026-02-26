@@ -56,7 +56,15 @@ async function getAccessToken() {
     
     if (data.error) {
         console.error('Token refresh error:', data);
+        // Clear cached token so it retries
+        accessToken = null;
+        tokenExpiry = null;
         throw new Error(`OAuth error: ${data.error_description || data.error}`);
+    }
+
+    if (!data.access_token) {
+        console.error('No access token in response:', data);
+        throw new Error('No access token received');
     }
 
     accessToken = data.access_token;
@@ -94,7 +102,10 @@ async function submitAndDownloadReport(reportType, startDate, endDate, columns) 
     const requestIdMatch = submitText.match(/<ReportRequestId[^>]*>([^<]+)<\/ReportRequestId>/);
     if (!requestIdMatch) {
         console.error('Submit response:', submitText);
-        throw new Error('Failed to get report request ID');
+        // Extract error message if present
+        const faultMatch = submitText.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
+        const errorMsg = faultMatch ? faultMatch[1] : 'Failed to get report request ID';
+        throw new Error(errorMsg);
     }
     
     const reportRequestId = requestIdMatch[1];
