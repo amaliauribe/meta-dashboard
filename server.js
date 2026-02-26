@@ -475,6 +475,11 @@ app.get('/auth/bing/callback', async (req, res) => {
 
 // ==================== TikTok Ads API ====================
 
+// TikTok URL verification file
+app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA.txt', (req, res) => {
+    res.type('text/plain').send('tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA');
+});
+
 // TikTok OAuth - Step 1: Redirect to TikTok auth
 app.get('/auth/tiktok', (req, res) => {
     const authUrl = `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_CONFIG.appId}&redirect_uri=${encodeURIComponent('https://vtc-ads-dashboard.onrender.com/auth/tiktok/callback')}&state=tiktok`;
