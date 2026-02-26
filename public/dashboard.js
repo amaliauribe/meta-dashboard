@@ -23,26 +23,25 @@ const dateRanges = {
     '30d': { days: 30 }
 };
 
+// Format date as YYYY-MM-DD using local time
+function formatDateLocal(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Get date range string for API (includes today for 7d, 14d, 30d)
 function getDateRange(range) {
     if (range.preset) {
         return `date_preset=${range.preset}`;
     }
     
-    // Use local date (not UTC) to ensure correct day
     const today = new Date();
     const since = new Date();
     since.setDate(today.getDate() - range.days + 1);
     
-    // Format as YYYY-MM-DD using local time (not toISOString which uses UTC)
-    const formatDate = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-    
-    return `time_range={"since":"${formatDate(since)}","until":"${formatDate(today)}"}`;
+    return `time_range={"since":"${formatDateLocal(since)}","until":"${formatDateLocal(today)}"}`;
 }
 
 // Get results from actions array - CUSTOM PIXEL CONVERSIONS (o-l-a-c)
@@ -72,7 +71,7 @@ function getResults(actions) {
 
 // Get budget status color based on remaining percentage
 function getBudgetStatus(budgetRemaining, dailyBudget) {
-    if (!dailyBudget || dailyBudget === 0) return { color: 'gray', label: 'N/A' };
+    if (!dailyBudget || dailyBudget === 0) return { color: 'gray', label: '-', percent: 0 };
     
     const percentRemaining = (budgetRemaining / dailyBudget) * 100;
     
@@ -204,14 +203,6 @@ async function loadChartData() {
     const range = dateRanges[currentRange];
     const days = getDaysArray(range.days);
 
-    // Helper to format date as YYYY-MM-DD using local time
-    const formatDateLocal = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
     try {
         const data = await apiCall(
             `${ACCOUNT_ID}/insights?fields=spend,actions&${getDateRange(range)}&time_increment=1`
@@ -324,8 +315,7 @@ async function loadCampaignData() {
         const today = new Date();
         const since = new Date();
         since.setDate(today.getDate() - range.days + 1);
-        const formatDate = (d) => d.toISOString().split('T')[0];
-        insightsQuery = `insights.time_range({"since":"${formatDate(since)}","until":"${formatDate(today)}"})`;
+        insightsQuery = `insights.time_range({"since":"${formatDateLocal(since)}","until":"${formatDateLocal(today)}"})`;
     }
 
     try {
@@ -334,15 +324,16 @@ async function loadCampaignData() {
             `${ACCOUNT_ID}/campaigns?fields=name,status,${insightsQuery}{spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
         );
         
-        // Fetch ad sets with budget info
+        // Fetch ONLY ACTIVE ad sets with budget info
         const adsetData = await apiCall(
-            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=100`
+            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining,status&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=100`
         );
         
-        // Aggregate budget by campaign
+        // Aggregate budget by campaign (ACTIVE ad sets only)
         const budgetByCampaign = {};
         if (adsetData.data) {
             adsetData.data.forEach(adset => {
+                if (adset.status !== 'ACTIVE') return; // Double check status
                 if (!budgetByCampaign[adset.campaign_id]) {
                     budgetByCampaign[adset.campaign_id] = { daily_budget: 0, budget_remaining: 0 };
                 }
@@ -372,7 +363,7 @@ async function loadCampaignData() {
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
             
-            // Budget info (convert from cents to dollars)
+            // Budget info (convert from cents to dollars) - ACTIVE ad sets only
             const budget = budgetByCampaign[c.id] || { daily_budget: 0, budget_remaining: 0 };
             const dailyBudget = budget.daily_budget / 100;
             const budgetRemaining = budget.budget_remaining / 100;
@@ -414,6 +405,7 @@ async function loadDailyData() {
             return;
         }
 
+        // Sort by date descending
         const sortedData = data.data.sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
 
         tbody.innerHTML = sortedData.map(day => {
@@ -425,10 +417,14 @@ async function loadDailyData() {
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            
+            // Parse date correctly - add timezone offset to avoid off-by-one
+            const dateParts = day.date_start.split('-');
+            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
 
             return `
                 <tr>
-                    <td>${new Date(day.date_start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
+                    <td>${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
                     <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td>${impressions.toLocaleString()}</td>
                     <td>${clicks.toLocaleString()}</td>
