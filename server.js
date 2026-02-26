@@ -269,11 +269,33 @@ function parseReportCsv(csvText) {
     const lines = csvText.trim().split('\n');
     if (lines.length < 2) return { rows: [] };
     
-    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+    // Parse CSV properly handling quoted fields with commas
+    function parseCsvLine(line) {
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                values.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        values.push(current.trim());
+        return values;
+    }
+    
+    const headers = parseCsvLine(lines[0]);
     const rows = [];
     
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.replace(/"/g, '').trim());
+        if (!lines[i].trim()) continue;
+        const values = parseCsvLine(lines[i]);
         const row = {};
         headers.forEach((h, idx) => {
             row[h] = values[idx] || '';
