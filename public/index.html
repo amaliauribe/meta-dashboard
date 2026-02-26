@@ -73,23 +73,31 @@
             </div>
         </section>
 
-        <!-- Spend Trend Chart -->
-        <section class="chart-section">
-            <h2>📈 Spend Trend Over Time</h2>
-            <div class="chart-container">
-                <canvas id="spendChart"></canvas>
+        <!-- 1. Daily Breakdown Table -->
+        <section class="table-section">
+            <h2>📅 Daily Breakdown</h2>
+            <div class="table-wrapper">
+                <table id="dailyTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Spend</th>
+                            <th>Impressions</th>
+                            <th>Clicks</th>
+                            <th>CTR</th>
+                            <th>CPC</th>
+                            <th>Results</th>
+                            <th>Cost/Result</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dailyBody">
+                        <tr><td colspan="8" class="loading">Loading daily data...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
-        <!-- Results Chart -->
-        <section class="chart-section">
-            <h2>🎯 Results Over Time</h2>
-            <div class="chart-container">
-                <canvas id="resultsChart"></canvas>
-            </div>
-        </section>
-
-        <!-- Campaign Performance Table -->
+        <!-- 2. Campaign Performance Table -->
         <section class="table-section">
             <h2>🚀 Active Campaigns</h2>
             <div class="table-wrapper">
@@ -113,27 +121,19 @@
             </div>
         </section>
 
-        <!-- Daily Breakdown Table -->
-        <section class="table-section">
-            <h2>📅 Daily Breakdown</h2>
-            <div class="table-wrapper">
-                <table id="dailyTable">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Spend</th>
-                            <th>Impressions</th>
-                            <th>Clicks</th>
-                            <th>CTR</th>
-                            <th>CPC</th>
-                            <th>Results</th>
-                            <th>Cost/Result</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dailyBody">
-                        <tr><td colspan="8" class="loading">Loading daily data...</td></tr>
-                    </tbody>
-                </table>
+        <!-- 3. Results Chart -->
+        <section class="chart-section">
+            <h2>🎯 Results Over Time</h2>
+            <div class="chart-container">
+                <canvas id="resultsChart"></canvas>
+            </div>
+        </section>
+
+        <!-- 4. Spend Trend Chart -->
+        <section class="chart-section">
+            <h2>📈 Spend Trend Over Time</h2>
+            <div class="chart-container">
+                <canvas id="spendChart"></canvas>
             </div>
         </section>
 
