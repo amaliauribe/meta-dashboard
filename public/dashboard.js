@@ -303,7 +303,7 @@ function showError(message) {
 async function loadData() {
     const campaignCols = (currentRange === 'today' || currentRange === 'yesterday') ? 10 : 8;
     document.getElementById('campaignBody').innerHTML = `<tr><td colspan="${campaignCols}" class="loading">Loading...</td></tr>`;
-    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
@@ -622,7 +622,7 @@ async function loadDailyData() {
         const tbody = document.getElementById('dailyBody');
         
         if (!data.data || data.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -642,10 +642,13 @@ async function loadDailyData() {
             // Parse date - create from parts to avoid timezone issues
             const dateParts = day.date_start.split('-');
             const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
 
             return `
                 <tr>
-                    <td>${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</td>
+                    <td>${dateFormatted}</td>
+                    <td>${dayOfWeek}</td>
                     <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td>${impressions.toLocaleString()}</td>
                     <td>${clicks.toLocaleString()}</td>
@@ -658,7 +661,7 @@ async function loadDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Daily error:', e);
-        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading daily data</td></tr>';
+        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="9" class="loading">Error loading daily data</td></tr>';
     }
 }
 
@@ -950,7 +953,7 @@ function getBingDateRange(range) {
 // Main Bing data loading function
 async function loadBingData() {
     document.getElementById('bingCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading Bing data...</td></tr>';
-    document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+    document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
@@ -980,7 +983,7 @@ function showBingLoadingError(errorMsg) {
         </tr>
     `;
     document.getElementById('bingCampaignBody').innerHTML = message;
-    document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="8" class="loading">${errorMsg}</td></tr>`;
+    document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="9" class="loading">${errorMsg}</td></tr>`;
     
     // Reset KPIs
     document.getElementById('bingTotalSpend').textContent = '$0.00';
@@ -1001,7 +1004,7 @@ function showBingError(message) {
     document.getElementById('bingCampaignBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
     document.getElementById('bingDailyBody').innerHTML = 
-        `<tr><td colspan="8" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="9" class="loading">${message}</td></tr>`;
 }
 
 // Bing API call helper - calls the backend proxy
@@ -1224,7 +1227,7 @@ async function loadBingDailyData() {
         const tbody = document.getElementById('bingDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -1254,10 +1257,13 @@ async function loadBingDailyData() {
             // Parse date from normalized format
             const dateParts = day.normalizedDate.split('-');
             const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
 
             return `
                 <tr>
-                    <td>${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</td>
+                    <td>${dateFormatted}</td>
+                    <td>${dayOfWeek}</td>
                     <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td>${impressions.toLocaleString()}</td>
                     <td>${clicks.toLocaleString()}</td>
@@ -1270,6 +1276,6 @@ async function loadBingDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
