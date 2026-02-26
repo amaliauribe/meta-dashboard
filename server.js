@@ -6,6 +6,21 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+// TikTok Ads API Configuration
+const TIKTOK_CONFIG = {
+    appId: process.env.TIKTOK_APP_ID,
+    appSecret: process.env.TIKTOK_APP_SECRET,
+    adAccountId: process.env.TIKTOK_AD_ACCOUNT_ID,
+    accessToken: process.env.TIKTOK_ACCESS_TOKEN
+};
+
+function isTikTokConfigured() {
+    return TIKTOK_CONFIG.appId && 
+           TIKTOK_CONFIG.appSecret && 
+           TIKTOK_CONFIG.adAccountId &&
+           TIKTOK_CONFIG.accessToken;
+}
+
 // Microsoft Advertising API Configuration (from environment variables)
 const MSADS_CONFIG = {
     clientId: process.env.MSADS_CLIENT_ID,
@@ -458,6 +473,231 @@ app.get('/auth/bing/callback', async (req, res) => {
     }
 });
 
+// ==================== TikTok Ads API ====================
+
+// TikTok OAuth - Step 1: Redirect to TikTok auth
+app.get('/auth/tiktok', (req, res) => {
+    const authUrl = `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_CONFIG.appId}&redirect_uri=${encodeURIComponent('https://vtc-ads-dashboard.onrender.com/auth/tiktok/callback')}&state=tiktok`;
+    res.redirect(authUrl);
+});
+
+// TikTok OAuth - Step 2: Handle callback
+app.get('/auth/tiktok/callback', async (req, res) => {
+    const { auth_code, error } = req.query;
+    
+    if (error) {
+        return res.send(`<h2>Error: ${error}</h2>`);
+    }
+    
+    if (!auth_code) {
+        return res.send('<h2>Error: No authorization code received</h2>');
+    }
+    
+    try {
+        const tokenResponse = await fetch('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                app_id: TIKTOK_CONFIG.appId,
+                secret: TIKTOK_CONFIG.appSecret,
+                auth_code: auth_code
+            })
+        });
+        
+        const result = await tokenResponse.json();
+        
+        if (result.code !== 0) {
+            return res.send(`<h2>Token Error</h2><pre>${JSON.stringify(result, null, 2)}</pre>`);
+        }
+        
+        res.send(`
+            <html>
+            <head><title>TikTok Auth Success</title></head>
+            <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h2 style="color: green;">✅ TikTok Authentication Successful!</h2>
+                <p>Copy this access token and send it to your admin to update the server:</p>
+                <textarea style="width: 100%; height: 150px; font-family: monospace; font-size: 12px;" readonly>${result.data.access_token}</textarea>
+                <p style="color: #666; margin-top: 20px;">Advertiser IDs with access: ${JSON.stringify(result.data.advertiser_ids)}</p>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        res.send(`<h2>Error exchanging code</h2><pre>${err.message}</pre>`);
+    }
+});
+
+// TikTok: Check if configured
+app.get('/api/tiktok/status', (req, res) => {
+    res.json({ configured: isTikTokConfigured() });
+});
+
+// TikTok: Account performance
+app.post('/api/tiktok/account-performance', async (req, res) => {
+    if (!isTikTokConfigured()) {
+        return res.status(503).json({ error: 'TikTok Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const params = new URLSearchParams({
+            advertiser_id: TIKTOK_CONFIG.adAccountId,
+            start_date: startDate,
+            end_date: endDate,
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'cost_per_conversion', 'ctr', 'cpc']),
+            data_level: 'AUCTION_ADVERTISER'
+        });
+        
+        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+            headers: {
+                'Access-Token': TIKTOK_CONFIG.accessToken
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.code !== 0) {
+            throw new Error(result.message);
+        }
+        
+        // Aggregate data
+        let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
+        
+        if (result.data && result.data.list) {
+            result.data.list.forEach(row => {
+                const metrics = row.metrics;
+                totals.spend += parseFloat(metrics.spend) || 0;
+                totals.impressions += parseInt(metrics.impressions) || 0;
+                totals.clicks += parseInt(metrics.clicks) || 0;
+                totals.conversions += parseInt(metrics.conversion) || 0;
+            });
+        }
+        
+        res.json(totals);
+    } catch (error) {
+        console.error('TikTok account performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// TikTok: Daily performance
+app.post('/api/tiktok/daily-performance', async (req, res) => {
+    if (!isTikTokConfigured()) {
+        return res.status(503).json({ error: 'TikTok Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const params = new URLSearchParams({
+            advertiser_id: TIKTOK_CONFIG.adAccountId,
+            start_date: startDate,
+            end_date: endDate,
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc']),
+            data_level: 'AUCTION_ADVERTISER',
+            dimensions: JSON.stringify(['stat_time_day'])
+        });
+        
+        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+            headers: {
+                'Access-Token': TIKTOK_CONFIG.accessToken
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.code !== 0) {
+            throw new Error(result.message);
+        }
+        
+        const rows = (result.data?.list || []).map(row => ({
+            date: row.dimensions.stat_time_day,
+            spend: parseFloat(row.metrics.spend) || 0,
+            impressions: parseInt(row.metrics.impressions) || 0,
+            clicks: parseInt(row.metrics.clicks) || 0,
+            ctr: parseFloat(row.metrics.ctr) || 0,
+            cpc: parseFloat(row.metrics.cpc) || 0,
+            conversions: parseInt(row.metrics.conversion) || 0
+        }));
+        
+        res.json({ rows });
+    } catch (error) {
+        console.error('TikTok daily performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// TikTok: Campaign performance
+app.post('/api/tiktok/campaign-performance', async (req, res) => {
+    if (!isTikTokConfigured()) {
+        return res.status(503).json({ error: 'TikTok Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const params = new URLSearchParams({
+            advertiser_id: TIKTOK_CONFIG.adAccountId,
+            start_date: startDate,
+            end_date: endDate,
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion']),
+            data_level: 'AUCTION_CAMPAIGN',
+            dimensions: JSON.stringify(['campaign_id'])
+        });
+        
+        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+            headers: {
+                'Access-Token': TIKTOK_CONFIG.accessToken
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.code !== 0) {
+            throw new Error(result.message);
+        }
+        
+        // Get campaign names
+        const campaignIds = (result.data?.list || []).map(r => r.dimensions.campaign_id);
+        let campaignNames = {};
+        
+        if (campaignIds.length > 0) {
+            const campaignParams = new URLSearchParams({
+                advertiser_id: TIKTOK_CONFIG.adAccountId,
+                filtering: JSON.stringify({ campaign_ids: campaignIds })
+            });
+            
+            const campaignResponse = await fetch(`https://business-api.tiktok.com/open_api/v1.3/campaign/get/?${campaignParams}`, {
+                headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
+            });
+            
+            const campaignResult = await campaignResponse.json();
+            if (campaignResult.code === 0 && campaignResult.data?.list) {
+                campaignResult.data.list.forEach(c => {
+                    campaignNames[c.campaign_id] = c.campaign_name;
+                });
+            }
+        }
+        
+        const campaigns = (result.data?.list || []).map(row => ({
+            id: row.dimensions.campaign_id,
+            name: campaignNames[row.dimensions.campaign_id] || `Campaign ${row.dimensions.campaign_id}`,
+            spend: parseFloat(row.metrics.spend) || 0,
+            impressions: parseInt(row.metrics.impressions) || 0,
+            clicks: parseInt(row.metrics.clicks) || 0,
+            ctr: parseFloat(row.metrics.ctr) || 0,
+            cpc: parseFloat(row.metrics.cpc) || 0,
+            conversions: parseInt(row.metrics.conversion) || 0,
+            costPerConversion: parseFloat(row.metrics.cost_per_conversion) || 0
+        }));
+        
+        res.json({ campaigns });
+    } catch (error) {
+        console.error('TikTok campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -467,4 +707,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Dashboard server running on port ${PORT}`);
     console.log(`Bing API configured: ${isBingConfigured()}`);
+    console.log(`TikTok API configured: ${isTikTokConfigured()}`);
 });
