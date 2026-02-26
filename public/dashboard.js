@@ -28,11 +28,20 @@ function getDateRange(range) {
     if (range.preset) {
         return `date_preset=${range.preset}`;
     }
+    
+    // Use local date (not UTC) to ensure correct day
     const today = new Date();
     const since = new Date();
     since.setDate(today.getDate() - range.days + 1);
     
-    const formatDate = (d) => d.toISOString().split('T')[0];
+    // Format as YYYY-MM-DD using local time (not toISOString which uses UTC)
+    const formatDate = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
     return `time_range={"since":"${formatDate(since)}","until":"${formatDate(today)}"}`;
 }
 
@@ -195,6 +204,14 @@ async function loadChartData() {
     const range = dateRanges[currentRange];
     const days = getDaysArray(range.days);
 
+    // Helper to format date as YYYY-MM-DD using local time
+    const formatDateLocal = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     try {
         const data = await apiCall(
             `${ACCOUNT_ID}/insights?fields=spend,actions&${getDateRange(range)}&time_increment=1`
@@ -212,7 +229,7 @@ async function loadChartData() {
             for (let i = 0; i < range.days; i++) {
                 const date = new Date();
                 date.setDate(date.getDate() - (range.days - 1 - i));
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = formatDateLocal(date);
                 
                 if (dataByDate[dateStr]) {
                     dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
