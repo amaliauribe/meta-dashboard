@@ -581,30 +581,33 @@ async function loadAdsData() {
             return;
         }
 
-        // Get creative info for each ad (batch request)
+        // Get creative info for each ad (batch requests in chunks of 50)
         const adIds = insightsData.data.map(ad => ad.ad_id);
         const creativeData = {};
         
-        // Fetch creative IDs for all ads
-        const adsWithCreatives = await apiCall(
-            `${ACCOUNT_ID}/ads?fields=creative&ids=${adIds.join(',')}`
-        );
-        
-        // Collect unique creative IDs
-        const creativeIds = new Set();
-        if (adsWithCreatives.data) {
-            adsWithCreatives.data.forEach(ad => {
+        // Fetch creative IDs in batches of 50
+        for (let i = 0; i < adIds.length; i += 50) {
+            const batchIds = adIds.slice(i, i + 50);
+            const adsWithCreatives = await apiCall(
+                `?ids=${batchIds.join(',')}&fields=creative`
+            );
+            
+            // Collect creative IDs from this batch
+            Object.values(adsWithCreatives).forEach(ad => {
                 if (ad.creative?.id) {
-                    creativeIds.add(ad.creative.id);
                     creativeData[ad.id] = { creativeId: ad.creative.id };
                 }
             });
         }
 
-        // Fetch thumbnail URLs for all creatives
-        if (creativeIds.size > 0) {
+        // Collect unique creative IDs
+        const creativeIds = [...new Set(Object.values(creativeData).map(c => c.creativeId))];
+
+        // Fetch thumbnail URLs in batches of 50
+        for (let i = 0; i < creativeIds.length; i += 50) {
+            const batchIds = creativeIds.slice(i, i + 50);
             const creativesInfo = await apiCall(
-                `?ids=${[...creativeIds].join(',')}&fields=thumbnail_url,video_id`
+                `?ids=${batchIds.join(',')}&fields=thumbnail_url,video_id`
             );
             
             // Map creative info back to ads
