@@ -8,18 +8,28 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <!-- Token Setup Modal -->
-    <div id="tokenModal" class="modal">
-        <div class="modal-content">
-            <h2>🔐 Connect to Meta</h2>
-            <p>Enter your Meta Marketing API access token to load your ad data.</p>
-            <input type="password" id="tokenInput" placeholder="Paste your access token here">
-            <button id="saveToken" class="login-btn">Connect</button>
-            <p class="hint">Token is stored locally in your browser only.</p>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h1>📊 Meta Ads Dashboard</h1>
+            <p class="subtitle">VIP Medical Group</p>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter username" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="login-btn">Login</button>
+                <p id="error" class="error"></p>
+            </form>
         </div>
     </div>
 
-    <div class="dashboard">
+    <!-- Dashboard (hidden until login) -->
+    <div id="dashboardContainer" class="dashboard hidden">
         <header>
             <h1>📊 Meta Ads Dashboard</h1>
             <div class="header-controls">
@@ -34,7 +44,7 @@
                     <button class="filter-btn" data-range="30d">Last 30 Days</button>
                 </div>
                 <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
-                <button id="disconnectBtn" class="disconnect-btn">🔓 Disconnect</button>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
         </header>
 
@@ -101,7 +111,7 @@
                         </tr>
                     </thead>
                     <tbody id="campaignBody">
-                        <tr><td colspan="9" class="loading">Connect to Meta to view campaigns...</td></tr>
+                        <tr><td colspan="9" class="loading">Loading campaigns...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -125,7 +135,7 @@
                         </tr>
                     </thead>
                     <tbody id="dailyBody">
-                        <tr><td colspan="8" class="loading">Connect to Meta to view daily data...</td></tr>
+                        <tr><td colspan="8" class="loading">Loading daily data...</td></tr>
                     </tbody>
                 </table>
             </div>

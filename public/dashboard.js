@@ -1,9 +1,13 @@
-// Meta API Configuration
+// Authentication
+const VALID_USER = 'ama';
+const VALID_PASS = 'ama123';
+
+// Meta API Configuration (embedded token)
+const ACCESS_TOKEN = 'EAAWzO6nYvm8BQ2HBleIOJDitEmwZBG7iE9hhiZBNF8tijy0kgimpg8CGKuPBOdhGwvzHtwZCs5jwqMaqSY8gQ3q1fNkFQ2Uk7CVLV4sAnsvp8VuH03l07CelnBRD6uIOE9Aa20FUQVvjX7D52jSrhaZAHaYNBBSN0g1S7ntZAYiSgU3iNyKwx0040ZBUCb';
 const API_VERSION = 'v19.0';
 const BASE_URL = 'https://graph.facebook.com';
 
 // Dashboard State
-let accessToken = localStorage.getItem('meta_access_token');
 let currentRange = '7d';
 let currentAccount = 'all';
 let spendChart = null;
@@ -20,43 +24,48 @@ const dateRanges = {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    initializeModal();
-    initializeFilters();
-    
-    if (accessToken) {
-        document.getElementById('tokenModal').classList.add('hidden');
-        loadAccounts();
+    // Check if already logged in
+    if (sessionStorage.getItem('loggedIn')) {
+        showDashboard();
     }
+    
+    initializeLogin();
 });
 
-function initializeModal() {
-    const modal = document.getElementById('tokenModal');
-    const saveBtn = document.getElementById('saveToken');
-    const disconnectBtn = document.getElementById('disconnectBtn');
-    const tokenInput = document.getElementById('tokenInput');
-
-    saveBtn.addEventListener('click', () => {
-        const token = tokenInput.value.trim();
-        if (token) {
-            accessToken = token;
-            localStorage.setItem('meta_access_token', token);
-            modal.classList.add('hidden');
-            loadAccounts();
+function initializeLogin() {
+    const loginForm = document.getElementById('loginForm');
+    
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorEl = document.getElementById('error');
+        
+        if (username === VALID_USER && password === VALID_PASS) {
+            sessionStorage.setItem('loggedIn', 'true');
+            showDashboard();
+        } else {
+            errorEl.textContent = 'Invalid username or password';
+            document.getElementById('password').value = '';
         }
-    });
-
-    tokenInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') saveBtn.click();
-    });
-
-    disconnectBtn.addEventListener('click', () => {
-        localStorage.removeItem('meta_access_token');
-        accessToken = null;
-        location.reload();
     });
 }
 
-function initializeFilters() {
+function showDashboard() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboardContainer').classList.remove('hidden');
+    initializeDashboard();
+}
+
+function initializeDashboard() {
+    // Logout button
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        sessionStorage.removeItem('loggedIn');
+        location.reload();
+    });
+
+    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -66,26 +75,26 @@ function initializeFilters() {
         });
     });
 
+    // Account selector
     document.getElementById('accountSelect').addEventListener('change', (e) => {
         currentAccount = e.target.value;
         loadData();
     });
 
+    // Refresh button
     document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+    // Load accounts
+    loadAccounts();
 }
 
 async function apiCall(endpoint) {
-    const url = `${BASE_URL}/${API_VERSION}/${endpoint}${endpoint.includes('?') ? '&' : '?'}access_token=${accessToken}`;
+    const url = `${BASE_URL}/${API_VERSION}/${endpoint}${endpoint.includes('?') ? '&' : '?'}access_token=${ACCESS_TOKEN}`;
     const response = await fetch(url);
     const data = await response.json();
     
     if (data.error) {
         console.error('API Error:', data.error);
-        if (data.error.code === 190) {
-            alert('Access token expired. Please reconnect.');
-            localStorage.removeItem('meta_access_token');
-            location.reload();
-        }
         throw new Error(data.error.message);
     }
     return data;
@@ -157,7 +166,7 @@ async function loadKPIs(selectedAccounts) {
                 
                 if (d.actions) {
                     const conv = d.actions.find(a => 
-                        ['lead', 'onsite_conversion.lead_grouped', 'omni_complete_registration', 'complete_registration'].includes(a.action_type)
+                        ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead', 'omni_complete_registration', 'complete_registration'].includes(a.action_type)
                     );
                     if (conv) totalConversions += parseInt(conv.value);
                 }
@@ -191,7 +200,7 @@ async function loadChartData(selectedAccounts) {
                         dailySpend[i] += parseFloat(day.spend || 0);
                         if (day.actions) {
                             const conv = day.actions.find(a => 
-                                ['lead', 'onsite_conversion.lead_grouped'].includes(a.action_type)
+                                ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'].includes(a.action_type)
                             );
                             if (conv) dailyConv[i] += parseInt(conv.value);
                         }
@@ -303,7 +312,7 @@ async function loadCampaignData(selectedAccounts) {
         let conversions = 0;
         if (ins.actions) {
             const conv = ins.actions.find(a => 
-                ['lead', 'onsite_conversion.lead_grouped', 'omni_complete_registration'].includes(a.action_type)
+                ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead', 'omni_complete_registration'].includes(a.action_type)
             );
             if (conv) conversions = parseInt(conv.value);
         }
@@ -347,7 +356,7 @@ async function loadDailyData(selectedAccounts) {
                     dailyData[date].impressions += parseInt(day.impressions || 0);
                     dailyData[date].clicks += parseInt(day.clicks || 0);
                     if (day.actions) {
-                        const conv = day.actions.find(a => ['lead', 'onsite_conversion.lead_grouped'].includes(a.action_type));
+                        const conv = day.actions.find(a => ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'].includes(a.action_type));
                         if (conv) dailyData[date].conversions += parseInt(conv.value);
                     }
                 });
