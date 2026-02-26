@@ -156,14 +156,16 @@ async function apiCall(endpoint) {
 }
 
 function showError(message) {
+    const campaignCols = currentRange === 'today' ? 10 : 8;
     document.getElementById('campaignBody').innerHTML = 
-        `<tr><td colspan="10" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="${campaignCols}" class="loading">${message}</td></tr>`;
     document.getElementById('dailyBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
 }
 
 async function loadData() {
-    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
+    const campaignCols = currentRange === 'today' ? 10 : 8;
+    document.getElementById('campaignBody').innerHTML = `<tr><td colspan="${campaignCols}" class="loading">Loading...</td></tr>`;
     document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
 
     try {
@@ -314,6 +316,40 @@ function renderResultsChart(labels, data) {
 
 async function loadCampaignData() {
     const range = dateRanges[currentRange];
+    const showBudget = currentRange === 'today';
+    const colCount = showBudget ? 10 : 8;
+    
+    // Update table header based on whether we're showing budget columns
+    const thead = document.getElementById('campaignHead');
+    if (showBudget) {
+        thead.innerHTML = `
+            <tr>
+                <th>Campaign</th>
+                <th>Spend</th>
+                <th>Daily Budget</th>
+                <th>Status <span class="info-icon" title="🟢 50%+ remaining&#10;🟡 20-50% remaining&#10;🔴 &lt;20% remaining">ⓘ</span></th>
+                <th>Impressions</th>
+                <th>Clicks</th>
+                <th>CTR</th>
+                <th>CPC</th>
+                <th>Results</th>
+                <th>Cost/Result</th>
+            </tr>
+        `;
+    } else {
+        thead.innerHTML = `
+            <tr>
+                <th>Campaign</th>
+                <th>Spend</th>
+                <th>Impressions</th>
+                <th>Clicks</th>
+                <th>CTR</th>
+                <th>CPC</th>
+                <th>Results</th>
+                <th>Cost/Result</th>
+            </tr>
+        `;
+    }
     
     // Build the insights query based on date range (using EST)
     let insightsQuery;
@@ -332,30 +368,34 @@ async function loadCampaignData() {
             `${ACCOUNT_ID}/campaigns?fields=name,status,${insightsQuery}{spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
         );
         
-        // Fetch ALL ad sets with budget info (not just filtered - filter may miss some)
-        const adsetData = await apiCall(
-            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining,status,effective_status&limit=200`
-        );
+        let budgetByCampaign = {};
         
-        // Aggregate budget by campaign (ACTIVE ad sets only)
-        const budgetByCampaign = {};
-        if (adsetData.data) {
-            adsetData.data.forEach(adset => {
-                // Only count ACTIVE ad sets
-                if (adset.status !== 'ACTIVE' && adset.effective_status !== 'ACTIVE') return;
-                if (!budgetByCampaign[adset.campaign_id]) {
-                    budgetByCampaign[adset.campaign_id] = { daily_budget: 0, budget_remaining: 0 };
-                }
-                budgetByCampaign[adset.campaign_id].daily_budget += parseInt(adset.daily_budget || 0);
-                budgetByCampaign[adset.campaign_id].budget_remaining += parseInt(adset.budget_remaining || 0);
-            });
+        // Only fetch budget data if showing Today
+        if (showBudget) {
+            // Fetch ALL ad sets with budget info (not just filtered - filter may miss some)
+            const adsetData = await apiCall(
+                `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining,status,effective_status&limit=200`
+            );
+            
+            // Aggregate budget by campaign (ACTIVE ad sets only)
+            if (adsetData.data) {
+                adsetData.data.forEach(adset => {
+                    // Only count ACTIVE ad sets
+                    if (adset.status !== 'ACTIVE' && adset.effective_status !== 'ACTIVE') return;
+                    if (!budgetByCampaign[adset.campaign_id]) {
+                        budgetByCampaign[adset.campaign_id] = { daily_budget: 0, budget_remaining: 0 };
+                    }
+                    budgetByCampaign[adset.campaign_id].daily_budget += parseInt(adset.daily_budget || 0);
+                    budgetByCampaign[adset.campaign_id].budget_remaining += parseInt(adset.budget_remaining || 0);
+                });
+            }
         }
         
         const campaigns = campaignData.data?.filter(c => c.status === 'ACTIVE') || [];
 
         const tbody = document.getElementById('campaignBody');
         if (campaigns.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="loading">No active campaigns with data</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${colCount}" class="loading">No active campaigns with data</td></tr>`;
             return;
         }
 
@@ -372,30 +412,45 @@ async function loadCampaignData() {
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
             
-            // Budget info (convert from cents to dollars) - ACTIVE ad sets only
-            const budget = budgetByCampaign[c.id] || { daily_budget: 0, budget_remaining: 0 };
-            const dailyBudget = budget.daily_budget / 100;
-            const budgetRemaining = budget.budget_remaining / 100;
-            const budgetStatus = getBudgetStatus(budgetRemaining, dailyBudget);
+            if (showBudget) {
+                // Budget info (convert from cents to dollars) - ACTIVE ad sets only
+                const budget = budgetByCampaign[c.id] || { daily_budget: 0, budget_remaining: 0 };
+                const dailyBudget = budget.daily_budget / 100;
+                const budgetRemaining = budget.budget_remaining / 100;
+                const budgetStatus = getBudgetStatus(budgetRemaining, dailyBudget);
 
-            return `
-                <tr>
-                    <td>${c.name}</td>
-                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td>$${dailyBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td title="${budgetStatus.percent?.toFixed(1) || 0}% remaining">${budgetStatus.label}</td>
-                    <td>${impressions.toLocaleString()}</td>
-                    <td>${clicks.toLocaleString()}</td>
-                    <td>${ctr}%</td>
-                    <td>${cpc}</td>
-                    <td>${results}</td>
-                    <td>${costPerResult}</td>
-                </tr>
-            `;
+                return `
+                    <tr>
+                        <td>${c.name}</td>
+                        <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td>$${dailyBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td title="${budgetStatus.percent?.toFixed(1) || 0}% remaining">${budgetStatus.label}</td>
+                        <td>${impressions.toLocaleString()}</td>
+                        <td>${clicks.toLocaleString()}</td>
+                        <td>${ctr}%</td>
+                        <td>${cpc}</td>
+                        <td>${results}</td>
+                        <td>${costPerResult}</td>
+                    </tr>
+                `;
+            } else {
+                return `
+                    <tr>
+                        <td>${c.name}</td>
+                        <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td>${impressions.toLocaleString()}</td>
+                        <td>${clicks.toLocaleString()}</td>
+                        <td>${ctr}%</td>
+                        <td>${cpc}</td>
+                        <td>${results}</td>
+                        <td>${costPerResult}</td>
+                    </tr>
+                `;
+            }
         }).join('');
     } catch (e) { 
         console.error('Campaign error:', e);
-        document.getElementById('campaignBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading campaigns</td></tr>';
+        document.getElementById('campaignBody').innerHTML = `<tr><td colspan="${colCount}" class="loading">Error loading campaigns</td></tr>`;
     }
 }
 
