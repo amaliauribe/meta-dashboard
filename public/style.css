@@ -261,6 +261,53 @@ header h1 {
     font-size: 24px;
 }
 
+/* Ads Filters */
+.ads-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-dropdown {
+    padding: 10px 14px;
+    border: 2px solid #e4e6eb;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    color: #1c1e21;
+    cursor: pointer;
+    min-width: 180px;
+    max-width: 250px;
+    transition: border-color 0.2s;
+}
+
+.filter-dropdown:focus {
+    outline: none;
+    border-color: #1877f2;
+}
+
+.filter-dropdown:hover {
+    border-color: #bcc0c4;
+}
+
+.clear-filters-btn {
+    padding: 10px 16px;
+    background: #e4e6eb;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #65676b;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.clear-filters-btn:hover {
+    background: #d8dadf;
+    color: #1c1e21;
+}
+
 /* KPI Cards */
 .kpi-cards {
     display: grid;

@@ -152,6 +152,18 @@
         <div id="adsView" class="view-content hidden">
             <section class="table-section">
                 <h2>🎬 Ad Creative Performance</h2>
+                <div class="ads-filters">
+                    <select id="filterCampaign" class="filter-dropdown">
+                        <option value="">All Campaigns</option>
+                    </select>
+                    <select id="filterAdset" class="filter-dropdown">
+                        <option value="">All Ad Sets</option>
+                    </select>
+                    <select id="filterAd" class="filter-dropdown">
+                        <option value="">All Ads</option>
+                    </select>
+                    <button id="clearFilters" class="clear-filters-btn">Clear Filters</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="adsTable">
                         <thead>

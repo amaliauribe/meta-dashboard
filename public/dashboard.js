@@ -20,6 +20,11 @@ let adsRawData = []; // Store ads data for sorting
 let adsSortColumn = 'results';
 let adsSortDirection = 'desc';
 
+// Ads Filters
+let filterCampaign = '';
+let filterAdset = '';
+let filterAd = '';
+
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
     'yesterday': { preset: 'yesterday', days: 1 },
@@ -210,6 +215,37 @@ function initializeDashboard() {
             // Re-render with new sort
             renderAdsTable();
         });
+    });
+
+    // Ads filter dropdowns
+    document.getElementById('filterCampaign').addEventListener('change', (e) => {
+        filterCampaign = e.target.value;
+        updateAdsetDropdown();
+        updateAdDropdown();
+        renderAdsTable();
+    });
+    
+    document.getElementById('filterAdset').addEventListener('change', (e) => {
+        filterAdset = e.target.value;
+        updateAdDropdown();
+        renderAdsTable();
+    });
+    
+    document.getElementById('filterAd').addEventListener('change', (e) => {
+        filterAd = e.target.value;
+        renderAdsTable();
+    });
+    
+    document.getElementById('clearFilters').addEventListener('click', () => {
+        filterCampaign = '';
+        filterAdset = '';
+        filterAd = '';
+        document.getElementById('filterCampaign').value = '';
+        document.getElementById('filterAdset').value = '';
+        document.getElementById('filterAd').value = '';
+        updateAdsetDropdown();
+        updateAdDropdown();
+        renderAdsTable();
     });
     
     loadData();
@@ -675,6 +711,13 @@ async function loadAdsData() {
         });
         
         adsDataLoaded = true;
+        
+        // Reset filters and populate dropdowns
+        filterCampaign = '';
+        filterAdset = '';
+        filterAd = '';
+        populateAdsFilterDropdowns();
+        
         renderAdsTable();
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (e) {
@@ -683,12 +726,74 @@ async function loadAdsData() {
     }
 }
 
-// Render ads table with current sort
+// Populate filter dropdowns
+function populateAdsFilterDropdowns() {
+    const campaigns = [...new Set(adsRawData.map(ad => ad.campaign_name))].sort();
+    const campaignSelect = document.getElementById('filterCampaign');
+    campaignSelect.innerHTML = '<option value="">All Campaigns</option>' + 
+        campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+    
+    updateAdsetDropdown();
+    updateAdDropdown();
+}
+
+function updateAdsetDropdown() {
+    let filteredData = adsRawData;
+    if (filterCampaign) {
+        filteredData = filteredData.filter(ad => ad.campaign_name === filterCampaign);
+    }
+    
+    const adsets = [...new Set(filteredData.map(ad => ad.adset_name))].sort();
+    const adsetSelect = document.getElementById('filterAdset');
+    adsetSelect.innerHTML = '<option value="">All Ad Sets</option>' + 
+        adsets.map(a => `<option value="${a}">${a}</option>`).join('');
+    
+    // Reset adset filter if current selection is not in filtered list
+    if (filterAdset && !adsets.includes(filterAdset)) {
+        filterAdset = '';
+        adsetSelect.value = '';
+    }
+}
+
+function updateAdDropdown() {
+    let filteredData = adsRawData;
+    if (filterCampaign) {
+        filteredData = filteredData.filter(ad => ad.campaign_name === filterCampaign);
+    }
+    if (filterAdset) {
+        filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
+    }
+    
+    const ads = [...new Set(filteredData.map(ad => ad.ad_name))].sort();
+    const adSelect = document.getElementById('filterAd');
+    adSelect.innerHTML = '<option value="">All Ads</option>' + 
+        ads.map(a => `<option value="${a}">${a}</option>`).join('');
+    
+    // Reset ad filter if current selection is not in filtered list
+    if (filterAd && !ads.includes(filterAd)) {
+        filterAd = '';
+        adSelect.value = '';
+    }
+}
+
+// Render ads table with current sort and filters
 function renderAdsTable() {
     const tbody = document.getElementById('adsBody');
     
+    // Filter the data
+    let filteredAds = adsRawData;
+    if (filterCampaign) {
+        filteredAds = filteredAds.filter(ad => ad.campaign_name === filterCampaign);
+    }
+    if (filterAdset) {
+        filteredAds = filteredAds.filter(ad => ad.adset_name === filterAdset);
+    }
+    if (filterAd) {
+        filteredAds = filteredAds.filter(ad => ad.ad_name === filterAd);
+    }
+    
     // Sort the data
-    const sortedAds = [...adsRawData].sort((a, b) => {
+    const sortedAds = [...filteredAds].sort((a, b) => {
         let valA = a[adsSortColumn];
         let valB = b[adsSortColumn];
         
