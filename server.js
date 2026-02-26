@@ -477,7 +477,7 @@ app.get('/auth/bing/callback', async (req, res) => {
 
 // TikTok URL verification file
 app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA.txt', (req, res) => {
-    res.type('text/plain').send('tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA');
+    res.type('text/plain').send('tiktok-developers-site-verification=ANOnTRrxnjAIJOinIlYFdacJIFGaCUMA');
 });
 
 // TikTok OAuth - Step 1: Redirect to TikTok auth
