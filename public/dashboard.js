@@ -177,12 +177,12 @@ function initializeDashboard() {
         });
     });
 
-    // View tabs (Campaigns / Ads / Bing)
-    document.querySelectorAll('.view-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentView = tab.dataset.view;
+    // Sidebar navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            currentView = item.dataset.view;
             
             // Show/hide views
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
@@ -195,6 +195,17 @@ function initializeDashboard() {
             }
             if (currentView === 'bing' && !bingDataLoaded) {
                 loadBingData();
+            }
+        });
+    });
+    
+    // Section toggle (Meta dropdown)
+    document.querySelectorAll('.nav-section-title').forEach(title => {
+        title.addEventListener('click', () => {
+            title.classList.toggle('collapsed');
+            const items = title.nextElementSibling;
+            if (items) {
+                items.classList.toggle('collapsed');
             }
         });
     });

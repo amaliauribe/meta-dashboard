@@ -30,9 +30,34 @@
 
     <!-- Dashboard (hidden until login) -->
     <div id="dashboardContainer" class="dashboard hidden">
-        <header>
-            <h1>📊 Meta Business VTC</h1>
-            <div class="header-controls">
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>📊 VTC Ads</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title" data-toggle="meta">
+                        <span>📘 Meta</span>
+                        <span class="nav-arrow">▼</span>
+                    </div>
+                    <div class="nav-section-items" id="metaItems">
+                        <button class="nav-item active" data-view="campaigns">Campaigns</button>
+                        <button class="nav-item" data-view="ads">Ads</button>
+                    </div>
+                </div>
+                <div class="nav-section">
+                    <button class="nav-item nav-item-main" data-view="bing">🔷 Bing</button>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
                 <div class="date-filters">
                     <button class="filter-btn" data-range="today">Today</button>
                     <button class="filter-btn" data-range="yesterday">Yesterday</button>
@@ -40,18 +65,11 @@
                     <button class="filter-btn" data-range="14d">Last 14 Days</button>
                     <button class="filter-btn" data-range="30d">Last 30 Days</button>
                 </div>
-                <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
-                <button id="logoutBtn" class="logout-btn">Logout</button>
-            </div>
-        </header>
-
-        <!-- View Tabs -->
-        <nav class="view-tabs">
-            <button class="view-tab active" data-view="campaigns">📊 Meta Campaigns</button>
-            <button class="view-tab" data-view="ads">🎬 Meta Ads</button>
-            <button class="view-tab" data-view="bing">🔷 Bing Ads</button>
-            <span class="last-updated-top">Last updated: <span id="lastUpdateTop">-</span></span>
-        </nav>
+                <div class="header-right">
+                    <span class="last-updated-top">Last updated: <span id="lastUpdateTop">-</span></span>
+                    <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+                </div>
+            </header>
 
         <!-- Campaigns View -->
         <div id="campaignsView" class="view-content">
@@ -288,10 +306,11 @@
 
         </div><!-- End Bing View -->
 
-        <footer>
-            <p>Last updated: <span id="lastUpdate">-</span></p>
-            <p>Data source: Meta Marketing API</p>
-        </footer>
+            <footer>
+                <p>Last updated: <span id="lastUpdate">-</span></p>
+                <p>Data source: Meta & Microsoft Advertising APIs</p>
+            </footer>
+        </main><!-- End Main Content -->
     </div>
     <script src="dashboard.js"></script>
 </body>
