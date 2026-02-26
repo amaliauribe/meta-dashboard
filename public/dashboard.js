@@ -16,6 +16,9 @@ let currentView = 'campaigns';
 let spendChart = null;
 let resultsChart = null;
 let adsDataLoaded = false;
+let adsRawData = []; // Store ads data for sorting
+let adsSortColumn = 'results';
+let adsSortDirection = 'desc';
 
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
@@ -183,6 +186,30 @@ function initializeDashboard() {
         } else {
             loadAdsData();
         }
+    });
+
+    // Sortable column headers for Ads table
+    document.querySelectorAll('#adsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            
+            // Toggle direction if same column, otherwise default to desc
+            if (adsSortColumn === sortKey) {
+                adsSortDirection = adsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                adsSortColumn = sortKey;
+                adsSortDirection = 'desc';
+            }
+            
+            // Update header styles
+            document.querySelectorAll('#adsTable th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            th.classList.add(adsSortDirection);
+            
+            // Re-render with new sort
+            renderAdsTable();
+        });
     });
     
     loadData();
@@ -620,58 +647,97 @@ async function loadAdsData() {
             });
         }
 
-        // Sort by results (descending), then by spend
-        const sortedAds = insightsData.data.sort((a, b) => {
-            const resultsA = getResults(a.actions);
-            const resultsB = getResults(b.actions);
-            if (resultsB !== resultsA) return resultsB - resultsA;
-            return parseFloat(b.spend || 0) - parseFloat(a.spend || 0);
-        });
-
-        tbody.innerHTML = sortedAds.map(ad => {
+        // Process and store ads data for sorting
+        adsRawData = insightsData.data.map(ad => {
             const spend = parseFloat(ad.spend || 0);
             const impressions = parseInt(ad.impressions || 0);
             const clicks = parseInt(ad.clicks || 0);
-            const ctr = ad.ctr ? parseFloat(ad.ctr).toFixed(2) : '-';
+            const ctr = ad.ctr ? parseFloat(ad.ctr) : 0;
             const results = getResults(ad.actions);
-            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            const costPerResult = results > 0 ? spend / results : Infinity;
             
             const creative = creativeData[ad.ad_id] || {};
-            const thumbnailUrl = creative.thumbnail;
-            const videoId = creative.videoId;
             
-            let thumbnailHtml;
-            if (thumbnailUrl && videoId) {
-                thumbnailHtml = `
-                    <a href="https://www.facebook.com/watch/?v=${videoId}" target="_blank" class="ad-thumbnail-link" title="Watch video">
-                        <img src="${thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
-                    </a>
-                `;
-            } else if (thumbnailUrl) {
-                thumbnailHtml = `<img src="${thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
-            } else {
-                thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
-            }
-
-            return `
-                <tr>
-                    <td>${thumbnailHtml}</td>
-                    <td>${ad.ad_name}</td>
-                    <td>${ad.campaign_name}</td>
-                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td>${impressions.toLocaleString()}</td>
-                    <td>${clicks.toLocaleString()}</td>
-                    <td>${ctr}%</td>
-                    <td>${results}</td>
-                    <td>${costPerResult}</td>
-                </tr>
-            `;
-        }).join('');
+            return {
+                ad_id: ad.ad_id,
+                ad_name: ad.ad_name,
+                campaign_name: ad.campaign_name,
+                spend,
+                impressions,
+                clicks,
+                ctr,
+                results,
+                cost_per_result: costPerResult,
+                thumbnail: creative.thumbnail,
+                videoId: creative.videoId
+            };
+        });
         
         adsDataLoaded = true;
+        renderAdsTable();
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (e) {
         console.error('Ads error:', e);
         tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
+}
+
+// Render ads table with current sort
+function renderAdsTable() {
+    const tbody = document.getElementById('adsBody');
+    
+    // Sort the data
+    const sortedAds = [...adsRawData].sort((a, b) => {
+        let valA = a[adsSortColumn];
+        let valB = b[adsSortColumn];
+        
+        // Handle string sorting
+        if (typeof valA === 'string') {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+            if (adsSortDirection === 'asc') {
+                return valA.localeCompare(valB);
+            } else {
+                return valB.localeCompare(valA);
+            }
+        }
+        
+        // Handle numeric sorting
+        if (adsSortDirection === 'asc') {
+            return valA - valB;
+        } else {
+            return valB - valA;
+        }
+    });
+
+    tbody.innerHTML = sortedAds.map(ad => {
+        let thumbnailHtml;
+        if (ad.thumbnail && ad.videoId) {
+            thumbnailHtml = `
+                <a href="https://www.facebook.com/watch/?v=${ad.videoId}" target="_blank" class="ad-thumbnail-link" title="Watch video">
+                    <img src="${ad.thumbnail}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
+                </a>
+            `;
+        } else if (ad.thumbnail) {
+            thumbnailHtml = `<img src="${ad.thumbnail}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
+        } else {
+            thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
+        }
+
+        const costPerResultDisplay = ad.cost_per_result !== Infinity ? '$' + ad.cost_per_result.toFixed(2) : '-';
+
+        return `
+            <tr>
+                <td>${thumbnailHtml}</td>
+                <td>${ad.ad_name}</td>
+                <td>${ad.campaign_name}</td>
+                <td>$${ad.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>${ad.impressions.toLocaleString()}</td>
+                <td>${ad.clicks.toLocaleString()}</td>
+                <td>${ad.ctr.toFixed(2)}%</td>
+                <td>${ad.results}</td>
+                <td>${costPerResultDisplay}</td>
+            </tr>
+        `;
+    }).join('');
 }
