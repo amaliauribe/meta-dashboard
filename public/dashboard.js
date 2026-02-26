@@ -2,17 +2,19 @@
 const VALID_USER = 'ama';
 const VALID_PASS = 'ama123';
 
-// Meta API Configuration (embedded token)
+// Meta API Configuration
 const ACCESS_TOKEN = 'EAAWzO6nYvm8BQ2HBleIOJDitEmwZBG7iE9hhiZBNF8tijy0kgimpg8CGKuPBOdhGwvzHtwZCs5jwqMaqSY8gQ3q1fNkFQ2Uk7CVLV4sAnsvp8VuH03l07CelnBRD6uIOE9Aa20FUQVvjX7D52jSrhaZAHaYNBBSN0g1S7ntZAYiSgU3iNyKwx0040ZBUCb';
 const API_VERSION = 'v19.0';
 const BASE_URL = 'https://graph.facebook.com';
 
+// Fixed account: CA : Vein Treatment Clinic
+const ACCOUNT_ID = 'act_1151591609552634';
+const ACCOUNT_NAME = 'CA : Vein Treatment Clinic';
+
 // Dashboard State
 let currentRange = '7d';
-let currentAccount = 'all';
 let spendChart = null;
-let convChart = null;
-let accounts = [];
+let resultsChart = null;
 
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
@@ -22,13 +24,23 @@ const dateRanges = {
     '30d': { preset: 'last_30d', days: 30 }
 };
 
+// Get results from actions array (leads)
+function getResults(actions) {
+    if (!actions) return 0;
+    // Look for lead-related actions
+    const resultTypes = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'];
+    for (const type of resultTypes) {
+        const action = actions.find(a => a.action_type === type);
+        if (action) return parseInt(action.value);
+    }
+    return 0;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if already logged in
     if (sessionStorage.getItem('loggedIn')) {
         showDashboard();
     }
-    
     initializeLogin();
 });
 
@@ -59,13 +71,11 @@ function showDashboard() {
 }
 
 function initializeDashboard() {
-    // Logout button
     document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionStorage.removeItem('loggedIn');
         location.reload();
     });
 
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -75,17 +85,8 @@ function initializeDashboard() {
         });
     });
 
-    // Account selector
-    document.getElementById('accountSelect').addEventListener('change', (e) => {
-        currentAccount = e.target.value;
-        loadData();
-    });
-
-    // Refresh button
     document.getElementById('refreshBtn').addEventListener('click', loadData);
-
-    // Load accounts
-    loadAccounts();
+    loadData();
 }
 
 async function apiCall(endpoint) {
@@ -100,48 +101,23 @@ async function apiCall(endpoint) {
     return data;
 }
 
-async function loadAccounts() {
-    try {
-        const data = await apiCall('me/adaccounts?fields=name,account_id,currency&limit=50');
-        accounts = data.data || [];
-        
-        const select = document.getElementById('accountSelect');
-        select.innerHTML = '<option value="all">All Accounts</option>';
-        accounts.forEach(acc => {
-            const option = document.createElement('option');
-            option.value = acc.id;
-            option.textContent = acc.name;
-            select.appendChild(option);
-        });
-        
-        loadData();
-    } catch (error) {
-        showError('Failed to load accounts: ' + error.message);
-    }
-}
-
 function showError(message) {
     document.getElementById('campaignBody').innerHTML = 
-        `<tr><td colspan="9" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="8" class="loading">${message}</td></tr>`;
     document.getElementById('dailyBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
 }
 
 async function loadData() {
-    const selectedAccounts = currentAccount === 'all' ? accounts.slice(0, 10) : 
-        accounts.filter(a => a.id === currentAccount);
-    
-    if (selectedAccounts.length === 0) return;
-
-    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
     document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
-            loadKPIs(selectedAccounts),
-            loadChartData(selectedAccounts),
-            loadCampaignData(selectedAccounts),
-            loadDailyData(selectedAccounts)
+            loadKPIs(),
+            loadChartData(),
+            loadCampaignData(),
+            loadDailyData()
         ]);
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (error) {
@@ -149,69 +125,59 @@ async function loadData() {
     }
 }
 
-async function loadKPIs(selectedAccounts) {
-    let totalSpend = 0, totalImpressions = 0, totalClicks = 0, totalConversions = 0;
+async function loadKPIs() {
+    try {
+        const data = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&date_preset=${dateRanges[currentRange].preset}`
+        );
+        
+        if (data.data?.[0]) {
+            const d = data.data[0];
+            const spend = parseFloat(d.spend || 0);
+            const impressions = parseInt(d.impressions || 0);
+            const clicks = parseInt(d.clicks || 0);
+            const results = getResults(d.actions);
 
-    for (const acc of selectedAccounts) {
-        try {
-            const data = await apiCall(
-                `${acc.id}/insights?fields=spend,impressions,clicks,actions&date_preset=${dateRanges[currentRange].preset}`
-            );
-            
-            if (data.data?.[0]) {
-                const d = data.data[0];
-                totalSpend += parseFloat(d.spend || 0);
-                totalImpressions += parseInt(d.impressions || 0);
-                totalClicks += parseInt(d.clicks || 0);
-                
-                if (d.actions) {
-                    const conv = d.actions.find(a => 
-                        ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead', 'omni_complete_registration', 'complete_registration'].includes(a.action_type)
-                    );
-                    if (conv) totalConversions += parseInt(conv.value);
-                }
-            }
-        } catch (e) { console.error('KPI error:', e); }
+            document.getElementById('totalSpend').textContent = '$' + spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('totalResults').textContent = results.toLocaleString();
+            document.getElementById('costPerResult').textContent = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            document.getElementById('cpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            document.getElementById('ctr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
+            document.getElementById('impressions').textContent = impressions.toLocaleString();
+        }
+    } catch (e) { 
+        console.error('KPI error:', e); 
     }
-
-    document.getElementById('totalSpend').textContent = '$' + totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    document.getElementById('totalConversions').textContent = totalConversions.toLocaleString();
-    document.getElementById('costPerConv').textContent = totalConversions > 0 ? '$' + (totalSpend / totalConversions).toFixed(2) : '-';
-    document.getElementById('cpc').textContent = totalClicks > 0 ? '$' + (totalSpend / totalClicks).toFixed(2) : '-';
-    document.getElementById('ctr').textContent = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) + '%' : '-';
-    document.getElementById('impressions').textContent = totalImpressions.toLocaleString();
 }
 
-async function loadChartData(selectedAccounts) {
+async function loadChartData() {
     const range = dateRanges[currentRange];
     const days = getDaysArray(range.days);
-    const dailySpend = new Array(range.days).fill(0);
-    const dailyConv = new Array(range.days).fill(0);
 
-    for (const acc of selectedAccounts.slice(0, 5)) {
-        try {
-            const data = await apiCall(
-                `${acc.id}/insights?fields=spend,actions&date_preset=${range.preset}&time_increment=1`
-            );
-            
-            if (data.data) {
-                data.data.forEach((day, i) => {
-                    if (i < range.days) {
-                        dailySpend[i] += parseFloat(day.spend || 0);
-                        if (day.actions) {
-                            const conv = day.actions.find(a => 
-                                ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'].includes(a.action_type)
-                            );
-                            if (conv) dailyConv[i] += parseInt(conv.value);
-                        }
-                    }
-                });
-            }
-        } catch (e) { console.error('Chart error:', e); }
+    try {
+        const data = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,actions&date_preset=${range.preset}&time_increment=1`
+        );
+        
+        const dailySpend = new Array(range.days).fill(0);
+        const dailyResults = new Array(range.days).fill(0);
+
+        if (data.data) {
+            data.data.forEach((day, i) => {
+                if (i < range.days) {
+                    dailySpend[i] = parseFloat(day.spend || 0);
+                    dailyResults[i] = getResults(day.actions);
+                }
+            });
+        }
+
+        renderSpendChart(days, dailySpend);
+        renderResultsChart(days, dailyResults);
+    } catch (e) { 
+        console.error('Chart error:', e);
+        renderSpendChart(days, new Array(range.days).fill(0));
+        renderResultsChart(days, new Array(range.days).fill(0));
     }
-
-    renderSpendChart(days, dailySpend);
-    renderConvChart(days, dailyConv);
 }
 
 function getDaysArray(numDays) {
@@ -254,16 +220,16 @@ function renderSpendChart(labels, data) {
     });
 }
 
-function renderConvChart(labels, data) {
-    const ctx = document.getElementById('convChart').getContext('2d');
-    if (convChart) convChart.destroy();
+function renderResultsChart(labels, data) {
+    const ctx = document.getElementById('resultsChart').getContext('2d');
+    if (resultsChart) resultsChart.destroy();
     
-    convChart = new Chart(ctx, {
+    resultsChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
             datasets: [{
-                label: 'Conversions',
+                label: 'Results',
                 data,
                 backgroundColor: 'rgba(49, 162, 76, 0.8)',
                 borderColor: '#31a24c',
@@ -280,115 +246,99 @@ function renderConvChart(labels, data) {
     });
 }
 
-async function loadCampaignData(selectedAccounts) {
-    const campaigns = [];
+async function loadCampaignData() {
     const range = dateRanges[currentRange];
 
-    for (const acc of selectedAccounts.slice(0, 5)) {
-        try {
-            const data = await apiCall(
-                `${acc.id}/campaigns?fields=name,status,insights.date_preset(${range.preset}){spend,impressions,clicks,actions}&limit=30`
-            );
-            if (data.data) {
-                campaigns.push(...data.data.map(c => ({ ...c, accountName: acc.name })));
-            }
-        } catch (e) { console.error('Campaign error:', e); }
-    }
-
-    const tbody = document.getElementById('campaignBody');
-    if (campaigns.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">No campaign data for this period</td></tr>';
-        return;
-    }
-
-    campaigns.sort((a, b) => parseFloat(b.insights?.data?.[0]?.spend || 0) - parseFloat(a.insights?.data?.[0]?.spend || 0));
-
-    tbody.innerHTML = campaigns.slice(0, 25).map(c => {
-        const ins = c.insights?.data?.[0] || {};
-        const spend = parseFloat(ins.spend || 0);
-        const impressions = parseInt(ins.impressions || 0);
-        const clicks = parseInt(ins.clicks || 0);
+    try {
+        // Only fetch ACTIVE campaigns
+        const data = await apiCall(
+            `${ACCOUNT_ID}/campaigns?fields=name,status,insights.date_preset(${range.preset}){spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
+        );
         
-        let conversions = 0;
-        if (ins.actions) {
-            const conv = ins.actions.find(a => 
-                ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead', 'omni_complete_registration'].includes(a.action_type)
-            );
-            if (conv) conversions = parseInt(conv.value);
+        const campaigns = data.data?.filter(c => c.status === 'ACTIVE') || [];
+
+        const tbody = document.getElementById('campaignBody');
+        if (campaigns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No active campaigns with data</td></tr>';
+            return;
         }
-        
-        const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
-        const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
-        const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
-        const statusClass = c.status === 'ACTIVE' ? 'status-active' : c.status === 'PAUSED' ? 'status-paused' : 'status-inactive';
 
-        return `
-            <tr>
-                <td title="${c.accountName}">${c.name}</td>
-                <td class="${statusClass}">${c.status}</td>
-                <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                <td>${impressions.toLocaleString()}</td>
-                <td>${clicks.toLocaleString()}</td>
-                <td>${ctr}%</td>
-                <td>${cpc}</td>
-                <td>${conversions}</td>
-                <td>${costPerConv}</td>
-            </tr>
-        `;
-    }).join('');
+        // Sort by spend
+        campaigns.sort((a, b) => parseFloat(b.insights?.data?.[0]?.spend || 0) - parseFloat(a.insights?.data?.[0]?.spend || 0));
+
+        tbody.innerHTML = campaigns.map(c => {
+            const ins = c.insights?.data?.[0] || {};
+            const spend = parseFloat(ins.spend || 0);
+            const impressions = parseInt(ins.impressions || 0);
+            const clicks = parseInt(ins.clicks || 0);
+            const results = getResults(ins.actions);
+            
+            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
+            const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+
+            return `
+                <tr>
+                    <td>${c.name}</td>
+                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>${impressions.toLocaleString()}</td>
+                    <td>${clicks.toLocaleString()}</td>
+                    <td>${ctr}%</td>
+                    <td>${cpc}</td>
+                    <td>${results}</td>
+                    <td>${costPerResult}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) { 
+        console.error('Campaign error:', e);
+        document.getElementById('campaignBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading campaigns</td></tr>';
+    }
 }
 
-async function loadDailyData(selectedAccounts) {
+async function loadDailyData() {
     const range = dateRanges[currentRange];
-    const dailyData = {};
 
-    for (const acc of selectedAccounts.slice(0, 5)) {
-        try {
-            const data = await apiCall(
-                `${acc.id}/insights?fields=spend,impressions,clicks,actions&date_preset=${range.preset}&time_increment=1`
-            );
+    try {
+        const data = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&date_preset=${range.preset}&time_increment=1`
+        );
+
+        const tbody = document.getElementById('dailyBody');
+        
+        if (!data.data || data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data for this period</td></tr>';
+            return;
+        }
+
+        // Sort by date descending
+        const sortedData = data.data.sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
+
+        tbody.innerHTML = sortedData.map(day => {
+            const spend = parseFloat(day.spend || 0);
+            const impressions = parseInt(day.impressions || 0);
+            const clicks = parseInt(day.clicks || 0);
+            const results = getResults(day.actions);
             
-            if (data.data) {
-                data.data.forEach(day => {
-                    const date = day.date_start;
-                    if (!dailyData[date]) dailyData[date] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
-                    dailyData[date].spend += parseFloat(day.spend || 0);
-                    dailyData[date].impressions += parseInt(day.impressions || 0);
-                    dailyData[date].clicks += parseInt(day.clicks || 0);
-                    if (day.actions) {
-                        const conv = day.actions.find(a => ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'].includes(a.action_type));
-                        if (conv) dailyData[date].conversions += parseInt(conv.value);
-                    }
-                });
-            }
-        } catch (e) { console.error('Daily error:', e); }
+            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
+            const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+
+            return `
+                <tr>
+                    <td>${new Date(day.date_start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
+                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>${impressions.toLocaleString()}</td>
+                    <td>${clicks.toLocaleString()}</td>
+                    <td>${ctr}%</td>
+                    <td>${cpc}</td>
+                    <td>${results}</td>
+                    <td>${costPerResult}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) { 
+        console.error('Daily error:', e);
+        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading daily data</td></tr>';
     }
-
-    const tbody = document.getElementById('dailyBody');
-    const sortedDates = Object.keys(dailyData).sort().reverse();
-    
-    if (sortedDates.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data for this period</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = sortedDates.map(date => {
-        const d = dailyData[date];
-        const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : '-';
-        const cpc = d.clicks > 0 ? '$' + (d.spend / d.clicks).toFixed(2) : '-';
-        const costPerConv = d.conversions > 0 ? '$' + (d.spend / d.conversions).toFixed(2) : '-';
-
-        return `
-            <tr>
-                <td>${new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
-                <td>$${d.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                <td>${d.impressions.toLocaleString()}</td>
-                <td>${d.clicks.toLocaleString()}</td>
-                <td>${ctr}%</td>
-                <td>${cpc}</td>
-                <td>${d.conversions}</td>
-                <td>${costPerConv}</td>
-            </tr>
-        `;
-    }).join('');
 }

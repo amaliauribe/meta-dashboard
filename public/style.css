@@ -124,14 +124,6 @@ header h1 {
     align-items: center;
 }
 
-#accountSelect {
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: none;
-    font-size: 14px;
-    min-width: 200px;
-}
-
 .date-filters {
     display: flex;
     gap: 8px;
@@ -195,6 +187,19 @@ header h1 {
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     text-align: center;
+}
+
+.kpi-card.highlight {
+    background: linear-gradient(135deg, #31a24c 0%, #25862c 100%);
+    color: white;
+}
+
+.kpi-card.highlight .kpi-label {
+    color: rgba(255,255,255,0.9);
+}
+
+.kpi-card.highlight .kpi-value {
+    color: white;
 }
 
 .kpi-label {
@@ -282,10 +287,6 @@ tr:hover {
     color: #65676b;
     padding: 40px !important;
 }
-
-.status-active { color: #31a24c; font-weight: 600; }
-.status-paused { color: #f7b928; font-weight: 600; }
-.status-inactive { color: #e4405f; font-weight: 600; }
 
 footer {
     text-align: center;

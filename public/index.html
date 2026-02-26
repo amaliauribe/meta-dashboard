@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meta Ads Dashboard | VIP Medical Group</title>
+    <title>Meta Ads Dashboard | CA: Vein Treatment Clinic</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -12,7 +12,7 @@
     <div id="loginScreen" class="login-container">
         <div class="login-box">
             <h1>📊 Meta Ads Dashboard</h1>
-            <p class="subtitle">VIP Medical Group</p>
+            <p class="subtitle">CA: Vein Treatment Clinic</p>
             <form id="loginForm">
                 <div class="input-group">
                     <label for="username">Username</label>
@@ -31,11 +31,8 @@
     <!-- Dashboard (hidden until login) -->
     <div id="dashboardContainer" class="dashboard hidden">
         <header>
-            <h1>📊 Meta Ads Dashboard</h1>
+            <h1>📊 CA: Vein Treatment Clinic</h1>
             <div class="header-controls">
-                <select id="accountSelect">
-                    <option value="all">All Accounts</option>
-                </select>
                 <div class="date-filters">
                     <button class="filter-btn" data-range="today">Today</button>
                     <button class="filter-btn" data-range="yesterday">Yesterday</button>
@@ -54,13 +51,13 @@
                 <div class="kpi-label">Total Spend</div>
                 <div class="kpi-value" id="totalSpend">$0.00</div>
             </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Conversions</div>
-                <div class="kpi-value" id="totalConversions">0</div>
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Results</div>
+                <div class="kpi-value" id="totalResults">0</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Cost per Conversion</div>
-                <div class="kpi-value" id="costPerConv">$0.00</div>
+                <div class="kpi-label">Cost per Result</div>
+                <div class="kpi-value" id="costPerResult">$0.00</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Cost per Click</div>
@@ -84,34 +81,33 @@
             </div>
         </section>
 
-        <!-- Conversions Chart -->
+        <!-- Results Chart -->
         <section class="chart-section">
-            <h2>🎯 Conversions Over Time</h2>
+            <h2>🎯 Results Over Time</h2>
             <div class="chart-container">
-                <canvas id="convChart"></canvas>
+                <canvas id="resultsChart"></canvas>
             </div>
         </section>
 
         <!-- Campaign Performance Table -->
         <section class="table-section">
-            <h2>🚀 Campaign Performance</h2>
+            <h2>🚀 Active Campaigns</h2>
             <div class="table-wrapper">
                 <table id="campaignTable">
                     <thead>
                         <tr>
                             <th>Campaign</th>
-                            <th>Status</th>
                             <th>Spend</th>
                             <th>Impressions</th>
                             <th>Clicks</th>
                             <th>CTR</th>
                             <th>CPC</th>
-                            <th>Conversions</th>
-                            <th>Cost/Conv</th>
+                            <th>Results</th>
+                            <th>Cost/Result</th>
                         </tr>
                     </thead>
                     <tbody id="campaignBody">
-                        <tr><td colspan="9" class="loading">Loading campaigns...</td></tr>
+                        <tr><td colspan="8" class="loading">Loading campaigns...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -130,8 +126,8 @@
                             <th>Clicks</th>
                             <th>CTR</th>
                             <th>CPC</th>
-                            <th>Conversions</th>
-                            <th>Cost/Conv</th>
+                            <th>Results</th>
+                            <th>Cost/Result</th>
                         </tr>
                     </thead>
                     <tbody id="dailyBody">
