@@ -595,16 +595,16 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading ads...</td></tr>';
 
     try {
         // Get ad-level insights
         const insightsData = await apiCall(
-            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,campaign_name,spend,impressions,clicks,ctr,actions&${getDateRange(range)}&limit=100`
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions&${getDateRange(range)}&limit=100`
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data for this period</td></tr>';
             return;
         }
 
@@ -661,6 +661,7 @@ async function loadAdsData() {
             return {
                 ad_id: ad.ad_id,
                 ad_name: ad.ad_name,
+                adset_name: ad.adset_name || '-',
                 campaign_name: ad.campaign_name,
                 spend,
                 impressions,
@@ -678,7 +679,7 @@ async function loadAdsData() {
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -730,6 +731,7 @@ function renderAdsTable() {
             <tr>
                 <td>${thumbnailHtml}</td>
                 <td>${ad.ad_name}</td>
+                <td>${ad.adset_name}</td>
                 <td>${ad.campaign_name}</td>
                 <td>$${ad.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                 <td>${ad.impressions.toLocaleString()}</td>
