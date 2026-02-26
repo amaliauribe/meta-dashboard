@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Ads Dashboard | VIP Medical Group</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>📊 Meta Ads Dashboard</h1>
+            <div class="header-controls">
+                <select id="accountSelect">
+                    <option value="all">All Accounts</option>
+                </select>
+                <div class="date-filters">
+                    <button class="filter-btn active" data-range="today">Today</button>
+                    <button class="filter-btn" data-range="yesterday">Yesterday</button>
+                    <button class="filter-btn" data-range="7d">Last 7 Days</button>
+                    <button class="filter-btn" data-range="14d">Last 14 Days</button>
+                    <button class="filter-btn" data-range="30d">Last 30 Days</button>
+                </div>
+                <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+            </div>
+        </header>
+
+        <!-- KPI Cards -->
+        <section class="kpi-cards">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Spend</div>
+                <div class="kpi-value" id="totalSpend">$0.00</div>
+                <div class="kpi-change positive" id="spendChange">+0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Conversions</div>
+                <div class="kpi-value" id="totalConversions">0</div>
+                <div class="kpi-change positive" id="convChange">+0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Cost per Conversion</div>
+                <div class="kpi-value" id="costPerConv">$0.00</div>
+                <div class="kpi-change negative" id="cpcChange">+0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Cost per Click</div>
+                <div class="kpi-value" id="cpc">$0.00</div>
+                <div class="kpi-change" id="cpcClickChange">+0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Click-Through Rate</div>
+                <div class="kpi-value" id="ctr">0.00%</div>
+                <div class="kpi-change positive" id="ctrChange">+0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Impressions</div>
+                <div class="kpi-value" id="impressions">0</div>
+                <div class="kpi-change positive" id="impChange">+0%</div>
+            </div>
+        </section>
+
+        <!-- Spend Trend Chart -->
+        <section class="chart-section">
+            <h2>📈 Spend Trend Over Time</h2>
+            <div class="chart-container">
+                <canvas id="spendChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Conversions Chart -->
+        <section class="chart-section">
+            <h2>🎯 Conversions Over Time</h2>
+            <div class="chart-container">
+                <canvas id="convChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Campaign Performance Table -->
+        <section class="table-section">
+            <h2>🚀 Campaign Performance</h2>
+            <div class="table-wrapper">
+                <table id="campaignTable">
+                    <thead>
+                        <tr>
+                            <th>Campaign</th>
+                            <th>Status</th>
+                            <th>Spend</th>
+                            <th>Impressions</th>
+                            <th>Clicks</th>
+                            <th>CTR</th>
+                            <th>CPC</th>
+                            <th>Conversions</th>
+                            <th>Cost/Conv</th>
+                            <th>ROAS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="campaignBody">
+                        <tr><td colspan="10" class="loading">Loading campaigns...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Daily Breakdown Table -->
+        <section class="table-section">
+            <h2>📅 Daily Breakdown</h2>
+            <div class="table-wrapper">
+                <table id="dailyTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Spend</th>
+                            <th>Impressions</th>
+                            <th>Clicks</th>
+                            <th>CTR</th>
+                            <th>CPC</th>
+                            <th>Conversions</th>
+                            <th>Cost/Conv</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dailyBody">
+                        <tr><td colspan="8" class="loading">Loading daily data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer>
+            <p>Last updated: <span id="lastUpdate">-</span></p>
+            <p>Data source: Meta Marketing API</p>
+        </footer>
+    </div>
+    <script src="config.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

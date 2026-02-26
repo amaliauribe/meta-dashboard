@@ -1,0 +1,251 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f2f5;
+    color: #1c1e21;
+    min-height: 100vh;
+}
+
+.dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    background: linear-gradient(135deg, #1877f2 0%, #0d65d9 100%);
+    color: white;
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+}
+
+header h1 {
+    font-size: 28px;
+    margin-bottom: 16px;
+}
+
+.header-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+#accountSelect {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    min-width: 200px;
+}
+
+.date-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 10px 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.filter-btn.active {
+    background: white;
+    color: #1877f2;
+    border-color: white;
+}
+
+.refresh-btn {
+    padding: 10px 20px;
+    background: white;
+    color: #1877f2;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.refresh-btn:hover {
+    transform: scale(1.05);
+}
+
+/* KPI Cards */
+.kpi-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.kpi-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.kpi-label {
+    font-size: 12px;
+    color: #65676b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1c1e21;
+    margin-bottom: 4px;
+}
+
+.kpi-change {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.kpi-change.positive {
+    color: #31a24c;
+}
+
+.kpi-change.negative {
+    color: #e4405f;
+}
+
+/* Charts */
+.chart-section {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.chart-section h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #1c1e21;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Tables */
+.table-section {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.table-section h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #1c1e21;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th {
+    background: #f0f2f5;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #65676b;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e4e6eb;
+}
+
+td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4e6eb;
+}
+
+tr:hover {
+    background: #f7f8fa;
+}
+
+.loading {
+    text-align: center;
+    color: #65676b;
+    padding: 40px !important;
+}
+
+.status-active {
+    color: #31a24c;
+    font-weight: 600;
+}
+
+.status-paused {
+    color: #f7b928;
+    font-weight: 600;
+}
+
+.status-inactive {
+    color: #e4405f;
+    font-weight: 600;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 20px;
+    color: #65676b;
+    font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .kpi-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .header-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .date-filters {
+        justify-content: center;
+    }
+    
+    .kpi-value {
+        font-size: 22px;
+    }
+}
