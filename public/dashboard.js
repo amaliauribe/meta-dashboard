@@ -50,26 +50,22 @@ function getDateRange(range) {
     return `time_range={"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"}`;
 }
 
-// Get results from actions array - CUSTOM PIXEL CONVERSIONS (o-l-a-c)
+// Get results from actions array - Custom Pixel Conversions + Lead Forms
 function getResults(actions) {
     if (!actions) return 0;
     
     let total = 0;
-    for (const action of actions) {
-        if (action.action_type.startsWith('offsite_conversion.custom.') ||
-            action.action_type === 'offsite_conversion.fb_pixel_custom') {
-            total += parseInt(action.value);
-        }
+    
+    // Custom pixel conversions (use aggregate total, not individual custom.XXX to avoid double-counting)
+    const pixelCustom = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_custom');
+    if (pixelCustom) {
+        total += parseInt(pixelCustom.value);
     }
     
-    if (total === 0) {
-        const leadTypes = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'];
-        for (const type of leadTypes) {
-            const action = actions.find(a => a.action_type === type);
-            if (action) {
-                total += parseInt(action.value);
-            }
-        }
+    // Lead form submissions
+    const lead = actions.find(a => a.action_type === 'lead');
+    if (lead) {
+        total += parseInt(lead.value);
     }
     
     return total;
