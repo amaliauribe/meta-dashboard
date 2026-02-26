@@ -288,6 +288,48 @@ tr:hover {
     padding: 40px !important;
 }
 
+/* Info icon with tooltip */
+.info-icon {
+    cursor: help;
+    color: #1877f2;
+    font-size: 14px;
+    margin-left: 4px;
+    position: relative;
+}
+
+.info-icon:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 100%;
+    margin-top: 8px;
+    background: #333;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: pre-line;
+    z-index: 100;
+    min-width: 160px;
+    text-align: left;
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.info-icon:hover::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 100%;
+    border: 6px solid transparent;
+    border-bottom-color: #333;
+    margin-top: -4px;
+}
+
 footer {
     text-align: center;
     padding: 20px;
