@@ -332,16 +332,17 @@ async function loadCampaignData() {
             `${ACCOUNT_ID}/campaigns?fields=name,status,${insightsQuery}{spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
         );
         
-        // Fetch ONLY ACTIVE ad sets with budget info
+        // Fetch ALL ad sets with budget info (not just filtered - filter may miss some)
         const adsetData = await apiCall(
-            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining,status&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=100`
+            `${ACCOUNT_ID}/adsets?fields=campaign_id,daily_budget,budget_remaining,status,effective_status&limit=200`
         );
         
         // Aggregate budget by campaign (ACTIVE ad sets only)
         const budgetByCampaign = {};
         if (adsetData.data) {
             adsetData.data.forEach(adset => {
-                if (adset.status !== 'ACTIVE') return; // Double check status
+                // Only count ACTIVE ad sets
+                if (adset.status !== 'ACTIVE' && adset.effective_status !== 'ACTIVE') return;
                 if (!budgetByCampaign[adset.campaign_id]) {
                     budgetByCampaign[adset.campaign_id] = { daily_budget: 0, budget_remaining: 0 };
                 }
