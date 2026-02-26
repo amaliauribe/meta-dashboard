@@ -77,7 +77,7 @@ async function getAccessToken() {
 // Submit report and poll for completion
 async function submitAndDownloadReport(reportType, startDate, endDate, columns) {
     const token = await getAccessToken();
-    const submitUrl = 'https://reporting.api.bingads.microsoft.com/Reporting/v13/ReportingService.svc';
+    const submitUrl = 'https://reporting.api.bingads.microsoft.com/Api/Advertiser/Reporting/v13/ReportingService.svc';
     
     let reportRequest;
     if (reportType === 'campaign') {
