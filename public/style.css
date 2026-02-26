@@ -332,6 +332,19 @@ header h1 {
     color: #65676b;
 }
 
+/* Bing Ads View Styling */
+#bingView .kpi-card.highlight {
+    background: linear-gradient(135deg, #00a4ef 0%, #0078d4 100%);
+}
+
+#bingView .table-section h2 {
+    color: #0078d4;
+}
+
+#bingView .chart-section h2 {
+    color: #0078d4;
+}
+
 /* KPI Cards */
 .kpi-cards {
     display: grid;

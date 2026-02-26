@@ -47,8 +47,9 @@
 
         <!-- View Tabs -->
         <nav class="view-tabs">
-            <button class="view-tab active" data-view="campaigns">📊 Campaigns</button>
-            <button class="view-tab" data-view="ads">🎬 Ads</button>
+            <button class="view-tab active" data-view="campaigns">📊 Meta Campaigns</button>
+            <button class="view-tab" data-view="ads">🎬 Meta Ads</button>
+            <button class="view-tab" data-view="bing">🔷 Bing Ads</button>
             <span class="last-updated-top">Last updated: <span id="lastUpdateTop">-</span></span>
         </nav>
 
@@ -189,6 +190,103 @@
                 </div>
             </section>
         </div><!-- End Ads View -->
+
+        <!-- Bing Ads View -->
+        <div id="bingView" class="view-content hidden">
+            
+            <!-- Bing KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Spend</div>
+                    <div class="kpi-value" id="bingTotalSpend">$0.00</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Conversions</div>
+                    <div class="kpi-value" id="bingTotalConversions">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cost per Conversion</div>
+                    <div class="kpi-value" id="bingCostPerConversion">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cost per Click</div>
+                    <div class="kpi-value" id="bingCpc">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Click-Through Rate</div>
+                    <div class="kpi-value" id="bingCtr">0.00%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Impressions</div>
+                    <div class="kpi-value" id="bingImpressions">0</div>
+                </div>
+            </section>
+
+            <!-- Bing Daily Breakdown Table -->
+            <section class="table-section">
+                <h2>📅 Daily Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="bingDailyTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingDailyBody">
+                            <tr><td colspan="8" class="loading">Select this tab to load Bing data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Bing Campaign Performance Table -->
+            <section class="table-section">
+                <h2>🚀 Active Campaigns</h2>
+                <div class="table-wrapper">
+                    <table id="bingCampaignTable">
+                        <thead id="bingCampaignHead">
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingCampaignBody">
+                            <tr><td colspan="8" class="loading">Loading campaigns...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Bing Conversions Chart -->
+            <section class="chart-section">
+                <h2>🎯 Conversions Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="bingConversionsChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Bing Spend Trend Chart -->
+            <section class="chart-section">
+                <h2>📈 Spend Trend Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="bingSpendChart"></canvas>
+                </div>
+            </section>
+
+        </div><!-- End Bing View -->
 
         <footer>
             <p>Last updated: <span id="lastUpdate">-</span></p>
