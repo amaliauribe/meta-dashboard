@@ -23,25 +23,31 @@ const dateRanges = {
     '30d': { days: 30 }
 };
 
-// Format date as YYYY-MM-DD using local time
-function formatDateLocal(d) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+// Format date as YYYY-MM-DD using EST timezone
+function formatDateEST(d) {
+    const estDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const year = estDate.getFullYear();
+    const month = String(estDate.getMonth() + 1).padStart(2, '0');
+    const day = String(estDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
-// Get date range string for API (includes today for 7d, 14d, 30d)
+// Get current date in EST
+function getESTDate() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+}
+
+// Get date range string for API (includes today for 7d, 14d, 30d) - using EST
 function getDateRange(range) {
     if (range.preset) {
         return `date_preset=${range.preset}`;
     }
     
-    const today = new Date();
-    const since = new Date();
+    const today = getESTDate();
+    const since = new Date(today);
     since.setDate(today.getDate() - range.days + 1);
     
-    return `time_range={"since":"${formatDateLocal(since)}","until":"${formatDateLocal(today)}"}`;
+    return `time_range={"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"}`;
 }
 
 // Get results from actions array - CUSTOM PIXEL CONVERSIONS (o-l-a-c)
@@ -217,10 +223,11 @@ async function loadChartData() {
                 dataByDate[day.date_start] = day;
             });
             
+            const today = getESTDate();
             for (let i = 0; i < range.days; i++) {
-                const date = new Date();
-                date.setDate(date.getDate() - (range.days - 1 - i));
-                const dateStr = formatDateLocal(date);
+                const date = new Date(today);
+                date.setDate(today.getDate() - (range.days - 1 - i));
+                const dateStr = formatDateEST(date);
                 
                 if (dataByDate[dateStr]) {
                     dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
@@ -240,10 +247,11 @@ async function loadChartData() {
 
 function getDaysArray(numDays) {
     const days = [];
+    const today = getESTDate();
     for (let i = numDays - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }));
     }
     return days;
 }
@@ -307,15 +315,15 @@ function renderResultsChart(labels, data) {
 async function loadCampaignData() {
     const range = dateRanges[currentRange];
     
-    // Build the insights query based on date range
+    // Build the insights query based on date range (using EST)
     let insightsQuery;
     if (range.preset) {
         insightsQuery = `insights.date_preset(${range.preset})`;
     } else {
-        const today = new Date();
-        const since = new Date();
+        const today = getESTDate();
+        const since = new Date(today);
         since.setDate(today.getDate() - range.days + 1);
-        insightsQuery = `insights.time_range({"since":"${formatDateLocal(since)}","until":"${formatDateLocal(today)}"})`;
+        insightsQuery = `insights.time_range({"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"})`;
     }
 
     try {
@@ -418,13 +426,13 @@ async function loadDailyData() {
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
             
-            // Parse date correctly - add timezone offset to avoid off-by-one
+            // Parse date - create from parts to avoid timezone issues
             const dateParts = day.date_start.split('-');
-            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
 
             return `
                 <tr>
-                    <td>${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
+                    <td>${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</td>
                     <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td>${impressions.toLocaleString()}</td>
                     <td>${clicks.toLocaleString()}</td>
