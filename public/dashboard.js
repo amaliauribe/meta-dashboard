@@ -24,16 +24,32 @@ const dateRanges = {
     '30d': { preset: 'last_30d', days: 30 }
 };
 
-// Get results from actions array (leads)
+// Get results from actions array - CUSTOM PIXEL CONVERSIONS (o-l-a-c)
 function getResults(actions) {
     if (!actions) return 0;
-    // Look for lead-related actions
-    const resultTypes = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'];
-    for (const type of resultTypes) {
-        const action = actions.find(a => a.action_type === type);
-        if (action) return parseInt(action.value);
+    
+    // Look for custom pixel conversion events (offsite_conversion.custom.*)
+    // This is what the Conversion - National Campaign optimizes for
+    let total = 0;
+    for (const action of actions) {
+        if (action.action_type.startsWith('offsite_conversion.custom.') ||
+            action.action_type === 'offsite_conversion.fb_pixel_custom') {
+            total += parseInt(action.value);
+        }
     }
-    return 0;
+    
+    // If no custom conversions found, fall back to leads
+    if (total === 0) {
+        const leadTypes = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'];
+        for (const type of leadTypes) {
+            const action = actions.find(a => a.action_type === type);
+            if (action) {
+                total += parseInt(action.value);
+            }
+        }
+    }
+    
+    return total;
 }
 
 // Initialize
