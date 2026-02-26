@@ -476,7 +476,7 @@ app.get('/auth/bing/callback', async (req, res) => {
 // ==================== TikTok Ads API ====================
 
 // TikTok URL verification - serve at multiple paths to cover all cases
-const TIKTOK_VERIFY_CONTENT = 'tiktok-developers-site-verification=ANOnTRrxnjAIJOinIlYFdacJIFGaCUMA';
+const TIKTOK_VERIFY_CONTENT = 'tiktok-developers-site-verification=i02rDYyrdA068fwx277aURAMgirXqwwz';
 
 // Various possible paths TikTok might check
 app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA.txt', (req, res) => {
