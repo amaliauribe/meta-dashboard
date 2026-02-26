@@ -9,7 +9,6 @@ const BASE_URL = 'https://graph.facebook.com';
 
 // Fixed account: CA : Vein Treatment Clinic
 const ACCOUNT_ID = 'act_1151591609552634';
-const ACCOUNT_NAME = 'CA : Vein Treatment Clinic';
 
 // Dashboard State
 let currentRange = '7d';
@@ -19,17 +18,28 @@ let resultsChart = null;
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
     'yesterday': { preset: 'yesterday', days: 1 },
-    '7d': { preset: 'last_7d', days: 7 },
-    '14d': { preset: 'last_14d', days: 14 },
-    '30d': { preset: 'last_30d', days: 30 }
+    '7d': { days: 7 },
+    '14d': { days: 14 },
+    '30d': { days: 30 }
 };
+
+// Get date range string for API (includes today for 7d, 14d, 30d)
+function getDateRange(range) {
+    if (range.preset) {
+        return `date_preset=${range.preset}`;
+    }
+    const today = new Date();
+    const since = new Date();
+    since.setDate(today.getDate() - range.days + 1);
+    
+    const formatDate = (d) => d.toISOString().split('T')[0];
+    return `time_range={"since":"${formatDate(since)}","until":"${formatDate(today)}"}`;
+}
 
 // Get results from actions array - CUSTOM PIXEL CONVERSIONS (o-l-a-c)
 function getResults(actions) {
     if (!actions) return 0;
     
-    // Look for custom pixel conversion events (offsite_conversion.custom.*)
-    // This is what the Conversion - National Campaign optimizes for
     let total = 0;
     for (const action of actions) {
         if (action.action_type.startsWith('offsite_conversion.custom.') ||
@@ -38,7 +48,6 @@ function getResults(actions) {
         }
     }
     
-    // If no custom conversions found, fall back to leads
     if (total === 0) {
         const leadTypes = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead'];
         for (const type of leadTypes) {
@@ -142,9 +151,10 @@ async function loadData() {
 }
 
 async function loadKPIs() {
+    const range = dateRanges[currentRange];
     try {
         const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&date_preset=${dateRanges[currentRange].preset}`
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}`
         );
         
         if (data.data?.[0]) {
@@ -172,19 +182,30 @@ async function loadChartData() {
 
     try {
         const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,actions&date_preset=${range.preset}&time_increment=1`
+            `${ACCOUNT_ID}/insights?fields=spend,actions&${getDateRange(range)}&time_increment=1`
         );
         
         const dailySpend = new Array(range.days).fill(0);
         const dailyResults = new Array(range.days).fill(0);
 
         if (data.data) {
-            data.data.forEach((day, i) => {
-                if (i < range.days) {
-                    dailySpend[i] = parseFloat(day.spend || 0);
-                    dailyResults[i] = getResults(day.actions);
-                }
+            // Map data by date
+            const dataByDate = {};
+            data.data.forEach(day => {
+                dataByDate[day.date_start] = day;
             });
+            
+            // Fill in the arrays matching our days
+            for (let i = 0; i < range.days; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - (range.days - 1 - i));
+                const dateStr = date.toISOString().split('T')[0];
+                
+                if (dataByDate[dateStr]) {
+                    dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
+                    dailyResults[i] = getResults(dataByDate[dateStr].actions);
+                }
+            }
         }
 
         renderSpendChart(days, dailySpend);
@@ -264,11 +285,22 @@ function renderResultsChart(labels, data) {
 
 async function loadCampaignData() {
     const range = dateRanges[currentRange];
+    
+    // Build the insights query based on date range
+    let insightsQuery;
+    if (range.preset) {
+        insightsQuery = `insights.date_preset(${range.preset})`;
+    } else {
+        const today = new Date();
+        const since = new Date();
+        since.setDate(today.getDate() - range.days + 1);
+        const formatDate = (d) => d.toISOString().split('T')[0];
+        insightsQuery = `insights.time_range({"since":"${formatDate(since)}","until":"${formatDate(today)}"})`;
+    }
 
     try {
-        // Only fetch ACTIVE campaigns
         const data = await apiCall(
-            `${ACCOUNT_ID}/campaigns?fields=name,status,insights.date_preset(${range.preset}){spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
+            `${ACCOUNT_ID}/campaigns?fields=name,status,${insightsQuery}{spend,impressions,clicks,actions}&limit=50&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]`
         );
         
         const campaigns = data.data?.filter(c => c.status === 'ACTIVE') || [];
@@ -279,7 +311,6 @@ async function loadCampaignData() {
             return;
         }
 
-        // Sort by spend
         campaigns.sort((a, b) => parseFloat(b.insights?.data?.[0]?.spend || 0) - parseFloat(a.insights?.data?.[0]?.spend || 0));
 
         tbody.innerHTML = campaigns.map(c => {
@@ -317,7 +348,7 @@ async function loadDailyData() {
 
     try {
         const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&date_preset=${range.preset}&time_increment=1`
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}&time_increment=1`
         );
 
         const tbody = document.getElementById('dailyBody');
