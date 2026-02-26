@@ -475,9 +475,23 @@ app.get('/auth/bing/callback', async (req, res) => {
 
 // ==================== TikTok Ads API ====================
 
-// TikTok URL verification file
+// TikTok URL verification - serve at multiple paths to cover all cases
+const TIKTOK_VERIFY_CONTENT = 'tiktok-developers-site-verification=ANOnTRrxnjAIJOinIlYFdacJIFGaCUMA';
+
+// Various possible paths TikTok might check
 app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAlJOinIIYFdacJIFGaCUMA.txt', (req, res) => {
-    res.type('text/plain').send('tiktok-developers-site-verification=ANOnTRrxnjAIJOinIlYFdacJIFGaCUMA');
+    res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
+});
+app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAIJOinIlYFdacJIFGaCUMA.txt', (req, res) => {
+    res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
+});
+// Serve verification content at the callback root too
+app.get('/auth/tiktok/callback/verification.txt', (req, res) => {
+    res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
+});
+// Catch any .txt file request in callback folder
+app.get('/auth/tiktok/callback/*.txt', (req, res) => {
+    res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
 });
 
 // TikTok OAuth - Step 1: Redirect to TikTok auth
