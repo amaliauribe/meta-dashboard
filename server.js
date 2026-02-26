@@ -164,9 +164,9 @@ function buildSoapEnvelope(action, body, token) {
     return `<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Header>
-    <h:AuthenticationToken xmlns:h="https://bingads.microsoft.com/Reporting/v13">${token}</h:AuthenticationToken>
-    <h:DeveloperToken xmlns:h="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.developerToken}</h:DeveloperToken>
-    <h:CustomerId xmlns:h="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.customerId}</h:CustomerId>
+    <AuthenticationToken xmlns="https://bingads.microsoft.com/Reporting/v13">${token}</AuthenticationToken>
+    <DeveloperToken xmlns="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.developerToken}</DeveloperToken>
+    <CustomerId xmlns="https://bingads.microsoft.com/Reporting/v13">${MSADS_CONFIG.customerId}</CustomerId>
   </s:Header>
   <s:Body>
     <${action} xmlns="https://bingads.microsoft.com/Reporting/v13">
@@ -177,18 +177,22 @@ function buildSoapEnvelope(action, body, token) {
 }
 
 function buildAccountReportRequest(startDate, endDate, columns) {
-    const columnElements = columns.map(c => `<Column>${c}</Column>`).join('\n            ');
+    // Use CampaignPerformanceReport for account-level daily data (aggregated)
+    const requiredColumns = ['TimePeriod'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<CampaignPerformanceReportColumn>${c}</CampaignPerformanceReportColumn>`).join('\n          ');
     
-    return `<ReportRequest xmlns:i="http://www.w3.org/2001/XMLSchema-instance" i:type="AccountPerformanceReportRequest">
+    return `<ReportRequest i:type="CampaignPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
         <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
         <ExcludeReportFooter>true</ExcludeReportFooter>
         <ExcludeReportHeader>true</ExcludeReportHeader>
         <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
         <ReportName>AccountPerformance</ReportName>
         <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
         <Aggregation>Daily</Aggregation>
         <Columns>
-            ${columnElements}
+          ${columnElements}
         </Columns>
         <Scope>
             <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
@@ -211,18 +215,22 @@ function buildAccountReportRequest(startDate, endDate, columns) {
 }
 
 function buildCampaignReportRequest(startDate, endDate, columns) {
-    const columnElements = columns.map(c => `<Column>${c}</Column>`).join('\n            ');
+    // Ensure required columns are included
+    const requiredColumns = ['CampaignName'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<CampaignPerformanceReportColumn>${c}</CampaignPerformanceReportColumn>`).join('\n          ');
     
-    return `<ReportRequest xmlns:i="http://www.w3.org/2001/XMLSchema-instance" i:type="CampaignPerformanceReportRequest">
+    return `<ReportRequest i:type="CampaignPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
         <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
         <ExcludeReportFooter>true</ExcludeReportFooter>
         <ExcludeReportHeader>true</ExcludeReportHeader>
         <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
         <ReportName>CampaignPerformance</ReportName>
         <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
         <Aggregation>Summary</Aggregation>
         <Columns>
-            ${columnElements}
+          ${columnElements}
         </Columns>
         <Scope>
             <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
