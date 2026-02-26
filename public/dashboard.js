@@ -1,11 +1,15 @@
+// Meta API Configuration
+const API_VERSION = 'v19.0';
+const BASE_URL = 'https://graph.facebook.com';
+
 // Dashboard State
+let accessToken = localStorage.getItem('meta_access_token');
 let currentRange = '7d';
 let currentAccount = 'all';
 let spendChart = null;
 let convChart = null;
 let accounts = [];
 
-// Date range mappings
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
     'yesterday': { preset: 'yesterday', days: 1 },
@@ -14,13 +18,44 @@ const dateRanges = {
     '30d': { preset: 'last_30d', days: 30 }
 };
 
-// Initialize dashboard
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initializeModal();
     initializeFilters();
-    loadAccounts();
+    
+    if (accessToken) {
+        document.getElementById('tokenModal').classList.add('hidden');
+        loadAccounts();
+    }
 });
 
-// Initialize filter buttons
+function initializeModal() {
+    const modal = document.getElementById('tokenModal');
+    const saveBtn = document.getElementById('saveToken');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const tokenInput = document.getElementById('tokenInput');
+
+    saveBtn.addEventListener('click', () => {
+        const token = tokenInput.value.trim();
+        if (token) {
+            accessToken = token;
+            localStorage.setItem('meta_access_token', token);
+            modal.classList.add('hidden');
+            loadAccounts();
+        }
+    });
+
+    tokenInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveBtn.click();
+    });
+
+    disconnectBtn.addEventListener('click', () => {
+        localStorage.removeItem('meta_access_token');
+        accessToken = null;
+        location.reload();
+    });
+}
+
 function initializeFilters() {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -39,56 +74,58 @@ function initializeFilters() {
     document.getElementById('refreshBtn').addEventListener('click', loadData);
 }
 
-// Load ad accounts
-async function loadAccounts() {
-    try {
-        const response = await fetch('/api/accounts');
-        const data = await response.json();
-        
-        if (data.error) {
-            console.error('API Error:', data.error);
-            showError('Unable to load accounts. Check API token permissions.');
-            return;
+async function apiCall(endpoint) {
+    const url = `${BASE_URL}/${API_VERSION}/${endpoint}${endpoint.includes('?') ? '&' : '?'}access_token=${accessToken}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+        console.error('API Error:', data.error);
+        if (data.error.code === 190) {
+            alert('Access token expired. Please reconnect.');
+            localStorage.removeItem('meta_access_token');
+            location.reload();
         }
-        
-        if (data.data) {
-            accounts = data.data;
-            populateAccountSelect(data.data);
-            loadData();
-        }
-    } catch (error) {
-        console.error('Error loading accounts:', error);
-        showError('Unable to connect to API.');
+        throw new Error(data.error.message);
     }
+    return data;
 }
 
-function populateAccountSelect(accs) {
-    const select = document.getElementById('accountSelect');
-    select.innerHTML = '<option value="all">All Accounts</option>';
-    accs.forEach(acc => {
-        const option = document.createElement('option');
-        option.value = acc.id;
-        option.textContent = acc.name;
-        select.appendChild(option);
-    });
+async function loadAccounts() {
+    try {
+        const data = await apiCall('me/adaccounts?fields=name,account_id,currency&limit=50');
+        accounts = data.data || [];
+        
+        const select = document.getElementById('accountSelect');
+        select.innerHTML = '<option value="all">All Accounts</option>';
+        accounts.forEach(acc => {
+            const option = document.createElement('option');
+            option.value = acc.id;
+            option.textContent = acc.name;
+            select.appendChild(option);
+        });
+        
+        loadData();
+    } catch (error) {
+        showError('Failed to load accounts: ' + error.message);
+    }
 }
 
 function showError(message) {
     document.getElementById('campaignBody').innerHTML = 
-        `<tr><td colspan="10" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="9" class="loading">${message}</td></tr>`;
     document.getElementById('dailyBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
 }
 
-// Load all data
 async function loadData() {
     const selectedAccounts = currentAccount === 'all' ? accounts.slice(0, 10) : 
         accounts.filter(a => a.id === currentAccount);
     
-    if (selectedAccounts.length === 0) {
-        showError('No accounts selected');
-        return;
-    }
+    if (selectedAccounts.length === 0) return;
+
+    document.getElementById('campaignBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
@@ -99,39 +136,33 @@ async function loadData() {
         ]);
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (error) {
-        console.error('Error loading data:', error);
+        showError('Error loading data: ' + error.message);
     }
 }
 
-// Load KPIs
 async function loadKPIs(selectedAccounts) {
     let totalSpend = 0, totalImpressions = 0, totalClicks = 0, totalConversions = 0;
 
     for (const acc of selectedAccounts) {
         try {
-            const response = await fetch(
-                `/api/insights/${acc.id}?date_preset=${dateRanges[currentRange].preset}`
+            const data = await apiCall(
+                `${acc.id}/insights?fields=spend,impressions,clicks,actions&date_preset=${dateRanges[currentRange].preset}`
             );
-            const data = await response.json();
             
-            if (data.data && data.data[0]) {
+            if (data.data?.[0]) {
                 const d = data.data[0];
                 totalSpend += parseFloat(d.spend || 0);
                 totalImpressions += parseInt(d.impressions || 0);
                 totalClicks += parseInt(d.clicks || 0);
                 
                 if (d.actions) {
-                    const leads = d.actions.find(a => 
-                        a.action_type === 'lead' || 
-                        a.action_type === 'onsite_conversion.lead_grouped' ||
-                        a.action_type === 'omni_complete_registration'
+                    const conv = d.actions.find(a => 
+                        ['lead', 'onsite_conversion.lead_grouped', 'omni_complete_registration', 'complete_registration'].includes(a.action_type)
                     );
-                    if (leads) totalConversions += parseInt(leads.value);
+                    if (conv) totalConversions += parseInt(conv.value);
                 }
             }
-        } catch (e) {
-            console.error('KPI error for', acc.id, e);
-        }
+        } catch (e) { console.error('KPI error:', e); }
     }
 
     document.getElementById('totalSpend').textContent = '$' + totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -142,7 +173,6 @@ async function loadKPIs(selectedAccounts) {
     document.getElementById('impressions').textContent = totalImpressions.toLocaleString();
 }
 
-// Load chart data
 async function loadChartData(selectedAccounts) {
     const range = dateRanges[currentRange];
     const days = getDaysArray(range.days);
@@ -151,28 +181,24 @@ async function loadChartData(selectedAccounts) {
 
     for (const acc of selectedAccounts.slice(0, 5)) {
         try {
-            const response = await fetch(
-                `/api/insights/${acc.id}?date_preset=${range.preset}&time_increment=1`
+            const data = await apiCall(
+                `${acc.id}/insights?fields=spend,actions&date_preset=${range.preset}&time_increment=1`
             );
-            const data = await response.json();
             
             if (data.data) {
                 data.data.forEach((day, i) => {
                     if (i < range.days) {
                         dailySpend[i] += parseFloat(day.spend || 0);
                         if (day.actions) {
-                            const leads = day.actions.find(a => 
-                                a.action_type === 'lead' || 
-                                a.action_type === 'onsite_conversion.lead_grouped'
+                            const conv = day.actions.find(a => 
+                                ['lead', 'onsite_conversion.lead_grouped'].includes(a.action_type)
                             );
-                            if (leads) dailyConv[i] += parseInt(leads.value);
+                            if (conv) dailyConv[i] += parseInt(conv.value);
                         }
                     }
                 });
             }
-        } catch (e) {
-            console.error('Chart data error:', e);
-        }
+        } catch (e) { console.error('Chart error:', e); }
     }
 
     renderSpendChart(days, dailySpend);
@@ -196,10 +222,10 @@ function renderSpendChart(labels, data) {
     spendChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels,
             datasets: [{
                 label: 'Daily Spend ($)',
-                data: data,
+                data,
                 borderColor: '#1877f2',
                 backgroundColor: 'rgba(24, 119, 242, 0.1)',
                 fill: true,
@@ -214,12 +240,7 @@ function renderSpendChart(labels, data) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { callback: value => '$' + value.toLocaleString() }
-                }
-            }
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } }
         }
     });
 }
@@ -231,10 +252,10 @@ function renderConvChart(labels, data) {
     convChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels,
             datasets: [{
                 label: 'Conversions',
-                data: data,
+                data,
                 backgroundColor: 'rgba(49, 162, 76, 0.8)',
                 borderColor: '#31a24c',
                 borderWidth: 1,
@@ -250,39 +271,30 @@ function renderConvChart(labels, data) {
     });
 }
 
-// Load campaign data
 async function loadCampaignData(selectedAccounts) {
     const campaigns = [];
     const range = dateRanges[currentRange];
 
     for (const acc of selectedAccounts.slice(0, 5)) {
         try {
-            const response = await fetch(
-                `/api/campaigns/${acc.id}?date_preset=${range.preset}`
+            const data = await apiCall(
+                `${acc.id}/campaigns?fields=name,status,insights.date_preset(${range.preset}){spend,impressions,clicks,actions}&limit=30`
             );
-            const data = await response.json();
             if (data.data) {
                 campaigns.push(...data.data.map(c => ({ ...c, accountName: acc.name })));
             }
-        } catch (e) {
-            console.error('Campaign data error:', e);
-        }
+        } catch (e) { console.error('Campaign error:', e); }
     }
 
     const tbody = document.getElementById('campaignBody');
     if (campaigns.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="loading">No campaign data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="loading">No campaign data for this period</td></tr>';
         return;
     }
 
-    // Sort by spend descending
-    campaigns.sort((a, b) => {
-        const spendA = parseFloat(a.insights?.data?.[0]?.spend || 0);
-        const spendB = parseFloat(b.insights?.data?.[0]?.spend || 0);
-        return spendB - spendA;
-    });
+    campaigns.sort((a, b) => parseFloat(b.insights?.data?.[0]?.spend || 0) - parseFloat(a.insights?.data?.[0]?.spend || 0));
 
-    tbody.innerHTML = campaigns.slice(0, 20).map(c => {
+    tbody.innerHTML = campaigns.slice(0, 25).map(c => {
         const ins = c.insights?.data?.[0] || {};
         const spend = parseFloat(ins.spend || 0);
         const impressions = parseInt(ins.impressions || 0);
@@ -290,20 +302,16 @@ async function loadCampaignData(selectedAccounts) {
         
         let conversions = 0;
         if (ins.actions) {
-            const leads = ins.actions.find(a => 
-                a.action_type === 'lead' || 
-                a.action_type === 'onsite_conversion.lead_grouped' ||
-                a.action_type === 'omni_complete_registration'
+            const conv = ins.actions.find(a => 
+                ['lead', 'onsite_conversion.lead_grouped', 'omni_complete_registration'].includes(a.action_type)
             );
-            if (leads) conversions = parseInt(leads.value);
+            if (conv) conversions = parseInt(conv.value);
         }
         
         const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
-        const cpc = clicks > 0 ? (spend / clicks).toFixed(2) : '-';
-        const costPerLead = conversions > 0 ? (spend / conversions).toFixed(2) : '-';
-        
-        const statusClass = c.status === 'ACTIVE' ? 'status-active' : 
-                           c.status === 'PAUSED' ? 'status-paused' : 'status-inactive';
+        const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+        const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+        const statusClass = c.status === 'ACTIVE' ? 'status-active' : c.status === 'PAUSED' ? 'status-paused' : 'status-inactive';
 
         return `
             <tr>
@@ -313,63 +321,53 @@ async function loadCampaignData(selectedAccounts) {
                 <td>${impressions.toLocaleString()}</td>
                 <td>${clicks.toLocaleString()}</td>
                 <td>${ctr}%</td>
-                <td>${cpc !== '-' ? '$' + cpc : '-'}</td>
+                <td>${cpc}</td>
                 <td>${conversions}</td>
-                <td>${costPerLead !== '-' ? '$' + costPerLead : '-'}</td>
-                <td>-</td>
+                <td>${costPerConv}</td>
             </tr>
         `;
     }).join('');
 }
 
-// Load daily data
 async function loadDailyData(selectedAccounts) {
     const range = dateRanges[currentRange];
     const dailyData = {};
 
     for (const acc of selectedAccounts.slice(0, 5)) {
         try {
-            const response = await fetch(
-                `/api/insights/${acc.id}?date_preset=${range.preset}&time_increment=1`
+            const data = await apiCall(
+                `${acc.id}/insights?fields=spend,impressions,clicks,actions&date_preset=${range.preset}&time_increment=1`
             );
-            const data = await response.json();
             
             if (data.data) {
                 data.data.forEach(day => {
                     const date = day.date_start;
-                    if (!dailyData[date]) {
-                        dailyData[date] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
-                    }
+                    if (!dailyData[date]) dailyData[date] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
                     dailyData[date].spend += parseFloat(day.spend || 0);
                     dailyData[date].impressions += parseInt(day.impressions || 0);
                     dailyData[date].clicks += parseInt(day.clicks || 0);
                     if (day.actions) {
-                        const leads = day.actions.find(a => 
-                            a.action_type === 'lead' || 
-                            a.action_type === 'onsite_conversion.lead_grouped'
-                        );
-                        if (leads) dailyData[date].conversions += parseInt(leads.value);
+                        const conv = day.actions.find(a => ['lead', 'onsite_conversion.lead_grouped'].includes(a.action_type));
+                        if (conv) dailyData[date].conversions += parseInt(conv.value);
                     }
                 });
             }
-        } catch (e) {
-            console.error('Daily data error:', e);
-        }
+        } catch (e) { console.error('Daily error:', e); }
     }
 
     const tbody = document.getElementById('dailyBody');
     const sortedDates = Object.keys(dailyData).sort().reverse();
     
     if (sortedDates.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No daily data for this period</td></tr>';
         return;
     }
 
     tbody.innerHTML = sortedDates.map(date => {
         const d = dailyData[date];
         const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : '-';
-        const cpc = d.clicks > 0 ? (d.spend / d.clicks).toFixed(2) : '-';
-        const costPerConv = d.conversions > 0 ? (d.spend / d.conversions).toFixed(2) : '-';
+        const cpc = d.clicks > 0 ? '$' + (d.spend / d.clicks).toFixed(2) : '-';
+        const costPerConv = d.conversions > 0 ? '$' + (d.spend / d.conversions).toFixed(2) : '-';
 
         return `
             <tr>
@@ -378,9 +376,9 @@ async function loadDailyData(selectedAccounts) {
                 <td>${d.impressions.toLocaleString()}</td>
                 <td>${d.clicks.toLocaleString()}</td>
                 <td>${ctr}%</td>
-                <td>${cpc !== '-' ? '$' + cpc : '-'}</td>
+                <td>${cpc}</td>
                 <td>${d.conversions}</td>
-                <td>${costPerConv !== '-' ? '$' + costPerConv : '-'}</td>
+                <td>${costPerConv}</td>
             </tr>
         `;
     }).join('');

@@ -11,6 +11,78 @@ body {
     min-height: 100vh;
 }
 
+/* Modal */
+.modal {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 16px;
+}
+
+.modal-content p {
+    color: #65676b;
+    margin-bottom: 20px;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #e4e6eb;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.modal-content input:focus {
+    outline: none;
+    border-color: #1877f2;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #1877f2 0%, #0d65d9 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-btn:hover {
+    opacity: 0.9;
+}
+
+.hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 12px;
+}
+
 .dashboard {
     max-width: 1400px;
     margin: 0 auto;
@@ -75,7 +147,7 @@ header h1 {
     border-color: white;
 }
 
-.refresh-btn {
+.refresh-btn, .disconnect-btn {
     padding: 10px 20px;
     background: white;
     color: #1877f2;
@@ -87,7 +159,12 @@ header h1 {
     transition: transform 0.2s;
 }
 
-.refresh-btn:hover {
+.disconnect-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.refresh-btn:hover, .disconnect-btn:hover {
     transform: scale(1.05);
 }
 
@@ -119,20 +196,6 @@ header h1 {
     font-size: 28px;
     font-weight: 700;
     color: #1c1e21;
-    margin-bottom: 4px;
-}
-
-.kpi-change {
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.kpi-change.positive {
-    color: #31a24c;
-}
-
-.kpi-change.negative {
-    color: #e4405f;
 }
 
 /* Charts */
@@ -207,22 +270,10 @@ tr:hover {
     padding: 40px !important;
 }
 
-.status-active {
-    color: #31a24c;
-    font-weight: 600;
-}
+.status-active { color: #31a24c; font-weight: 600; }
+.status-paused { color: #f7b928; font-weight: 600; }
+.status-inactive { color: #e4405f; font-weight: 600; }
 
-.status-paused {
-    color: #f7b928;
-    font-weight: 600;
-}
-
-.status-inactive {
-    color: #e4405f;
-    font-weight: 600;
-}
-
-/* Footer */
 footer {
     text-align: center;
     padding: 20px;
@@ -230,22 +281,9 @@ footer {
     font-size: 12px;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
-    .kpi-cards {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .header-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .date-filters {
-        justify-content: center;
-    }
-    
-    .kpi-value {
-        font-size: 22px;
-    }
+    .kpi-cards { grid-template-columns: repeat(2, 1fr); }
+    .header-controls { flex-direction: column; align-items: stretch; }
+    .date-filters { justify-content: center; }
+    .kpi-value { font-size: 22px; }
 }

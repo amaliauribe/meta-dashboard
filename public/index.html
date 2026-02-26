@@ -8,6 +8,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- Token Setup Modal -->
+    <div id="tokenModal" class="modal">
+        <div class="modal-content">
+            <h2>🔐 Connect to Meta</h2>
+            <p>Enter your Meta Marketing API access token to load your ad data.</p>
+            <input type="password" id="tokenInput" placeholder="Paste your access token here">
+            <button id="saveToken" class="login-btn">Connect</button>
+            <p class="hint">Token is stored locally in your browser only.</p>
+        </div>
+    </div>
+
     <div class="dashboard">
         <header>
             <h1>📊 Meta Ads Dashboard</h1>
@@ -16,13 +27,14 @@
                     <option value="all">All Accounts</option>
                 </select>
                 <div class="date-filters">
-                    <button class="filter-btn active" data-range="today">Today</button>
+                    <button class="filter-btn" data-range="today">Today</button>
                     <button class="filter-btn" data-range="yesterday">Yesterday</button>
-                    <button class="filter-btn" data-range="7d">Last 7 Days</button>
+                    <button class="filter-btn active" data-range="7d">Last 7 Days</button>
                     <button class="filter-btn" data-range="14d">Last 14 Days</button>
                     <button class="filter-btn" data-range="30d">Last 30 Days</button>
                 </div>
                 <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+                <button id="disconnectBtn" class="disconnect-btn">🔓 Disconnect</button>
             </div>
         </header>
 
@@ -31,32 +43,26 @@
             <div class="kpi-card">
                 <div class="kpi-label">Total Spend</div>
                 <div class="kpi-value" id="totalSpend">$0.00</div>
-                <div class="kpi-change positive" id="spendChange">+0%</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Conversions</div>
                 <div class="kpi-value" id="totalConversions">0</div>
-                <div class="kpi-change positive" id="convChange">+0%</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Cost per Conversion</div>
                 <div class="kpi-value" id="costPerConv">$0.00</div>
-                <div class="kpi-change negative" id="cpcChange">+0%</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Cost per Click</div>
                 <div class="kpi-value" id="cpc">$0.00</div>
-                <div class="kpi-change" id="cpcClickChange">+0%</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Click-Through Rate</div>
                 <div class="kpi-value" id="ctr">0.00%</div>
-                <div class="kpi-change positive" id="ctrChange">+0%</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Impressions</div>
                 <div class="kpi-value" id="impressions">0</div>
-                <div class="kpi-change positive" id="impChange">+0%</div>
             </div>
         </section>
 
@@ -92,11 +98,10 @@
                             <th>CPC</th>
                             <th>Conversions</th>
                             <th>Cost/Conv</th>
-                            <th>ROAS</th>
                         </tr>
                     </thead>
                     <tbody id="campaignBody">
-                        <tr><td colspan="10" class="loading">Loading campaigns...</td></tr>
+                        <tr><td colspan="9" class="loading">Connect to Meta to view campaigns...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -120,7 +125,7 @@
                         </tr>
                     </thead>
                     <tbody id="dailyBody">
-                        <tr><td colspan="8" class="loading">Loading daily data...</td></tr>
+                        <tr><td colspan="8" class="loading">Connect to Meta to view daily data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -131,7 +136,6 @@
             <p>Data source: Meta Marketing API</p>
         </footer>
     </div>
-    <script src="config.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>
