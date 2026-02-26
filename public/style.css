@@ -308,6 +308,21 @@ header h1 {
     color: #1c1e21;
 }
 
+/* CPR Trend */
+.trend-up {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.trend-down {
+    color: #31a24c;
+    font-weight: 600;
+}
+
+.trend-neutral {
+    color: #65676b;
+}
+
 /* KPI Cards */
 .kpi-cards {
     display: grid;

@@ -631,17 +631,32 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading ads...</td></tr>';
 
     try {
-        // Get ad-level insights
+        // Get ad-level insights for current period
         const insightsData = await apiCall(
             `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions&${getDateRange(range)}&limit=100`
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="loading">No ad data for this period</td></tr>';
             return;
+        }
+        
+        // Get last 7 days baseline for trend comparison
+        const baselineData = await apiCall(
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,spend,actions&date_preset=last_7d&limit=100`
+        );
+        
+        // Build baseline CPR map
+        const baselineCPR = {};
+        if (baselineData.data) {
+            baselineData.data.forEach(ad => {
+                const spend = parseFloat(ad.spend || 0);
+                const results = getResults(ad.actions);
+                baselineCPR[ad.ad_id] = results > 0 ? spend / results : null;
+            });
         }
 
         // Get creative info for each ad (batch requests in chunks of 50)
@@ -692,6 +707,13 @@ async function loadAdsData() {
             const results = getResults(ad.actions);
             const costPerResult = results > 0 ? spend / results : Infinity;
             
+            // Calculate CPR trend vs 7-day baseline
+            const baseline = baselineCPR[ad.ad_id];
+            let cprTrend = null; // percentage change
+            if (baseline && costPerResult !== Infinity && baseline > 0) {
+                cprTrend = ((costPerResult - baseline) / baseline) * 100;
+            }
+            
             const creative = creativeData[ad.ad_id] || {};
             
             return {
@@ -705,6 +727,7 @@ async function loadAdsData() {
                 ctr,
                 results,
                 cost_per_result: costPerResult,
+                cpr_trend: cprTrend,
                 thumbnail: creative.thumbnail,
                 videoId: creative.videoId
             };
@@ -722,7 +745,7 @@ async function loadAdsData() {
         document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="10" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -831,6 +854,18 @@ function renderAdsTable() {
         }
 
         const costPerResultDisplay = ad.cost_per_result !== Infinity ? '$' + ad.cost_per_result.toFixed(2) : '-';
+        
+        // Format trend
+        let trendHtml;
+        if (ad.cpr_trend === null || ad.results === 0) {
+            trendHtml = '<span class="trend-neutral">-</span>';
+        } else if (ad.cpr_trend > 0) {
+            trendHtml = `<span class="trend-up">↑ ${ad.cpr_trend.toFixed(1)}%</span>`;
+        } else if (ad.cpr_trend < 0) {
+            trendHtml = `<span class="trend-down">↓ ${Math.abs(ad.cpr_trend).toFixed(1)}%</span>`;
+        } else {
+            trendHtml = '<span class="trend-neutral">→ 0%</span>';
+        }
 
         return `
             <tr>
@@ -844,6 +879,7 @@ function renderAdsTable() {
                 <td>${ad.ctr.toFixed(2)}%</td>
                 <td>${ad.results}</td>
                 <td>${costPerResultDisplay}</td>
+                <td>${trendHtml}</td>
             </tr>
         `;
     }).join('');
