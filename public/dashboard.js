@@ -75,7 +75,7 @@ function getResults(actions) {
     return total;
 }
 
-// Get budget status color based on remaining percentage
+// Get budget status color based on remaining percentage (for Today - pacing)
 function getBudgetStatus(budgetRemaining, dailyBudget) {
     if (!dailyBudget || dailyBudget === 0) return { color: 'gray', label: '-', percent: 0 };
     
@@ -87,6 +87,21 @@ function getBudgetStatus(budgetRemaining, dailyBudget) {
         return { color: '#f7b928', label: '🟡', percent: percentRemaining };
     } else {
         return { color: '#e74c3c', label: '🔴', percent: percentRemaining };
+    }
+}
+
+// Get utilization status color based on spend percentage (for Yesterday)
+function getUtilizationStatus(spend, dailyBudget) {
+    if (!dailyBudget || dailyBudget === 0) return { color: 'gray', label: '-', percent: 0 };
+    
+    const percentSpent = (spend / dailyBudget) * 100;
+    
+    if (percentSpent >= 85) {
+        return { color: '#31a24c', label: '🟢', percent: percentSpent };
+    } else if (percentSpent >= 50) {
+        return { color: '#f7b928', label: '🟡', percent: percentSpent };
+    } else {
+        return { color: '#e74c3c', label: '🔴', percent: percentSpent };
     }
 }
 
@@ -156,7 +171,7 @@ async function apiCall(endpoint) {
 }
 
 function showError(message) {
-    const campaignCols = currentRange === 'today' ? 10 : 8;
+    const campaignCols = (currentRange === 'today' || currentRange === 'yesterday') ? 10 : 8;
     document.getElementById('campaignBody').innerHTML = 
         `<tr><td colspan="${campaignCols}" class="loading">${message}</td></tr>`;
     document.getElementById('dailyBody').innerHTML = 
@@ -164,7 +179,7 @@ function showError(message) {
 }
 
 async function loadData() {
-    const campaignCols = currentRange === 'today' ? 10 : 8;
+    const campaignCols = (currentRange === 'today' || currentRange === 'yesterday') ? 10 : 8;
     document.getElementById('campaignBody').innerHTML = `<tr><td colspan="${campaignCols}" class="loading">Loading...</td></tr>`;
     document.getElementById('dailyBody').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
 
@@ -316,18 +331,22 @@ function renderResultsChart(labels, data) {
 
 async function loadCampaignData() {
     const range = dateRanges[currentRange];
-    const showBudget = currentRange === 'today';
+    const showBudget = currentRange === 'today' || currentRange === 'yesterday';
+    const isToday = currentRange === 'today';
     const colCount = showBudget ? 10 : 8;
     
     // Update table header based on whether we're showing budget columns
     const thead = document.getElementById('campaignHead');
     if (showBudget) {
+        const statusHeader = isToday 
+            ? 'Pacing <span class="info-icon" title="🟢 50%+ remaining&#10;🟡 20-50% remaining&#10;🔴 &lt;20% remaining">ⓘ</span>'
+            : 'Utilization <span class="info-icon" title="🟢 85%+ spent&#10;🟡 50-85% spent&#10;🔴 &lt;50% spent">ⓘ</span>';
         thead.innerHTML = `
             <tr>
                 <th>Campaign</th>
                 <th>Spend</th>
                 <th>Daily Budget</th>
-                <th>Status <span class="info-icon" title="🟢 50%+ remaining&#10;🟡 20-50% remaining&#10;🔴 &lt;20% remaining">ⓘ</span></th>
+                <th>${statusHeader}</th>
                 <th>Impressions</th>
                 <th>Clicks</th>
                 <th>CTR</th>
@@ -417,14 +436,24 @@ async function loadCampaignData() {
                 const budget = budgetByCampaign[c.id] || { daily_budget: 0, budget_remaining: 0 };
                 const dailyBudget = budget.daily_budget / 100;
                 const budgetRemaining = budget.budget_remaining / 100;
-                const budgetStatus = getBudgetStatus(budgetRemaining, dailyBudget);
+                
+                // Today: show pacing (% remaining), Yesterday: show utilization (% spent)
+                let statusInfo;
+                let statusTitle;
+                if (isToday) {
+                    statusInfo = getBudgetStatus(budgetRemaining, dailyBudget);
+                    statusTitle = `${statusInfo.percent?.toFixed(1) || 0}% remaining`;
+                } else {
+                    statusInfo = getUtilizationStatus(spend, dailyBudget);
+                    statusTitle = `${statusInfo.percent?.toFixed(1) || 0}% of budget spent`;
+                }
 
                 return `
                     <tr>
                         <td>${c.name}</td>
                         <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td>$${dailyBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                        <td title="${budgetStatus.percent?.toFixed(1) || 0}% remaining">${budgetStatus.label}</td>
+                        <td title="${statusTitle}">${statusInfo.label}</td>
                         <td>${impressions.toLocaleString()}</td>
                         <td>${clicks.toLocaleString()}</td>
                         <td>${ctr}%</td>
