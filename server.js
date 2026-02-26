@@ -153,9 +153,21 @@ async function submitAndDownloadReport(reportType, startDate, endDate, columns) 
         throw new Error('Report generation timed out');
     }
 
-    // Download and parse
+    // Download the ZIP file and extract CSV
     const reportResponse = await fetch(downloadUrl);
-    const reportText = await reportResponse.text();
+    const zipBuffer = await reportResponse.buffer();
+    
+    // Use built-in zlib to decompress (the ZIP is simple enough)
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip(zipBuffer);
+    const zipEntries = zip.getEntries();
+    
+    if (zipEntries.length === 0) {
+        throw new Error('Empty report ZIP file');
+    }
+    
+    const reportText = zipEntries[0].getData().toString('utf8');
+    console.log('Report CSV preview:', reportText.substring(0, 200));
     
     return parseReportCsv(reportText);
 }
