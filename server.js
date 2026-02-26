@@ -349,6 +349,61 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', configured: isBingConfigured() });
 });
 
+// OAuth helper - Step 1: Redirect to Microsoft login
+app.get('/auth/bing', (req, res) => {
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${MSADS_CONFIG.clientId}&response_type=code&redirect_uri=${encodeURIComponent('https://vtc-ads-dashboard.onrender.com/auth/bing/callback')}&scope=${encodeURIComponent('https://ads.microsoft.com/msads.manage offline_access')}&state=auth`;
+    res.redirect(authUrl);
+});
+
+// OAuth helper - Step 2: Handle callback and exchange code for tokens
+app.get('/auth/bing/callback', async (req, res) => {
+    const { code, error } = req.query;
+    
+    if (error) {
+        return res.send(`<h2>Error: ${error}</h2><p>${req.query.error_description || ''}</p>`);
+    }
+    
+    if (!code) {
+        return res.send('<h2>Error: No authorization code received</h2>');
+    }
+    
+    try {
+        const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: MSADS_CONFIG.clientId,
+                client_secret: MSADS_CONFIG.clientSecret,
+                code: code,
+                redirect_uri: 'https://vtc-ads-dashboard.onrender.com/auth/bing/callback',
+                grant_type: 'authorization_code',
+                scope: 'https://ads.microsoft.com/msads.manage offline_access'
+            }).toString()
+        });
+        
+        const tokens = await tokenResponse.json();
+        
+        if (tokens.error) {
+            return res.send(`<h2>Token Error</h2><pre>${JSON.stringify(tokens, null, 2)}</pre>`);
+        }
+        
+        // Show the refresh token so it can be saved
+        res.send(`
+            <html>
+            <head><title>Bing Auth Success</title></head>
+            <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h2 style="color: green;">✅ Authentication Successful!</h2>
+                <p>Copy this refresh token and send it to your admin to update the server:</p>
+                <textarea style="width: 100%; height: 150px; font-family: monospace; font-size: 12px;" readonly>${tokens.refresh_token}</textarea>
+                <p style="color: #666; margin-top: 20px;">This page is temporary - the token needs to be saved in the server environment variables.</p>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        res.send(`<h2>Error exchanging code</h2><pre>${err.message}</pre>`);
+    }
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
