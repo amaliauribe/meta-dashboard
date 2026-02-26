@@ -140,7 +140,8 @@ async function submitAndDownloadReport(reportType, startDate, endDate, columns) 
         if (status === 'Success') {
             const urlMatch = pollText.match(/<ReportDownloadUrl[^>]*>([^<]+)<\/ReportDownloadUrl>/);
             if (urlMatch) {
-                downloadUrl = urlMatch[1];
+                // Decode XML entities in URL (e.g., &amp; -> &)
+                downloadUrl = urlMatch[1].replace(/&amp;/g, '&');
             }
         } else if (status === 'Error') {
             throw new Error('Report generation failed');
