@@ -1125,10 +1125,25 @@ async function loadSummaryData() {
             if (metaData.data) {
                 metaData.data.forEach(row => {
                     metaByDate[row.date_start] = parseFloat(row.spend) || 0;
-                    // Get lead conversions from actions
+                    // Get conversions from actions - sum all conversion-related action types
                     const actions = row.actions || [];
-                    const leadAction = actions.find(a => a.action_type === 'lead' || a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
-                    metaConvByDate[row.date_start] = leadAction ? parseFloat(leadAction.value) : 0;
+                    const conversionTypes = [
+                        'lead', 
+                        'onsite_conversion.lead_grouped',
+                        'onsite_conversion.messaging_conversation_started_7d',
+                        'offsite_conversion.fb_pixel_lead',
+                        'omni_complete_registration',
+                        'contact_total',
+                        'onsite_web_lead',
+                        'submit_application_total'
+                    ];
+                    let totalConv = 0;
+                    actions.forEach(a => {
+                        if (conversionTypes.includes(a.action_type)) {
+                            totalConv += parseFloat(a.value) || 0;
+                        }
+                    });
+                    metaConvByDate[row.date_start] = totalConv;
                 });
             }
         } catch (e) {
