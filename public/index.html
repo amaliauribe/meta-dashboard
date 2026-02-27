@@ -37,12 +37,15 @@
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-section">
+                    <button class="nav-item nav-item-main active" data-view="summary">📊 Summary</button>
+                </div>
+                <div class="nav-section">
                     <div class="nav-section-title" data-toggle="meta">
                         <span>📘 Meta</span>
                         <span class="nav-arrow">▼</span>
                     </div>
                     <div class="nav-section-items" id="metaItems">
-                        <button class="nav-item active" data-view="campaigns">Campaigns</button>
+                        <button class="nav-item" data-view="campaigns">Campaigns</button>
                         <button class="nav-item" data-view="ads">Ads</button>
                     </div>
                 </div>
@@ -74,8 +77,103 @@
                 </div>
             </header>
 
+        <!-- Summary View -->
+        <div id="summaryView" class="view-content">
+            <div class="summary-header">
+                <h2>💰 Spend Summary</h2>
+                <p class="summary-subtitle">Cross-platform ad spend comparison across time periods</p>
+            </div>
+
+            <!-- Summary KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Spend (All Platforms)</div>
+                    <div class="kpi-value" id="summaryTotalSpend">$0.00</div>
+                </div>
+                <div class="kpi-card meta-card">
+                    <div class="kpi-label">📘 Meta</div>
+                    <div class="kpi-value" id="summaryMetaSpend">$0.00</div>
+                </div>
+                <div class="kpi-card google-card">
+                    <div class="kpi-label">🔴 Google</div>
+                    <div class="kpi-value" id="summaryGoogleSpend">$0.00</div>
+                </div>
+                <div class="kpi-card bing-card">
+                    <div class="kpi-label">🔷 Bing</div>
+                    <div class="kpi-value" id="summaryBingSpend">$0.00</div>
+                </div>
+            </section>
+
+            <!-- 14-Day Daily Breakdown -->
+            <section class="table-section">
+                <h2>📅 14-Day Daily Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="summaryDailyTable" class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Day</th>
+                                <th>Meta</th>
+                                <th>Google</th>
+                                <th>Bing</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryDailyBody">
+                            <tr><td colspan="6" class="loading">Loading summary data...</td></tr>
+                        </tbody>
+                        <tfoot id="summaryDailyFoot">
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Weekly Breakdown -->
+            <section class="table-section">
+                <h2>📆 Weekly Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="summaryWeeklyTable" class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Meta</th>
+                                <th>Google</th>
+                                <th>Bing</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryWeeklyBody">
+                            <tr><td colspan="5" class="loading">Loading weekly data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Monthly Breakdown -->
+            <section class="table-section">
+                <h2>📊 Monthly Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="summaryMonthlyTable" class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Meta</th>
+                                <th>Google</th>
+                                <th>Bing</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryMonthlyBody">
+                            <tr><td colspan="5" class="loading">Loading monthly data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </div><!-- End Summary View -->
+
         <!-- Campaigns View -->
-        <div id="campaignsView" class="view-content">
+        <div id="campaignsView" class="view-content hidden">
 
         <!-- KPI Cards -->
         <section class="kpi-cards">

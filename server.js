@@ -1027,6 +1027,116 @@ app.post('/api/google/keyword-performance', async (req, res) => {
     }
 });
 
+// ==================== Summary API ====================
+
+// Summary: Get daily spend data for all platforms
+app.post('/api/summary/daily', async (req, res) => {
+    const { startDate, endDate } = req.body;
+    
+    const results = {
+        meta: [],
+        google: [],
+        bing: []
+    };
+    
+    // Fetch Meta daily data
+    try {
+        // Meta API would go here - for now return empty
+        // This would need the Meta API integration
+    } catch (e) {
+        console.error('Meta summary error:', e.message);
+    }
+    
+    // Fetch Google daily data
+    if (isGoogleAdsConfigured()) {
+        try {
+            const googleData = await googleAdsApiRequest(`
+                SELECT 
+                    segments.date,
+                    metrics.cost_micros
+                FROM customer
+                WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                ORDER BY segments.date DESC
+            `);
+            
+            results.google = googleData.map(row => ({
+                date: row.segments?.date,
+                spend: (parseInt(row.metrics?.cost_micros) || 0) / 1000000
+            }));
+        } catch (e) {
+            console.error('Google summary error:', e.message);
+        }
+    }
+    
+    // Fetch Bing daily data
+    if (isBingConfigured()) {
+        try {
+            const columns = ['TimePeriod', 'Spend'];
+            const report = await submitAndDownloadReport('account', startDate, endDate, columns);
+            
+            results.bing = report.rows.map(row => ({
+                date: row.TimePeriod,
+                spend: parseFloat(row.Spend) || 0
+            }));
+        } catch (e) {
+            console.error('Bing summary error:', e.message);
+        }
+    }
+    
+    res.json(results);
+});
+
+// Summary: Get aggregated spend for periods (weekly/monthly)
+app.post('/api/summary/aggregated', async (req, res) => {
+    const { periods } = req.body; // Array of {name, startDate, endDate}
+    
+    const results = [];
+    
+    for (const period of periods) {
+        const periodData = {
+            name: period.name,
+            meta: 0,
+            google: 0,
+            bing: 0
+        };
+        
+        // Fetch Google
+        if (isGoogleAdsConfigured()) {
+            try {
+                const googleData = await googleAdsApiRequest(`
+                    SELECT metrics.cost_micros
+                    FROM customer
+                    WHERE segments.date BETWEEN '${period.startDate}' AND '${period.endDate}'
+                `);
+                
+                googleData.forEach(row => {
+                    periodData.google += (parseInt(row.metrics?.cost_micros) || 0) / 1000000;
+                });
+            } catch (e) {
+                console.error('Google aggregated error:', e.message);
+            }
+        }
+        
+        // Fetch Bing
+        if (isBingConfigured()) {
+            try {
+                const columns = ['TimePeriod', 'Spend'];
+                const report = await submitAndDownloadReport('account', period.startDate, period.endDate, columns);
+                
+                report.rows.forEach(row => {
+                    periodData.bing += parseFloat(row.Spend) || 0;
+                });
+            } catch (e) {
+                console.error('Bing aggregated error:', e.message);
+            }
+        }
+        
+        results.push(periodData);
+    }
+    
+    res.json(results);
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

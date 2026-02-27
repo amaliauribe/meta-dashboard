@@ -12,7 +12,7 @@ const ACCOUNT_ID = 'act_1151591609552634';
 
 // Dashboard State
 let currentRange = '7d';
-let currentView = 'campaigns';
+let currentView = 'summary';
 let spendChart = null;
 let resultsChart = null;
 let adsDataLoaded = false;
@@ -29,6 +29,9 @@ let bingConversionsChart = null;
 let googleDataLoaded = false;
 let googleSpendChart = null;
 let googleConversionsChart = null;
+
+// Summary State
+let summaryDataLoaded = false;
 
 // Bing API is handled by the backend server
 const BING_API_ENABLED = true;
@@ -173,7 +176,10 @@ function initializeDashboard() {
             adsDataLoaded = false; // Reset ads data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
             googleDataLoaded = false; // Reset google data when date changes
-            if (currentView === 'campaigns') {
+            summaryDataLoaded = false; // Reset summary data when date changes
+            if (currentView === 'summary') {
+                loadSummaryData();
+            } else if (currentView === 'campaigns') {
                 loadData();
             } else if (currentView === 'ads') {
                 loadAdsData();
@@ -193,12 +199,16 @@ function initializeDashboard() {
             currentView = item.dataset.view;
             
             // Show/hide views
+            document.getElementById('summaryView').classList.toggle('hidden', currentView !== 'summary');
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             
             // Load data for the selected view
+            if (currentView === 'summary' && !summaryDataLoaded) {
+                loadSummaryData();
+            }
             if (currentView === 'ads' && !adsDataLoaded) {
                 loadAdsData();
             }
@@ -226,7 +236,10 @@ function initializeDashboard() {
         adsDataLoaded = false;
         bingDataLoaded = false;
         googleDataLoaded = false;
-        if (currentView === 'campaigns') {
+        summaryDataLoaded = false;
+        if (currentView === 'summary') {
+            loadSummaryData();
+        } else if (currentView === 'campaigns') {
             loadData();
         } else if (currentView === 'ads') {
             loadAdsData();
@@ -292,7 +305,8 @@ function initializeDashboard() {
         renderAdsTable();
     });
     
-    loadData();
+    // Load summary by default
+    loadSummaryData();
 }
 
 async function apiCall(endpoint) {
@@ -964,6 +978,206 @@ function getBingDateRange(range) {
     
     return { since, until };
 }
+
+// ==================== Summary Functions ====================
+
+async function loadSummaryData() {
+    document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="6" class="loading">Loading summary data...</td></tr>';
+    document.getElementById('summaryWeeklyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    document.getElementById('summaryMonthlyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    
+    try {
+        // Get date range for 14 days
+        const today = getESTDate();
+        const dates = [];
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            dates.push(formatDateEST(d));
+        }
+        
+        const startDate = dates[dates.length - 1];
+        const endDate = dates[0];
+        
+        // Fetch daily data from API
+        const dailyResponse = await fetch('/api/summary/daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const dailyData = await dailyResponse.json();
+        
+        // Build daily map
+        const googleByDate = {};
+        const bingByDate = {};
+        
+        (dailyData.google || []).forEach(row => {
+            googleByDate[row.date] = row.spend;
+        });
+        (dailyData.bing || []).forEach(row => {
+            // Bing dates might be formatted differently
+            const dateStr = row.date?.split('T')[0] || row.date;
+            bingByDate[dateStr] = row.spend;
+        });
+        
+        // Build daily table
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        let dailyHtml = '';
+        let totalMeta = 0, totalGoogle = 0, totalBing = 0;
+        
+        dates.forEach(date => {
+            const d = new Date(date + 'T12:00:00');
+            const dayName = dayNames[d.getDay()];
+            const meta = 0; // Meta not yet integrated
+            const google = googleByDate[date] || 0;
+            const bing = bingByDate[date] || 0;
+            const total = meta + google + bing;
+            
+            totalMeta += meta;
+            totalGoogle += google;
+            totalBing += bing;
+            
+            dailyHtml += `
+                <tr>
+                    <td>${date}</td>
+                    <td>${dayName}</td>
+                    <td>${meta > 0 ? '$' + meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${google > 0 ? '$' + google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${bing > 0 ? '$' + bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                </tr>
+            `;
+        });
+        
+        document.getElementById('summaryDailyBody').innerHTML = dailyHtml;
+        
+        // Add totals row
+        const grandTotal = totalMeta + totalGoogle + totalBing;
+        document.getElementById('summaryDailyFoot').innerHTML = `
+            <tr class="total-row">
+                <td><strong>14-Day Total</strong></td>
+                <td></td>
+                <td><strong>$${totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+            </tr>
+        `;
+        
+        // Update KPI cards
+        document.getElementById('summaryTotalSpend').textContent = '$' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryMetaSpend').textContent = '$' + totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryGoogleSpend').textContent = '$' + totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        // Weekly breakdown
+        const weeklyPeriods = [
+            { name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] },
+            { name: '7-14 Days Ago', startDate: dates[13], endDate: dates[7] }
+        ];
+        
+        // Monthly breakdown - current and last month
+        const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        
+        const monthlyPeriods = [
+            { 
+                name: currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+                startDate: formatDateEST(currentMonth),
+                endDate: formatDateEST(today)
+            },
+            {
+                name: lastMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+                startDate: formatDateEST(lastMonth),
+                endDate: formatDateEST(lastDayLastMonth)
+            }
+        ];
+        
+        // Fetch aggregated data
+        const aggregatedResponse = await fetch('/api/summary/aggregated', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periods: [...weeklyPeriods, ...monthlyPeriods] })
+        });
+        const aggregatedData = await aggregatedResponse.json();
+        
+        // Weekly table
+        let weeklyHtml = '';
+        let weeklyTotalMeta = 0, weeklyTotalGoogle = 0, weeklyTotalBing = 0;
+        
+        aggregatedData.slice(0, 2).forEach(row => {
+            const total = row.meta + row.google + row.bing;
+            weeklyTotalMeta += row.meta;
+            weeklyTotalGoogle += row.google;
+            weeklyTotalBing += row.bing;
+            
+            weeklyHtml += `
+                <tr>
+                    <td>${row.name}</td>
+                    <td>${row.meta > 0 ? '$' + row.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${row.google > 0 ? '$' + row.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${row.bing > 0 ? '$' + row.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                </tr>
+            `;
+        });
+        
+        const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing;
+        weeklyHtml += `
+            <tr class="total-row">
+                <td><strong>14-Day Total</strong></td>
+                <td><strong>$${weeklyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${weeklyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${weeklyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${weeklyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+            </tr>
+        `;
+        document.getElementById('summaryWeeklyBody').innerHTML = weeklyHtml;
+        
+        // Monthly table
+        let monthlyHtml = '';
+        let monthlyTotalMeta = 0, monthlyTotalGoogle = 0, monthlyTotalBing = 0;
+        
+        aggregatedData.slice(2).forEach(row => {
+            const total = row.meta + row.google + row.bing;
+            monthlyTotalMeta += row.meta;
+            monthlyTotalGoogle += row.google;
+            monthlyTotalBing += row.bing;
+            
+            monthlyHtml += `
+                <tr>
+                    <td>${row.name}</td>
+                    <td>${row.meta > 0 ? '$' + row.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${row.google > 0 ? '$' + row.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${row.bing > 0 ? '$' + row.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                </tr>
+            `;
+        });
+        
+        const monthlyGrandTotal = monthlyTotalMeta + monthlyTotalGoogle + monthlyTotalBing;
+        monthlyHtml += `
+            <tr class="total-row">
+                <td><strong>Grand Total</strong></td>
+                <td><strong>$${monthlyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${monthlyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${monthlyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${monthlyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+            </tr>
+        `;
+        document.getElementById('summaryMonthlyBody').innerHTML = monthlyHtml;
+        
+        summaryDataLoaded = true;
+        updateLastUpdated();
+        
+    } catch (error) {
+        console.error('Summary error:', error);
+        document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="6" class="error">Error loading summary data</td></tr>';
+    }
+}
+
+// ==================== Bing Functions ====================
 
 // Main Bing data loading function
 async function loadBingData() {
