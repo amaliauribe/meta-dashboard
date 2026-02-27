@@ -1127,7 +1127,8 @@ app.post('/api/google/qs-capture', async (req, res) => {
         const query = `
             SELECT 
                 ad_group_criterion.keyword.text,
-                ad_group_criterion.quality_info.quality_score
+                ad_group_criterion.quality_info.quality_score,
+                metrics.clicks
             FROM keyword_view
             WHERE segments.date DURING LAST_7_DAYS
             ORDER BY metrics.clicks DESC

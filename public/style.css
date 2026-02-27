@@ -676,6 +676,33 @@ footer {
     margin: 0 2px;
 }
 
+/* Tooltip for column headers */
+.has-tooltip {
+    position: relative;
+    cursor: help;
+}
+.has-tooltip .tooltip {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    text-align: left;
+    line-height: 1.6;
+}
+.has-tooltip:hover .tooltip {
+    display: block;
+}
+
 @media (max-width: 768px) {
     .kpi-cards { grid-template-columns: repeat(2, 1fr); }
     .header-controls { flex-direction: column; align-items: stretch; }
