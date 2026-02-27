@@ -999,13 +999,28 @@ async function loadSummaryData() {
         const startDate = dates[dates.length - 1];
         const endDate = dates[0];
         
-        // Fetch daily data from API
+        // Fetch daily data from API (Google + Bing)
         const dailyResponse = await fetch('/api/summary/daily', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ startDate, endDate })
         });
         const dailyData = await dailyResponse.json();
+        
+        // Fetch Meta daily data directly
+        let metaByDate = {};
+        try {
+            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${ACCESS_TOKEN}`;
+            const metaResponse = await fetch(metaUrl);
+            const metaData = await metaResponse.json();
+            if (metaData.data) {
+                metaData.data.forEach(row => {
+                    metaByDate[row.date_start] = parseFloat(row.spend) || 0;
+                });
+            }
+        } catch (e) {
+            console.error('Meta summary error:', e);
+        }
         
         // Build daily map
         const googleByDate = {};
@@ -1028,7 +1043,7 @@ async function loadSummaryData() {
         dates.forEach(date => {
             const d = new Date(date + 'T12:00:00');
             const dayName = dayNames[d.getDay()];
-            const meta = 0; // Meta not yet integrated
+            const meta = metaByDate[date] || 0;
             const google = googleByDate[date] || 0;
             const bing = bingByDate[date] || 0;
             const total = meta + google + bing;
@@ -1094,13 +1109,28 @@ async function loadSummaryData() {
             }
         ];
         
-        // Fetch aggregated data
+        // Fetch aggregated data (Google + Bing from server)
         const aggregatedResponse = await fetch('/api/summary/aggregated', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ periods: [...weeklyPeriods, ...monthlyPeriods] })
         });
         const aggregatedData = await aggregatedResponse.json();
+        
+        // Fetch Meta aggregated data for each period
+        const allPeriods = [...weeklyPeriods, ...monthlyPeriods];
+        for (let i = 0; i < allPeriods.length; i++) {
+            try {
+                const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${allPeriods[i].startDate}","until":"${allPeriods[i].endDate}"}&access_token=${ACCESS_TOKEN}`;
+                const metaResponse = await fetch(metaUrl);
+                const metaData = await metaResponse.json();
+                if (metaData.data && metaData.data[0]) {
+                    aggregatedData[i].meta = parseFloat(metaData.data[0].spend) || 0;
+                }
+            } catch (e) {
+                console.error('Meta aggregated error:', e);
+            }
+        }
         
         // Weekly table
         let weeklyHtml = '';
