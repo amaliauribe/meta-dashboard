@@ -31,12 +31,20 @@ let googleSpendChart = null;
 let googleConversionsChart = null;
 let googleKeywordsDataLoaded = false;
 let googleQsHistoryDataLoaded = false;
+let googleGeoDataLoaded = false;
 let qsHistoryChart = null;
 
 // Keywords sorting state
 let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
 let keywordsSortDirection = 'desc';
+
+// Geographic state
+let geoDataLoaded = false;
+let geoRawData = [];
+let geoSortColumn = 'clicks';
+let geoSortDirection = 'desc';
+let geoTypeFilter = 'all';
 
 // Summary State
 let summaryDataLoaded = false;
@@ -186,6 +194,7 @@ function initializeDashboard() {
             googleDataLoaded = false; // Reset google data when date changes
             googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
+            googleGeoDataLoaded = false; // Reset google geo data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
@@ -201,6 +210,8 @@ function initializeDashboard() {
                 loadGoogleKeywordsData();
             } else if (currentView === 'googleQsHistory') {
                 loadGoogleQsHistoryData();
+            } else if (currentView === 'googleGeo') {
+                loadGoogleGeoData();
             }
         });
     });
@@ -220,6 +231,7 @@ function initializeDashboard() {
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
             document.getElementById('googleQsHistoryView').classList.toggle('hidden', currentView !== 'googleQsHistory');
+            document.getElementById('googleGeoView').classList.toggle('hidden', currentView !== 'googleGeo');
             
             // Load data for the selected view
             if (currentView === 'summary' && !summaryDataLoaded) {
@@ -239,6 +251,9 @@ function initializeDashboard() {
             }
             if (currentView === 'googleQsHistory' && !googleQsHistoryDataLoaded) {
                 loadGoogleQsHistoryData();
+            }
+            if (currentView === 'googleGeo' && !googleGeoDataLoaded) {
+                loadGoogleGeoData();
             }
         });
     });
@@ -260,6 +275,7 @@ function initializeDashboard() {
         googleDataLoaded = false;
         googleKeywordsDataLoaded = false;
         googleQsHistoryDataLoaded = false;
+        googleGeoDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
             loadSummaryData();
@@ -275,6 +291,8 @@ function initializeDashboard() {
             loadGoogleKeywordsData();
         } else if (currentView === 'googleQsHistory') {
             loadGoogleQsHistoryData();
+        } else if (currentView === 'googleGeo') {
+            loadGoogleGeoData();
         }
     });
 
@@ -324,6 +342,33 @@ function initializeDashboard() {
             // Re-render with new sort
             renderKeywordsTable();
         });
+    });
+    
+    // Sortable column headers for Geographic table
+    document.querySelectorAll('#geoTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            
+            if (geoSortColumn === sortKey) {
+                geoSortDirection = geoSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                geoSortColumn = sortKey;
+                geoSortDirection = 'desc';
+            }
+            
+            document.querySelectorAll('#geoTable th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            th.classList.add(geoSortDirection);
+            
+            renderGeoTable();
+        });
+    });
+    
+    // Geographic type filter
+    document.getElementById('geoTypeFilter').addEventListener('change', (e) => {
+        geoTypeFilter = e.target.value;
+        renderGeoTable();
     });
 
     // Ads filter dropdowns
@@ -2239,4 +2284,109 @@ function updateQsHistoryChart(chartData) {
             }
         }
     });
+}
+
+// ==================== Geographic Performance ====================
+
+async function loadGoogleGeoData() {
+    document.getElementById('geoBody').innerHTML = '<tr><td colspan="10" class="loading">Loading geographic data...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const dateRange = getGoogleDateRange(range);
+        
+        const data = await googleApiCall('geographic-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+        
+        const locations = data?.locations || [];
+        
+        if (locations.length === 0) {
+            document.getElementById('geoBody').innerHTML = '<tr><td colspan="10" class="loading">No geographic data available</td></tr>';
+            return;
+        }
+        
+        // Store raw data for filtering/sorting
+        geoRawData = locations;
+        
+        // Calculate totals
+        let totalClicks = 0, totalCost = 0, totalConversions = 0, totalImpressions = 0;
+        let zipCount = 0;
+        
+        locations.forEach(loc => {
+            totalClicks += loc.clicks || 0;
+            totalCost += loc.cost || 0;
+            totalConversions += loc.conversions || 0;
+            totalImpressions += loc.impressions || 0;
+            if (loc.type === 'Postal Code') zipCount++;
+        });
+        
+        // Update KPI cards
+        document.getElementById('geoTotalLocations').textContent = locations.length.toLocaleString();
+        document.getElementById('geoZipCount').textContent = zipCount.toLocaleString();
+        document.getElementById('geoTotalClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('geoTotalCost').textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('geoTotalConversions').textContent = totalConversions.toFixed(1);
+        document.getElementById('geoAvgConvRate').textContent = totalClicks > 0 ? ((totalConversions / totalClicks) * 100).toFixed(2) + '%' : '0%';
+        
+        // Update date range display
+        document.getElementById('geoDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
+        
+        // Render table
+        renderGeoTable();
+        
+        googleGeoDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Google Geographic error:', e);
+        document.getElementById('geoBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderGeoTable() {
+    if (geoRawData.length === 0) return;
+    
+    // Filter by type
+    let filtered = geoRawData;
+    if (geoTypeFilter !== 'all') {
+        filtered = geoRawData.filter(loc => loc.type === geoTypeFilter);
+    }
+    
+    // Sort data
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[geoSortColumn];
+        let bVal = b[geoSortColumn];
+        
+        if (aVal === null || aVal === undefined) aVal = geoSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = geoSortDirection === 'desc' ? -Infinity : Infinity;
+        
+        if (geoSortColumn === 'name' || geoSortColumn === 'type') {
+            aVal = (aVal || '').toLowerCase();
+            bVal = (bVal || '').toLowerCase();
+            return geoSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        
+        return geoSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    // Build table
+    document.getElementById('geoBody').innerHTML = sorted.map(loc => {
+        const convRateClass = loc.convRate >= 10 ? 'qs-good' : (loc.convRate >= 5 ? 'qs-ok' : 'qs-low');
+        
+        return `
+            <tr>
+                <td title="${loc.canonicalName || ''}">${loc.name}</td>
+                <td>${loc.type || '-'}</td>
+                <td>${(loc.impressions || 0).toLocaleString()}</td>
+                <td>${(loc.clicks || 0).toLocaleString()}</td>
+                <td>${loc.ctr?.toFixed(2) || '0.00'}%</td>
+                <td>$${(loc.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>$${(loc.cpc || 0).toFixed(2)}</td>
+                <td>${(loc.conversions || 0).toFixed(1)}</td>
+                <td class="${convRateClass}">${loc.convRate?.toFixed(2) || '0.00'}%</td>
+                <td>${loc.conversions > 0 ? '$' + loc.costPerConv.toFixed(2) : '-'}</td>
+            </tr>
+        `;
+    }).join('');
 }

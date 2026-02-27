@@ -61,6 +61,7 @@
                         <button class="nav-item" data-view="google">Campaigns</button>
                         <button class="nav-item" data-view="googleKeywords">Keywords</button>
                         <button class="nav-item" data-view="googleQsHistory">QS History</button>
+                        <button class="nav-item" data-view="googleGeo">Geographic</button>
                     </div>
                 </div>
             </nav>
@@ -667,6 +668,78 @@
             </section>
 
         </div><!-- End Google QS History View -->
+
+        <!-- Google Geographic View -->
+        <div id="googleGeoView" class="view-content hidden">
+            <h1>📍 Geographic Performance</h1>
+            
+            <!-- KPI Cards -->
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL LOCATIONS</div>
+                    <div id="geoTotalLocations" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">ZIP CODES</div>
+                    <div id="geoZipCount" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CLICKS</div>
+                    <div id="geoTotalClicks" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL COST</div>
+                    <div id="geoTotalCost" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CONVERSIONS</div>
+                    <div id="geoTotalConversions" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">AVG. CONV. RATE</div>
+                    <div id="geoAvgConvRate" class="kpi-value">-</div>
+                </div>
+            </div>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <label for="geoTypeFilter">Filter by Type: </label>
+                <select id="geoTypeFilter">
+                    <option value="all">All Locations</option>
+                    <option value="Postal Code">ZIP Codes Only</option>
+                    <option value="City">Cities Only</option>
+                    <option value="County">Counties Only</option>
+                    <option value="State">States Only</option>
+                </select>
+            </div>
+            
+            <!-- Geographic Table -->
+            <section class="table-section">
+                <h2>📍 Performance by Location</h2>
+                <p class="table-subtitle" id="geoDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="geoTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="name">Location</th>
+                                <th class="sortable" data-sort="type">Type</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="cost">Cost</th>
+                                <th class="sortable" data-sort="cpc">Avg CPC</th>
+                                <th class="sortable" data-sort="conversions">Conversions</th>
+                                <th class="sortable" data-sort="convRate">Conv. Rate</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="geoBody">
+                            <tr><td colspan="10" class="loading">Loading geographic data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Google Geographic View -->
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>

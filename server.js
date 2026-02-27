@@ -1089,6 +1089,126 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
     }
 });
 
+// ==================== Geographic Performance API ====================
+
+// Cache for geo target constant names (to avoid repeated lookups)
+const geoNameCache = {};
+
+// Google Ads: Geographic performance by location
+app.post('/api/google/geographic-performance', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    const { startDate, endDate } = req.body;
+    
+    try {
+        // Get location performance data
+        const query = `
+            SELECT 
+                campaign.name,
+                campaign_criterion.location.geo_target_constant,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.conversions
+            FROM location_view
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                AND metrics.impressions > 0
+            ORDER BY metrics.clicks DESC
+            LIMIT 500
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        // Extract unique geo IDs to look up names
+        const geoIds = [...new Set(results.map(r => {
+            const geoConstant = r.campaign_criterion?.location?.geo_target_constant || '';
+            const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+            return match ? match[1] : null;
+        }).filter(Boolean))];
+        
+        // Look up names for geo IDs not in cache
+        const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
+        if (uncachedIds.length > 0) {
+            const geoQuery = `
+                SELECT 
+                    geo_target_constant.id,
+                    geo_target_constant.name,
+                    geo_target_constant.canonical_name,
+                    geo_target_constant.target_type
+                FROM geo_target_constant
+                WHERE geo_target_constant.id IN (${uncachedIds.join(',')})
+            `;
+            const geoResults = await googleAdsApiRequest(geoQuery);
+            geoResults.forEach(r => {
+                const g = r.geo_target_constant || {};
+                geoNameCache[g.id] = {
+                    name: g.name,
+                    canonicalName: g.canonical_name,
+                    targetType: g.target_type
+                };
+            });
+        }
+        
+        // Aggregate by location (combining all campaigns)
+        const locationMap = {};
+        
+        results.forEach(row => {
+            const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
+            const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+            const geoId = match ? match[1] : 'unknown';
+            const metrics = row.metrics || {};
+            
+            if (!locationMap[geoId]) {
+                const geoInfo = geoNameCache[geoId] || { name: geoId, canonicalName: '', targetType: '' };
+                locationMap[geoId] = {
+                    geoId,
+                    name: geoInfo.name,
+                    canonicalName: geoInfo.canonicalName,
+                    type: geoInfo.targetType,
+                    impressions: 0,
+                    clicks: 0,
+                    cost: 0,
+                    conversions: 0,
+                    campaigns: new Set()
+                };
+            }
+            
+            locationMap[geoId].impressions += parseInt(metrics.impressions) || 0;
+            locationMap[geoId].clicks += parseInt(metrics.clicks) || 0;
+            locationMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+            locationMap[geoId].conversions += parseFloat(metrics.conversions) || 0;
+            locationMap[geoId].campaigns.add(row.campaign?.name || 'Unknown');
+        });
+        
+        // Convert to array and calculate derived metrics
+        const locations = Object.values(locationMap).map(loc => ({
+            geoId: loc.geoId,
+            name: loc.name,
+            canonicalName: loc.canonicalName,
+            type: loc.type,
+            impressions: loc.impressions,
+            clicks: loc.clicks,
+            cost: loc.cost,
+            conversions: loc.conversions,
+            ctr: loc.impressions > 0 ? (loc.clicks / loc.impressions) * 100 : 0,
+            cpc: loc.clicks > 0 ? loc.cost / loc.clicks : 0,
+            costPerConv: loc.conversions > 0 ? loc.cost / loc.conversions : 0,
+            convRate: loc.clicks > 0 ? (loc.conversions / loc.clicks) * 100 : 0,
+            campaignCount: loc.campaigns.size
+        }));
+        
+        // Sort by clicks descending
+        locations.sort((a, b) => b.clicks - a.clicks);
+        
+        res.json({ locations });
+    } catch (error) {
+        console.error('Google geographic performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== QS History API ====================
 
 // Simple file-based storage for QS history
