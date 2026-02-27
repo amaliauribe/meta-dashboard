@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fetch = require('node-fetch');
+const { GoogleAdsApi } = require('google-ads-api');
 
 const app = express();
 app.use(express.json());
@@ -24,86 +25,42 @@ function isGoogleAdsConfigured() {
            GOOGLE_ADS_CONFIG.customerId;
 }
 
-// Google Ads token cache
-let googleAccessToken = null;
-let googleTokenExpiry = null;
+// Google Ads API client
+let googleAdsClient = null;
 
-// Get Google Ads access token
-async function getGoogleAdsAccessToken() {
-    if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry) {
-        return googleAccessToken;
+function getGoogleAdsClient() {
+    if (!googleAdsClient && isGoogleAdsConfigured()) {
+        googleAdsClient = new GoogleAdsApi({
+            client_id: GOOGLE_ADS_CONFIG.clientId,
+            client_secret: GOOGLE_ADS_CONFIG.clientSecret,
+            developer_token: GOOGLE_ADS_CONFIG.developerToken
+        });
     }
-
-    console.log('Refreshing Google Ads access token...');
-    
-    const tokenUrl = 'https://oauth2.googleapis.com/token';
-    const params = new URLSearchParams({
-        client_id: GOOGLE_ADS_CONFIG.clientId,
-        client_secret: GOOGLE_ADS_CONFIG.clientSecret,
-        refresh_token: GOOGLE_ADS_CONFIG.refreshToken,
-        grant_type: 'refresh_token'
-    });
-
-    const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-    });
-
-    const data = await response.json();
-    
-    if (data.error) {
-        console.error('Google token refresh error:', data);
-        throw new Error(`OAuth error: ${data.error_description || data.error}`);
-    }
-
-    googleAccessToken = data.access_token;
-    googleTokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
-    
-    console.log('Google Ads access token refreshed successfully');
-    return googleAccessToken;
+    return googleAdsClient;
 }
 
 // Make Google Ads API request
 async function googleAdsApiRequest(query) {
-    const token = await getGoogleAdsAccessToken();
+    const client = getGoogleAdsClient();
+    if (!client) {
+        throw new Error('Google Ads API not configured');
+    }
+    
     const customerId = GOOGLE_ADS_CONFIG.customerId.replace(/-/g, '');
     const loginCustomerId = GOOGLE_ADS_CONFIG.loginCustomerId.replace(/-/g, '');
     
-    // Use v14 (confirmed stable version)
-    const url = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
-    
-    console.log('Google Ads API request to:', url);
+    console.log('Google Ads API query for customer:', customerId);
     console.log('Login customer ID:', loginCustomerId);
     
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'developer-token': GOOGLE_ADS_CONFIG.developerToken,
-            'Content-Type': 'application/json',
-            'login-customer-id': loginCustomerId
-        },
-        body: JSON.stringify({ query })
+    const customer = client.Customer({
+        customer_id: customerId,
+        login_customer_id: loginCustomerId,
+        refresh_token: GOOGLE_ADS_CONFIG.refreshToken
     });
-
-    const text = await response.text();
     
-    let data;
-    try {
-        data = JSON.parse(text);
-    } catch (e) {
-        console.error('Google Ads API raw response:', text.substring(0, 1000));
-        throw new Error('Invalid response from Google Ads API: ' + text.substring(0, 200));
-    }
-    
-    if (data.error) {
-        console.error('Google Ads API error:', JSON.stringify(data.error));
-        throw new Error(data.error.message || data.error.status || 'Google Ads API error');
-    }
-    
-    console.log('Google Ads API success, results:', data.results?.length || 0);
-    return data.results || [];
+    const results = await customer.query(query);
+    console.log('Google Ads API success, results:', results?.length || 0);
+    return results || [];
 }
 
 // TikTok Ads API Configuration
