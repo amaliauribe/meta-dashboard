@@ -12,7 +12,8 @@ const GOOGLE_ADS_CONFIG = {
     clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET,
     developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN,
-    customerId: process.env.GOOGLE_ADS_CUSTOMER_ID
+    customerId: process.env.GOOGLE_ADS_CUSTOMER_ID,
+    loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || process.env.GOOGLE_ADS_CUSTOMER_ID
 };
 
 function isGoogleAdsConfigured() {
@@ -67,9 +68,13 @@ async function getGoogleAdsAccessToken() {
 async function googleAdsApiRequest(query) {
     const token = await getGoogleAdsAccessToken();
     const customerId = GOOGLE_ADS_CONFIG.customerId.replace(/-/g, '');
+    const loginCustomerId = GOOGLE_ADS_CONFIG.loginCustomerId.replace(/-/g, '');
     
     // Use v18 (latest stable version)
     const url = `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:search`;
+    
+    console.log('Google Ads API request to:', url);
+    console.log('Login customer ID:', loginCustomerId);
     
     const response = await fetch(url, {
         method: 'POST',
@@ -77,7 +82,7 @@ async function googleAdsApiRequest(query) {
             'Authorization': `Bearer ${token}`,
             'developer-token': GOOGLE_ADS_CONFIG.developerToken,
             'Content-Type': 'application/json',
-            'login-customer-id': customerId
+            'login-customer-id': loginCustomerId
         },
         body: JSON.stringify({ query })
     });
