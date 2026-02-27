@@ -1915,7 +1915,13 @@ async function loadGoogleDailyData() {
 // Load Google Keyword Data (simple view on Google Campaigns page)
 async function loadGoogleKeywordData() {
     try {
-        const data = await googleApiCall('keyword-performance', {});
+        const range = dateRanges[currentRange];
+        const dateRange = getGoogleDateRange(range);
+        
+        const data = await googleApiCall('keyword-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
 
         const tbody = document.getElementById('googleKeywordBody');
         const keywords = data?.keywords || [];
@@ -1954,7 +1960,13 @@ async function loadGoogleKeywordsData() {
     document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="10" class="loading">Loading keywords...</td></tr>';
     
     try {
-        const data = await googleApiCall('keyword-performance-full', {});
+        const range = dateRanges[currentRange];
+        const dateRange = getGoogleDateRange(range);
+        
+        const data = await googleApiCall('keyword-performance-full', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
         const keywords = data?.keywords || [];
         
         if (keywords.length === 0) {
