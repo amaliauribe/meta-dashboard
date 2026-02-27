@@ -21,6 +21,23 @@ function isTikTokConfigured() {
            TIKTOK_CONFIG.accessToken;
 }
 
+// Google Ads API Configuration
+const GOOGLE_ADS_CONFIG = {
+    clientId: process.env.GOOGLE_ADS_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET,
+    developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+    customerId: process.env.GOOGLE_ADS_CUSTOMER_ID
+};
+
+function isGoogleAdsConfigured() {
+    return GOOGLE_ADS_CONFIG.clientId && 
+           GOOGLE_ADS_CONFIG.clientSecret && 
+           GOOGLE_ADS_CONFIG.developerToken &&
+           GOOGLE_ADS_CONFIG.refreshToken &&
+           GOOGLE_ADS_CONFIG.customerId;
+}
+
 // Microsoft Advertising API Configuration (from environment variables)
 const MSADS_CONFIG = {
     clientId: process.env.MSADS_CLIENT_ID,
@@ -489,6 +506,62 @@ app.get('/auth/tiktok/callback/tiktokANOnTRrxnjAIJOinIlYFdacJIFGaCUMA.txt', (req
 app.get('/auth/tiktok/callback/verification.txt', (req, res) => {
     res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
 });
+
+// ==================== Google Ads OAuth ====================
+
+// Google OAuth - Step 1: Redirect to Google auth
+app.get('/auth/google', (req, res) => {
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_ADS_CONFIG.clientId}&redirect_uri=${encodeURIComponent('https://vtc-ads-dashboard.onrender.com/auth/google/callback')}&response_type=code&scope=${encodeURIComponent('https://www.googleapis.com/auth/adwords')}&access_type=offline&prompt=consent`;
+    res.redirect(authUrl);
+});
+
+// Google OAuth - Step 2: Handle callback
+app.get('/auth/google/callback', async (req, res) => {
+    const { code, error } = req.query;
+    
+    if (error) {
+        return res.send(`<h2>Error: ${error}</h2>`);
+    }
+    
+    if (!code) {
+        return res.send('<h2>Error: No authorization code received</h2>');
+    }
+    
+    try {
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: GOOGLE_ADS_CONFIG.clientId,
+                client_secret: GOOGLE_ADS_CONFIG.clientSecret,
+                code: code,
+                redirect_uri: 'https://vtc-ads-dashboard.onrender.com/auth/google/callback',
+                grant_type: 'authorization_code'
+            }).toString()
+        });
+        
+        const tokens = await tokenResponse.json();
+        
+        if (tokens.error) {
+            return res.send(`<h2>Token Error</h2><pre>${JSON.stringify(tokens, null, 2)}</pre>`);
+        }
+        
+        res.send(`
+            <html>
+            <head><title>Google Ads Auth Success</title></head>
+            <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h2 style="color: green;">✅ Google Ads Authentication Successful!</h2>
+                <p>Copy this refresh token and send it to your admin to update the server:</p>
+                <textarea style="width: 100%; height: 150px; font-family: monospace; font-size: 12px;" readonly>${tokens.refresh_token}</textarea>
+                <p style="color: #666; margin-top: 20px;">This page is temporary - the token needs to be saved in the server environment variables.</p>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        res.send(`<h2>Error exchanging code</h2><pre>${err.message}</pre>`);
+    }
+});
+
 // Catch any .txt file request in callback folder
 app.get('/auth/tiktok/callback/*.txt', (req, res) => {
     res.type('text/plain').send(TIKTOK_VERIFY_CONTENT);
