@@ -660,6 +660,22 @@ footer {
 .qs-ok { color: #f7b928; font-weight: 600; }
 .qs-low { color: #e74c3c; font-weight: 600; }
 
+/* Table Subtitle */
+.table-subtitle {
+    color: #666;
+    font-size: 13px;
+    margin: -8px 0 12px 0;
+}
+.qs-legend {
+    color: #888;
+}
+.qs-legend .qs-good,
+.qs-legend .qs-ok,
+.qs-legend .qs-low {
+    font-size: 10px;
+    margin: 0 2px;
+}
+
 @media (max-width: 768px) {
     .kpi-cards { grid-template-columns: repeat(2, 1fr); }
     .header-controls { flex-direction: column; align-items: stretch; }

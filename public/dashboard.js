@@ -2032,6 +2032,9 @@ async function loadGoogleKeywordsData() {
         document.getElementById('keywordsAvgCpc').textContent = totalClicks > 0 ? '$' + (totalCost / totalClicks).toFixed(2) : '$0.00';
         document.getElementById('keywordsAvgQs').textContent = qsCount > 0 ? (qsSum / qsCount).toFixed(1) : '-';
         document.getElementById('keywordsTotalImpressions').textContent = totalImpressions.toLocaleString();
+        
+        // Update date range display
+        document.getElementById('keywordsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
 
         // Render table with current sort
         renderKeywordsTable();
