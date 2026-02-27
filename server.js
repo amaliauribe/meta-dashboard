@@ -1129,7 +1129,8 @@ app.post('/api/google/qs-capture', async (req, res) => {
                 ad_group_criterion.keyword.text,
                 ad_group_criterion.quality_info.quality_score
             FROM keyword_view
-            WHERE ad_group_criterion.status = 'ENABLED'
+            WHERE segments.date DURING LAST_7_DAYS
+            ORDER BY metrics.clicks DESC
             LIMIT 500
         `;
         
@@ -1140,7 +1141,7 @@ app.post('/api/google/qs-capture', async (req, res) => {
             keywords: results.map(row => ({
                 keyword: row.ad_group_criterion?.keyword?.text || 'Unknown',
                 qs: row.ad_group_criterion?.quality_info?.quality_score || null
-            })).filter(k => k.qs !== null)
+            })).filter(k => k.keyword !== 'Unknown')
         };
         
         // Load existing history and add snapshot
