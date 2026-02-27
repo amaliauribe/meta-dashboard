@@ -6,60 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-// Google Sheets Configuration (for Google Ads data via Looker Studio export)
-const GOOGLE_SHEETS_CONFIG = {
-    adGroupSheetId: '1cTVE6sRmquFmetKpI_QumW-wYFBnUomH48GCrsiMVB4',
-    keywordSheetId: '1YsELx9TvD7JwsqSNMtZ8QrjG6y2oqFWjiOUM5sjEVws',
-    apiKey: process.env.GOOGLE_SHEETS_API_KEY
-};
-
-function isGoogleSheetsConfigured() {
-    return GOOGLE_SHEETS_CONFIG.apiKey && 
-           GOOGLE_SHEETS_CONFIG.adGroupSheetId && 
-           GOOGLE_SHEETS_CONFIG.keywordSheetId;
-}
-
-// Fetch data from Google Sheets
-async function fetchGoogleSheet(sheetId) {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A:Z?key=${GOOGLE_SHEETS_CONFIG.apiKey}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.error) {
-        throw new Error(data.error.message);
-    }
-    
-    if (!data.values || data.values.length < 2) {
-        return { headers: [], rows: [] };
-    }
-    
-    const headers = data.values[0];
-    const rows = data.values.slice(1).map(row => {
-        const obj = {};
-        headers.forEach((h, i) => {
-            obj[h] = row[i] || '';
-        });
-        return obj;
-    });
-    
-    return { headers, rows };
-}
-
-// TikTok Ads API Configuration
-const TIKTOK_CONFIG = {
-    appId: process.env.TIKTOK_APP_ID,
-    appSecret: process.env.TIKTOK_APP_SECRET,
-    adAccountId: process.env.TIKTOK_AD_ACCOUNT_ID,
-    accessToken: process.env.TIKTOK_ACCESS_TOKEN
-};
-
-function isTikTokConfigured() {
-    return TIKTOK_CONFIG.appId && 
-           TIKTOK_CONFIG.appSecret && 
-           TIKTOK_CONFIG.adAccountId &&
-           TIKTOK_CONFIG.accessToken;
-}
-
 // Google Ads API Configuration
 const GOOGLE_ADS_CONFIG = {
     clientId: process.env.GOOGLE_ADS_CLIENT_ID,
@@ -75,6 +21,98 @@ function isGoogleAdsConfigured() {
            GOOGLE_ADS_CONFIG.developerToken &&
            GOOGLE_ADS_CONFIG.refreshToken &&
            GOOGLE_ADS_CONFIG.customerId;
+}
+
+// Google Ads token cache
+let googleAccessToken = null;
+let googleTokenExpiry = null;
+
+// Get Google Ads access token
+async function getGoogleAdsAccessToken() {
+    if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry) {
+        return googleAccessToken;
+    }
+
+    console.log('Refreshing Google Ads access token...');
+    
+    const tokenUrl = 'https://oauth2.googleapis.com/token';
+    const params = new URLSearchParams({
+        client_id: GOOGLE_ADS_CONFIG.clientId,
+        client_secret: GOOGLE_ADS_CONFIG.clientSecret,
+        refresh_token: GOOGLE_ADS_CONFIG.refreshToken,
+        grant_type: 'refresh_token'
+    });
+
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+        console.error('Google token refresh error:', data);
+        throw new Error(`OAuth error: ${data.error_description || data.error}`);
+    }
+
+    googleAccessToken = data.access_token;
+    googleTokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
+    
+    console.log('Google Ads access token refreshed successfully');
+    return googleAccessToken;
+}
+
+// Make Google Ads API request
+async function googleAdsApiRequest(query) {
+    const token = await getGoogleAdsAccessToken();
+    const customerId = GOOGLE_ADS_CONFIG.customerId.replace(/-/g, '');
+    
+    const url = `https://googleads.googleapis.com/v15/customers/${customerId}/googleAds:searchStream`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'developer-token': GOOGLE_ADS_CONFIG.developerToken,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+        console.error('Google Ads API error:', data.error);
+        throw new Error(data.error.message || 'Google Ads API error');
+    }
+    
+    // Parse the streaming response
+    const results = [];
+    if (Array.isArray(data)) {
+        data.forEach(batch => {
+            if (batch.results) {
+                results.push(...batch.results);
+            }
+        });
+    }
+    
+    return results;
+}
+
+// TikTok Ads API Configuration
+const TIKTOK_CONFIG = {
+    appId: process.env.TIKTOK_APP_ID,
+    appSecret: process.env.TIKTOK_APP_SECRET,
+    adAccountId: process.env.TIKTOK_AD_ACCOUNT_ID,
+    accessToken: process.env.TIKTOK_ACCESS_TOKEN
+};
+
+function isTikTokConfigured() {
+    return TIKTOK_CONFIG.appId && 
+           TIKTOK_CONFIG.appSecret && 
+           TIKTOK_CONFIG.adAccountId &&
+           TIKTOK_CONFIG.accessToken;
 }
 
 // Microsoft Advertising API Configuration (from environment variables)
@@ -829,43 +867,44 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
     }
 });
 
-// ==================== Google Ads (via Google Sheets) ====================
+// ==================== Google Ads API ====================
 
 // Google Ads: Check if configured
 app.get('/api/google/status', (req, res) => {
-    res.json({ configured: isGoogleSheetsConfigured() });
+    res.json({ configured: isGoogleAdsConfigured() });
 });
 
 // Google Ads: Account performance (aggregated KPIs)
 app.post('/api/google/account-performance', async (req, res) => {
-    if (!isGoogleSheetsConfigured()) {
-        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
     }
     
     try {
         const { startDate, endDate } = req.body;
-        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
         
-        // Filter by date range
-        const filteredRows = data.rows.filter(row => {
-            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
-            if (!rowDate) return true; // Include if no date field
-            return rowDate >= startDate && rowDate <= endDate;
-        });
+        const query = `
+            SELECT 
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+            FROM customer
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+        `;
         
-        // Aggregate totals
+        const results = await googleAdsApiRequest(query);
+        
         let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
         
-        filteredRows.forEach(row => {
-            // Handle different column name formats from Google Ads Scripts
-            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
-            const costValue = typeof cost === 'string' && cost.includes('micros') ? parseFloat(cost) / 1000000 : parseFloat(cost) || 0;
-            
-            totals.spend += costValue > 1000 ? costValue / 1000000 : costValue; // Handle micros
-            totals.impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
-            totals.clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
-            totals.conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
-            totals.conversionValue += parseFloat(row['Conv. value'] || row['metrics.conversions_value'] || 0);
+        results.forEach(row => {
+            const metrics = row.metrics || {};
+            totals.spend += (parseInt(metrics.costMicros) || 0) / 1000000;
+            totals.impressions += parseInt(metrics.impressions) || 0;
+            totals.clicks += parseInt(metrics.clicks) || 0;
+            totals.conversions += parseFloat(metrics.conversions) || 0;
+            totals.conversionValue += parseFloat(metrics.conversionsValue) || 0;
         });
         
         res.json(totals);
@@ -877,44 +916,45 @@ app.post('/api/google/account-performance', async (req, res) => {
 
 // Google Ads: Daily performance
 app.post('/api/google/daily-performance', async (req, res) => {
-    if (!isGoogleSheetsConfigured()) {
-        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
     }
     
     try {
         const { startDate, endDate } = req.body;
-        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
         
-        // Group by date
-        const dailyData = {};
+        const query = `
+            SELECT 
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions
+            FROM customer
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            ORDER BY segments.date DESC
+        `;
         
-        data.rows.forEach(row => {
-            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
-            if (!rowDate) return;
-            if (rowDate < startDate || rowDate > endDate) return;
+        const results = await googleAdsApiRequest(query);
+        
+        const rows = results.map(row => {
+            const metrics = row.metrics || {};
+            const segments = row.segments || {};
+            const spend = (parseInt(metrics.costMicros) || 0) / 1000000;
+            const impressions = parseInt(metrics.impressions) || 0;
+            const clicks = parseInt(metrics.clicks) || 0;
+            const conversions = parseFloat(metrics.conversions) || 0;
             
-            if (!dailyData[rowDate]) {
-                dailyData[rowDate] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
-            }
-            
-            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
-            const costValue = parseFloat(cost) || 0;
-            
-            dailyData[rowDate].spend += costValue > 1000000 ? costValue / 1000000 : costValue;
-            dailyData[rowDate].impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
-            dailyData[rowDate].clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
-            dailyData[rowDate].conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
+            return {
+                date: segments.date,
+                spend,
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpc: clicks > 0 ? spend / clicks : 0,
+                conversions
+            };
         });
-        
-        const rows = Object.entries(dailyData).map(([date, metrics]) => ({
-            date,
-            spend: metrics.spend,
-            impressions: metrics.impressions,
-            clicks: metrics.clicks,
-            ctr: metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0,
-            cpc: metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0,
-            conversions: metrics.conversions
-        }));
         
         res.json({ rows });
     } catch (error) {
@@ -925,46 +965,49 @@ app.post('/api/google/daily-performance', async (req, res) => {
 
 // Google Ads: Campaign performance
 app.post('/api/google/campaign-performance', async (req, res) => {
-    if (!isGoogleSheetsConfigured()) {
-        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
     }
     
     try {
         const { startDate, endDate } = req.body;
-        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
         
-        // Group by campaign
-        const campaignData = {};
+        const query = `
+            SELECT 
+                campaign.name,
+                campaign.status,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions
+            FROM campaign
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                AND campaign.status = 'ENABLED'
+            ORDER BY metrics.cost_micros DESC
+        `;
         
-        data.rows.forEach(row => {
-            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
-            if (rowDate && (rowDate < startDate || rowDate > endDate)) return;
+        const results = await googleAdsApiRequest(query);
+        
+        const campaigns = results.map(row => {
+            const campaign = row.campaign || {};
+            const metrics = row.metrics || {};
+            const spend = (parseInt(metrics.costMicros) || 0) / 1000000;
+            const impressions = parseInt(metrics.impressions) || 0;
+            const clicks = parseInt(metrics.clicks) || 0;
+            const conversions = parseFloat(metrics.conversions) || 0;
             
-            const campaignName = row['Campaign'] || row['campaign.name'] || row['Base Campaign'] || 'Unknown';
-            
-            if (!campaignData[campaignName]) {
-                campaignData[campaignName] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
-            }
-            
-            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
-            const costValue = parseFloat(cost) || 0;
-            
-            campaignData[campaignName].spend += costValue > 1000000 ? costValue / 1000000 : costValue;
-            campaignData[campaignName].impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
-            campaignData[campaignName].clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
-            campaignData[campaignName].conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
+            return {
+                name: campaign.name,
+                status: campaign.status,
+                spend,
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpc: clicks > 0 ? spend / clicks : 0,
+                conversions,
+                costPerConversion: conversions > 0 ? spend / conversions : 0
+            };
         });
-        
-        const campaigns = Object.entries(campaignData).map(([name, metrics]) => ({
-            name,
-            spend: metrics.spend,
-            impressions: metrics.impressions,
-            clicks: metrics.clicks,
-            ctr: metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0,
-            cpc: metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0,
-            conversions: metrics.conversions,
-            costPerConversion: metrics.conversions > 0 ? metrics.spend / metrics.conversions : 0
-        }));
         
         res.json({ campaigns });
     } catch (error) {
@@ -975,24 +1018,42 @@ app.post('/api/google/campaign-performance', async (req, res) => {
 
 // Google Ads: Keyword performance
 app.post('/api/google/keyword-performance', async (req, res) => {
-    if (!isGoogleSheetsConfigured()) {
-        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
     }
     
     try {
-        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.keywordSheetId);
+        const { startDate, endDate } = req.body;
         
-        const keywords = data.rows.map(row => {
-            const cost = row['Cost'] || row['metrics.cost_micros'] || 0;
-            const costValue = parseFloat(cost) || 0;
-            const clicks = parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
+        const query = `
+            SELECT 
+                ad_group_criterion.keyword.text,
+                ad_group_criterion.quality_info.quality_score,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.average_cpc
+            FROM keyword_view
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            ORDER BY metrics.clicks DESC
+            LIMIT 100
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        const keywords = results.map(row => {
+            const criterion = row.adGroupCriterion || {};
+            const keyword = criterion.keyword || {};
+            const qualityInfo = criterion.qualityInfo || {};
+            const metrics = row.metrics || {};
             
             return {
-                keyword: row['Search keyword'] || row['Keyword'] || row['keyword_view.resource_name'] || 'Unknown',
-                qualityScore: parseInt(row['Keyword quality score'] || row['Quality Score'] || 0) || null,
-                clicks,
-                cost: costValue > 1000000 ? costValue / 1000000 : costValue,
-                cpc: parseFloat(row['Avg. CPC'] || row['metrics.average_cpc'] || 0)
+                keyword: keyword.text || 'Unknown',
+                qualityScore: qualityInfo.qualityScore || null,
+                impressions: parseInt(metrics.impressions) || 0,
+                clicks: parseInt(metrics.clicks) || 0,
+                cost: (parseInt(metrics.costMicros) || 0) / 1000000,
+                cpc: (parseInt(metrics.averageCpc) || 0) / 1000000
             };
         });
         
@@ -1013,4 +1074,5 @@ app.listen(PORT, () => {
     console.log(`Dashboard server running on port ${PORT}`);
     console.log(`Bing API configured: ${isBingConfigured()}`);
     console.log(`TikTok API configured: ${isTikTokConfigured()}`);
+    console.log(`Google Ads API configured: ${isGoogleAdsConfigured()}`);
 });
