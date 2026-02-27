@@ -49,6 +49,9 @@
                 <div class="nav-section">
                     <button class="nav-item nav-item-main" data-view="bing">🔷 Bing</button>
                 </div>
+                <div class="nav-section">
+                    <button class="nav-item nav-item-main" data-view="google">🔴 Google</button>
+                </div>
             </nav>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -308,9 +311,128 @@
 
         </div><!-- End Bing View -->
 
+        <!-- Google Ads View -->
+        <div id="googleView" class="view-content hidden">
+            
+            <!-- Google KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Spend</div>
+                    <div class="kpi-value" id="googleTotalSpend">$0.00</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Conversions</div>
+                    <div class="kpi-value" id="googleTotalConversions">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cost per Conversion</div>
+                    <div class="kpi-value" id="googleCostPerConversion">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cost per Click</div>
+                    <div class="kpi-value" id="googleCpc">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Click-Through Rate</div>
+                    <div class="kpi-value" id="googleCtr">0.00%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Impressions</div>
+                    <div class="kpi-value" id="googleImpressions">0</div>
+                </div>
+            </section>
+
+            <!-- Google Daily Breakdown Table -->
+            <section class="table-section">
+                <h2>📅 Daily Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="googleDailyTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="googleDailyBody">
+                            <tr><td colspan="9" class="loading">Select this tab to load Google Ads data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Google Campaign Performance Table -->
+            <section class="table-section">
+                <h2>🚀 Active Campaigns</h2>
+                <div class="table-wrapper">
+                    <table id="googleCampaignTable">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="googleCampaignBody">
+                            <tr><td colspan="8" class="loading">Loading campaigns...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Google Keyword Performance Table -->
+            <section class="table-section">
+                <h2>🔑 Top Keywords</h2>
+                <div class="table-wrapper">
+                    <table id="googleKeywordTable">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Quality Score</th>
+                                <th>Clicks</th>
+                                <th>Cost</th>
+                                <th>Avg. CPC</th>
+                            </tr>
+                        </thead>
+                        <tbody id="googleKeywordBody">
+                            <tr><td colspan="5" class="loading">Loading keywords...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Google Conversions Chart -->
+            <section class="chart-section">
+                <h2>🎯 Conversions Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="googleConversionsChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Google Spend Trend Chart -->
+            <section class="chart-section">
+                <h2>📈 Spend Trend Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="googleSpendChart"></canvas>
+                </div>
+            </section>
+
+        </div><!-- End Google View -->
+
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
-                <p>Data source: Meta & Microsoft Advertising APIs</p>
+                <p>Data source: Meta, Microsoft & Google Advertising APIs</p>
             </footer>
         </main><!-- End Main Content -->
     </div>

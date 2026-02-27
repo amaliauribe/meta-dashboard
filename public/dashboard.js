@@ -25,6 +25,11 @@ let bingDataLoaded = false;
 let bingSpendChart = null;
 let bingConversionsChart = null;
 
+// Google Ads State
+let googleDataLoaded = false;
+let googleSpendChart = null;
+let googleConversionsChart = null;
+
 // Bing API is handled by the backend server
 const BING_API_ENABLED = true;
 
@@ -167,12 +172,15 @@ function initializeDashboard() {
             currentRange = btn.dataset.range;
             adsDataLoaded = false; // Reset ads data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
+            googleDataLoaded = false; // Reset google data when date changes
             if (currentView === 'campaigns') {
                 loadData();
             } else if (currentView === 'ads') {
                 loadAdsData();
             } else if (currentView === 'bing') {
                 loadBingData();
+            } else if (currentView === 'google') {
+                loadGoogleData();
             }
         });
     });
@@ -188,6 +196,7 @@ function initializeDashboard() {
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
+            document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             
             // Load data for the selected view
             if (currentView === 'ads' && !adsDataLoaded) {
@@ -195,6 +204,9 @@ function initializeDashboard() {
             }
             if (currentView === 'bing' && !bingDataLoaded) {
                 loadBingData();
+            }
+            if (currentView === 'google' && !googleDataLoaded) {
+                loadGoogleData();
             }
         });
     });
@@ -213,12 +225,15 @@ function initializeDashboard() {
     document.getElementById('refreshBtn').addEventListener('click', () => {
         adsDataLoaded = false;
         bingDataLoaded = false;
+        googleDataLoaded = false;
         if (currentView === 'campaigns') {
             loadData();
         } else if (currentView === 'ads') {
             loadAdsData();
         } else if (currentView === 'bing') {
             loadBingData();
+        } else if (currentView === 'google') {
+            loadGoogleData();
         }
     });
 
@@ -1277,5 +1292,378 @@ async function loadBingDailyData() {
     } catch (e) { 
         console.error('Bing Daily error:', e);
         document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+// =====================================================
+// GOOGLE ADS INTEGRATION (via Google Sheets)
+// =====================================================
+
+// Get date range for Google API (YYYY-MM-DD format)
+function getGoogleDateRange(range) {
+    const today = getESTDate();
+    let since, until;
+    
+    if (range.preset === 'today') {
+        since = formatDateEST(today);
+        until = formatDateEST(today);
+    } else if (range.preset === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        since = formatDateEST(yesterday);
+        until = formatDateEST(yesterday);
+    } else {
+        const sinceDate = new Date(today);
+        sinceDate.setDate(today.getDate() - range.days + 1);
+        since = formatDateEST(sinceDate);
+        until = formatDateEST(today);
+    }
+    
+    return { since, until };
+}
+
+// Main Google data loading function
+async function loadGoogleData() {
+    document.getElementById('googleCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading Google Ads data...</td></tr>';
+    document.getElementById('googleDailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('googleKeywordBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+
+    try {
+        await Promise.all([
+            loadGoogleKPIs(),
+            loadGoogleChartData(),
+            loadGoogleCampaignData(),
+            loadGoogleDailyData(),
+            loadGoogleKeywordData()
+        ]);
+        googleDataLoaded = true;
+        updateLastUpdated();
+    } catch (error) {
+        console.error('Google data error:', error);
+        showGoogleLoadingError('Error loading Google Ads data: ' + error.message);
+    }
+}
+
+// Show error message for Google
+function showGoogleLoadingError(errorMsg) {
+    const message = `
+        <tr>
+            <td colspan="8" class="loading">
+                <div style="padding: 20px;">
+                    <h3 style="margin-bottom: 10px;">⚠️ Error Loading Google Ads Data</h3>
+                    <p style="color: #65676b;">${errorMsg}</p>
+                </div>
+            </td>
+        </tr>
+    `;
+    document.getElementById('googleCampaignBody').innerHTML = message;
+    document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="9" class="loading">${errorMsg}</td></tr>`;
+    document.getElementById('googleKeywordBody').innerHTML = `<tr><td colspan="5" class="loading">${errorMsg}</td></tr>`;
+    
+    // Reset KPIs
+    document.getElementById('googleTotalSpend').textContent = '$0.00';
+    document.getElementById('googleTotalConversions').textContent = '0';
+    document.getElementById('googleCostPerConversion').textContent = '$0.00';
+    document.getElementById('googleCpc').textContent = '$0.00';
+    document.getElementById('googleCtr').textContent = '0.00%';
+    document.getElementById('googleImpressions').textContent = '0';
+    
+    // Show empty charts
+    const range = dateRanges[currentRange];
+    const days = getDaysArray(range.days);
+    renderGoogleSpendChart(days, new Array(range.days).fill(0));
+    renderGoogleConversionsChart(days, new Array(range.days).fill(0));
+}
+
+// Google API call helper - calls the backend proxy
+async function googleApiCall(endpoint, params = {}) {
+    const response = await fetch(`/api/google/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+        throw new Error(data.error);
+    }
+    
+    return data;
+}
+
+// Load Google KPIs
+async function loadGoogleKPIs() {
+    const range = dateRanges[currentRange];
+    const dateRange = getGoogleDateRange(range);
+    
+    try {
+        const data = await googleApiCall('account-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+        
+        if (data) {
+            const spend = parseFloat(data.spend || 0);
+            const impressions = parseInt(data.impressions || 0);
+            const clicks = parseInt(data.clicks || 0);
+            const conversions = parseFloat(data.conversions || 0);
+
+            document.getElementById('googleTotalSpend').textContent = '$' + spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('googleTotalConversions').textContent = Math.round(conversions).toLocaleString();
+            document.getElementById('googleCostPerConversion').textContent = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+            document.getElementById('googleCpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            document.getElementById('googleCtr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
+            document.getElementById('googleImpressions').textContent = impressions.toLocaleString();
+        }
+    } catch (e) { 
+        console.error('Google KPI error:', e);
+        throw e;
+    }
+}
+
+// Load Google Chart Data
+async function loadGoogleChartData() {
+    const range = dateRanges[currentRange];
+    const days = getDaysArray(range.days);
+
+    try {
+        const dateRange = getGoogleDateRange(range);
+        const data = await googleApiCall('daily-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+        
+        const dailySpend = new Array(range.days).fill(0);
+        const dailyConversions = new Array(range.days).fill(0);
+
+        if (data && data.rows) {
+            const dataByDate = {};
+            data.rows.forEach(row => {
+                dataByDate[row.date] = row;
+            });
+            
+            const today = getESTDate();
+            for (let i = 0; i < range.days; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - (range.days - 1 - i));
+                const dateStr = formatDateEST(date);
+                
+                if (dataByDate[dateStr]) {
+                    dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
+                    dailyConversions[i] = Math.round(parseFloat(dataByDate[dateStr].conversions || 0));
+                }
+            }
+        }
+
+        renderGoogleSpendChart(days, dailySpend);
+        renderGoogleConversionsChart(days, dailyConversions);
+    } catch (e) { 
+        console.error('Google Chart error:', e);
+        renderGoogleSpendChart(days, new Array(range.days).fill(0));
+        renderGoogleConversionsChart(days, new Array(range.days).fill(0));
+    }
+}
+
+// Render Google Spend Chart
+function renderGoogleSpendChart(labels, data) {
+    const ctx = document.getElementById('googleSpendChart').getContext('2d');
+    if (googleSpendChart) googleSpendChart.destroy();
+    
+    googleSpendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Daily Spend ($)',
+                data,
+                borderColor: '#ea4335',  // Google red
+                backgroundColor: 'rgba(234, 67, 53, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#ea4335',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } }
+        }
+    });
+}
+
+// Render Google Conversions Chart
+function renderGoogleConversionsChart(labels, data) {
+    const ctx = document.getElementById('googleConversionsChart').getContext('2d');
+    if (googleConversionsChart) googleConversionsChart.destroy();
+    
+    googleConversionsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Conversions',
+                data,
+                backgroundColor: 'rgba(234, 67, 53, 0.8)',  // Google red
+                borderColor: '#ea4335',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+// Load Google Campaign Data
+async function loadGoogleCampaignData() {
+    const range = dateRanges[currentRange];
+    const dateRange = getGoogleDateRange(range);
+
+    try {
+        const data = await googleApiCall('campaign-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+
+        const campaigns = data?.campaigns || [];
+        const tbody = document.getElementById('googleCampaignBody');
+        
+        if (campaigns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No campaigns with data for this period</td></tr>';
+            return;
+        }
+
+        // Sort by spend descending
+        campaigns.sort((a, b) => parseFloat(b.spend || 0) - parseFloat(a.spend || 0));
+
+        tbody.innerHTML = campaigns.map(c => {
+            const spend = parseFloat(c.spend || 0);
+            const impressions = parseInt(c.impressions || 0);
+            const clicks = parseInt(c.clicks || 0);
+            const conversions = Math.round(parseFloat(c.conversions || 0));
+            
+            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
+            const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+
+            return `
+                <tr>
+                    <td>${c.name}</td>
+                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>${impressions.toLocaleString()}</td>
+                    <td>${clicks.toLocaleString()}</td>
+                    <td>${ctr}%</td>
+                    <td>${cpc}</td>
+                    <td>${conversions}</td>
+                    <td>${costPerConv}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) { 
+        console.error('Google Campaign error:', e);
+        document.getElementById('googleCampaignBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+// Load Google Daily Data
+async function loadGoogleDailyData() {
+    const range = dateRanges[currentRange];
+    const dateRange = getGoogleDateRange(range);
+
+    try {
+        const data = await googleApiCall('daily-performance', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+
+        const tbody = document.getElementById('googleDailyBody');
+        
+        if (!data?.rows || data.rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
+            return;
+        }
+
+        // Sort by date descending
+        const sortedData = data.rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        tbody.innerHTML = sortedData.map(day => {
+            const spend = parseFloat(day.spend || 0);
+            const impressions = parseInt(day.impressions || 0);
+            const clicks = parseInt(day.clicks || 0);
+            const conversions = Math.round(parseFloat(day.conversions || 0));
+            
+            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
+            const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+            
+            // Parse date
+            const dateParts = day.date.split('-');
+            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+
+            return `
+                <tr>
+                    <td>${dateFormatted}</td>
+                    <td>${dayOfWeek}</td>
+                    <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>${impressions.toLocaleString()}</td>
+                    <td>${clicks.toLocaleString()}</td>
+                    <td>${ctr}%</td>
+                    <td>${cpc}</td>
+                    <td>${conversions}</td>
+                    <td>${costPerConv}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) { 
+        console.error('Google Daily error:', e);
+        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+// Load Google Keyword Data
+async function loadGoogleKeywordData() {
+    try {
+        const data = await googleApiCall('keyword-performance', {});
+
+        const tbody = document.getElementById('googleKeywordBody');
+        const keywords = data?.keywords || [];
+        
+        if (keywords.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">No keyword data available</td></tr>';
+            return;
+        }
+
+        // Sort by clicks descending
+        keywords.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+
+        // Show top 20
+        tbody.innerHTML = keywords.slice(0, 20).map(kw => {
+            const qualityScore = kw.qualityScore ? kw.qualityScore : '-';
+            const qsClass = kw.qualityScore >= 7 ? 'qs-good' : (kw.qualityScore >= 5 ? 'qs-ok' : 'qs-low');
+            
+            return `
+                <tr>
+                    <td>${kw.keyword}</td>
+                    <td class="${qsClass}">${qualityScore}</td>
+                    <td>${(kw.clicks || 0).toLocaleString()}</td>
+                    <td>$${(kw.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>$${(kw.cpc || 0).toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) { 
+        console.error('Google Keyword error:', e);
+        document.getElementById('googleKeywordBody').innerHTML = `<tr><td colspan="5" class="loading">Error: ${e.message}</td></tr>`;
     }
 }

@@ -6,6 +6,45 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+// Google Sheets Configuration (for Google Ads data via Looker Studio export)
+const GOOGLE_SHEETS_CONFIG = {
+    adGroupSheetId: '1cTVE6sRmquFmetKpI_QumW-wYFBnUomH48GCrsiMVB4',
+    keywordSheetId: '1YsELx9TvD7JwsqSNMtZ8QrjG6y2oqFWjiOUM5sjEVws',
+    apiKey: process.env.GOOGLE_SHEETS_API_KEY
+};
+
+function isGoogleSheetsConfigured() {
+    return GOOGLE_SHEETS_CONFIG.apiKey && 
+           GOOGLE_SHEETS_CONFIG.adGroupSheetId && 
+           GOOGLE_SHEETS_CONFIG.keywordSheetId;
+}
+
+// Fetch data from Google Sheets
+async function fetchGoogleSheet(sheetId) {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A:Z?key=${GOOGLE_SHEETS_CONFIG.apiKey}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+        throw new Error(data.error.message);
+    }
+    
+    if (!data.values || data.values.length < 2) {
+        return { headers: [], rows: [] };
+    }
+    
+    const headers = data.values[0];
+    const rows = data.values.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => {
+            obj[h] = row[i] || '';
+        });
+        return obj;
+    });
+    
+    return { headers, rows };
+}
+
 // TikTok Ads API Configuration
 const TIKTOK_CONFIG = {
     appId: process.env.TIKTOK_APP_ID,
@@ -786,6 +825,180 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
         res.json({ campaigns });
     } catch (error) {
         console.error('TikTok campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== Google Ads (via Google Sheets) ====================
+
+// Google Ads: Check if configured
+app.get('/api/google/status', (req, res) => {
+    res.json({ configured: isGoogleSheetsConfigured() });
+});
+
+// Google Ads: Account performance (aggregated KPIs)
+app.post('/api/google/account-performance', async (req, res) => {
+    if (!isGoogleSheetsConfigured()) {
+        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
+        
+        // Filter by date range
+        const filteredRows = data.rows.filter(row => {
+            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
+            if (!rowDate) return true; // Include if no date field
+            return rowDate >= startDate && rowDate <= endDate;
+        });
+        
+        // Aggregate totals
+        let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
+        
+        filteredRows.forEach(row => {
+            // Handle different column name formats from Google Ads Scripts
+            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
+            const costValue = typeof cost === 'string' && cost.includes('micros') ? parseFloat(cost) / 1000000 : parseFloat(cost) || 0;
+            
+            totals.spend += costValue > 1000 ? costValue / 1000000 : costValue; // Handle micros
+            totals.impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
+            totals.clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
+            totals.conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
+            totals.conversionValue += parseFloat(row['Conv. value'] || row['metrics.conversions_value'] || 0);
+        });
+        
+        res.json(totals);
+    } catch (error) {
+        console.error('Google account performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Google Ads: Daily performance
+app.post('/api/google/daily-performance', async (req, res) => {
+    if (!isGoogleSheetsConfigured()) {
+        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
+        
+        // Group by date
+        const dailyData = {};
+        
+        data.rows.forEach(row => {
+            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
+            if (!rowDate) return;
+            if (rowDate < startDate || rowDate > endDate) return;
+            
+            if (!dailyData[rowDate]) {
+                dailyData[rowDate] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
+            }
+            
+            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
+            const costValue = parseFloat(cost) || 0;
+            
+            dailyData[rowDate].spend += costValue > 1000000 ? costValue / 1000000 : costValue;
+            dailyData[rowDate].impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
+            dailyData[rowDate].clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
+            dailyData[rowDate].conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
+        });
+        
+        const rows = Object.entries(dailyData).map(([date, metrics]) => ({
+            date,
+            spend: metrics.spend,
+            impressions: metrics.impressions,
+            clicks: metrics.clicks,
+            ctr: metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0,
+            cpc: metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0,
+            conversions: metrics.conversions
+        }));
+        
+        res.json({ rows });
+    } catch (error) {
+        console.error('Google daily performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Google Ads: Campaign performance
+app.post('/api/google/campaign-performance', async (req, res) => {
+    if (!isGoogleSheetsConfigured()) {
+        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.adGroupSheetId);
+        
+        // Group by campaign
+        const campaignData = {};
+        
+        data.rows.forEach(row => {
+            const rowDate = row['Day'] || row['Date'] || row['segments.date'];
+            if (rowDate && (rowDate < startDate || rowDate > endDate)) return;
+            
+            const campaignName = row['Campaign'] || row['campaign.name'] || row['Base Campaign'] || 'Unknown';
+            
+            if (!campaignData[campaignName]) {
+                campaignData[campaignName] = { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
+            }
+            
+            const cost = row['Cost'] || row['metrics.cost_micros'] || row['cost_micros'] || 0;
+            const costValue = parseFloat(cost) || 0;
+            
+            campaignData[campaignName].spend += costValue > 1000000 ? costValue / 1000000 : costValue;
+            campaignData[campaignName].impressions += parseInt(row['Impressions'] || row['metrics.impressions'] || 0);
+            campaignData[campaignName].clicks += parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
+            campaignData[campaignName].conversions += parseFloat(row['Conversions'] || row['metrics.conversions'] || 0);
+        });
+        
+        const campaigns = Object.entries(campaignData).map(([name, metrics]) => ({
+            name,
+            spend: metrics.spend,
+            impressions: metrics.impressions,
+            clicks: metrics.clicks,
+            ctr: metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0,
+            cpc: metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0,
+            conversions: metrics.conversions,
+            costPerConversion: metrics.conversions > 0 ? metrics.spend / metrics.conversions : 0
+        }));
+        
+        res.json({ campaigns });
+    } catch (error) {
+        console.error('Google campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Google Ads: Keyword performance
+app.post('/api/google/keyword-performance', async (req, res) => {
+    if (!isGoogleSheetsConfigured()) {
+        return res.status(503).json({ error: 'Google Sheets API key not configured' });
+    }
+    
+    try {
+        const data = await fetchGoogleSheet(GOOGLE_SHEETS_CONFIG.keywordSheetId);
+        
+        const keywords = data.rows.map(row => {
+            const cost = row['Cost'] || row['metrics.cost_micros'] || 0;
+            const costValue = parseFloat(cost) || 0;
+            const clicks = parseInt(row['Clicks'] || row['metrics.clicks'] || 0);
+            
+            return {
+                keyword: row['Search keyword'] || row['Keyword'] || row['keyword_view.resource_name'] || 'Unknown',
+                qualityScore: parseInt(row['Keyword quality score'] || row['Quality Score'] || 0) || null,
+                clicks,
+                cost: costValue > 1000000 ? costValue / 1000000 : costValue,
+                cpc: parseFloat(row['Avg. CPC'] || row['metrics.average_cpc'] || 0)
+            };
+        });
+        
+        res.json({ keywords });
+    } catch (error) {
+        console.error('Google keyword performance error:', error);
         res.status(500).json({ error: error.message });
     }
 });
