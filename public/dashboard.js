@@ -39,6 +39,9 @@ let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
 let keywordsSortDirection = 'desc';
 
+// Summary chart
+let platformComparisonChart = null;
+
 // Geographic state
 let geoDataLoaded = false;
 let geoRawData = [];
@@ -1216,6 +1219,12 @@ async function loadSummaryData() {
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
         
+        // Update Platform Comparison Chart
+        updatePlatformComparisonChart(
+            { meta: totalMeta, google: totalGoogle, bing: totalBing },
+            { meta: totalMetaConv, google: totalGoogleConv, bing: totalBingConv }
+        );
+        
         // Weekly breakdown
         const weeklyPeriods = [
             { name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] },
@@ -2300,6 +2309,98 @@ function updateQsHistoryChart(chartData) {
                     min: 0,
                     max: 10,
                     ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}
+
+// ==================== Platform Comparison Chart ====================
+
+function updatePlatformComparisonChart(spend, conversions) {
+    const ctx = document.getElementById('platformComparisonChart').getContext('2d');
+    
+    if (platformComparisonChart) {
+        platformComparisonChart.destroy();
+    }
+    
+    platformComparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Meta', 'Google', 'Bing'],
+            datasets: [
+                {
+                    label: 'Spend ($)',
+                    data: [spend.meta, spend.google, spend.bing],
+                    backgroundColor: ['#4267B2', '#EA4335', '#00A4EF'],
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Conversions',
+                    data: [conversions.meta, conversions.google, conversions.bing],
+                    backgroundColor: ['rgba(66, 103, 178, 0.5)', 'rgba(234, 67, 53, 0.5)', 'rgba(0, 164, 239, 0.5)'],
+                    borderColor: ['#4267B2', '#EA4335', '#00A4EF'],
+                    borderWidth: 2,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: '#333',
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.dataset.label === 'Spend ($)') {
+                                return 'Spend: $' + context.raw.toLocaleString('en-US', {minimumFractionDigits: 2});
+                            }
+                            return 'Conversions: ' + context.raw.toFixed(1);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Spend ($)',
+                        color: '#333'
+                    },
+                    ticks: {
+                        color: '#333',
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    },
+                    grid: { color: '#eee' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Conversions',
+                        color: '#333'
+                    },
+                    ticks: { color: '#333' },
+                    grid: { drawOnChartArea: false }
+                },
+                x: {
+                    ticks: {
+                        color: '#333',
+                        font: { size: 14, weight: 'bold' }
+                    }
                 }
             }
         }
