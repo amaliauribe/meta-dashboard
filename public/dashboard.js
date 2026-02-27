@@ -2392,9 +2392,28 @@ function renderGeoTable() {
     document.getElementById('geoBody').innerHTML = sorted.map(loc => {
         const convRateClass = loc.convRate >= 10 ? 'qs-good' : (loc.convRate >= 5 ? 'qs-ok' : 'qs-low');
         
+        // Extract state from canonical name (format: "ZIP,State,Country")
+        let stateAbbr = '';
+        if (loc.canonicalName) {
+            const parts = loc.canonicalName.split(',');
+            if (parts.length >= 2) {
+                const stateName = parts[1].trim();
+                // Convert state name to abbreviation
+                const stateMap = {
+                    'New York': 'NY', 'California': 'CA', 'Texas': 'TX', 'New Jersey': 'NJ',
+                    'Connecticut': 'CT', 'Maryland': 'MD', 'District of Columbia': 'DC',
+                    'Florida': 'FL', 'Pennsylvania': 'PA', 'Virginia': 'VA', 'Massachusetts': 'MA',
+                    'Georgia': 'GA', 'Illinois': 'IL', 'Ohio': 'OH', 'Michigan': 'MI',
+                    'North Carolina': 'NC', 'Arizona': 'AZ', 'Washington': 'WA', 'Colorado': 'CO'
+                };
+                stateAbbr = stateMap[stateName] || stateName.substring(0, 2).toUpperCase();
+            }
+        }
+        const locationDisplay = stateAbbr ? `${loc.name} <span class="state-badge">${stateAbbr}</span>` : loc.name;
+        
         return `
             <tr>
-                <td title="${loc.canonicalName || ''}">${loc.name}</td>
+                <td title="${loc.canonicalName || ''}">${locationDisplay}</td>
                 <td>${loc.type || '-'}</td>
                 <td>${(loc.impressions || 0).toLocaleString()}</td>
                 <td>${(loc.clicks || 0).toLocaleString()}</td>
