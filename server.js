@@ -1350,7 +1350,6 @@ app.post('/api/google/qs-history', async (req, res) => {
         }
         
         // Get current snapshot and historical snapshots
-        const today = new Date().toISOString().split('T')[0];
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const thirtyDaysAgo = new Date();
