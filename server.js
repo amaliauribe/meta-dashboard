@@ -863,11 +863,11 @@ app.post('/api/google/account-performance', async (req, res) => {
         
         results.forEach(row => {
             const metrics = row.metrics || {};
-            totals.spend += (parseInt(metrics.costMicros) || 0) / 1000000;
+            totals.spend += (parseInt(metrics.cost_micros) || 0) / 1000000;
             totals.impressions += parseInt(metrics.impressions) || 0;
             totals.clicks += parseInt(metrics.clicks) || 0;
             totals.conversions += parseFloat(metrics.conversions) || 0;
-            totals.conversionValue += parseFloat(metrics.conversionsValue) || 0;
+            totals.conversionValue += parseFloat(metrics.conversions_value) || 0;
         });
         
         res.json(totals);
@@ -903,7 +903,7 @@ app.post('/api/google/daily-performance', async (req, res) => {
         const rows = results.map(row => {
             const metrics = row.metrics || {};
             const segments = row.segments || {};
-            const spend = (parseInt(metrics.costMicros) || 0) / 1000000;
+            const spend = (parseInt(metrics.cost_micros) || 0) / 1000000;
             const impressions = parseInt(metrics.impressions) || 0;
             const clicks = parseInt(metrics.clicks) || 0;
             const conversions = parseFloat(metrics.conversions) || 0;
@@ -954,7 +954,7 @@ app.post('/api/google/campaign-performance', async (req, res) => {
         const campaigns = results.map(row => {
             const campaign = row.campaign || {};
             const metrics = row.metrics || {};
-            const spend = (parseInt(metrics.costMicros) || 0) / 1000000;
+            const spend = (parseInt(metrics.cost_micros) || 0) / 1000000;
             const impressions = parseInt(metrics.impressions) || 0;
             const clicks = parseInt(metrics.clicks) || 0;
             const conversions = parseFloat(metrics.conversions) || 0;
@@ -1015,8 +1015,8 @@ app.post('/api/google/keyword-performance', async (req, res) => {
                 qualityScore: qualityInfo.qualityScore || null,
                 impressions: parseInt(metrics.impressions) || 0,
                 clicks: parseInt(metrics.clicks) || 0,
-                cost: (parseInt(metrics.costMicros) || 0) / 1000000,
-                cpc: (parseInt(metrics.averageCpc) || 0) / 1000000
+                cost: (parseInt(metrics.cost_micros) || 0) / 1000000,
+                cpc: (parseInt(metrics.average_cpc) || 0) / 1000000
             };
         });
         
