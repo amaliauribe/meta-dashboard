@@ -68,36 +68,36 @@ async function googleAdsApiRequest(query) {
     const token = await getGoogleAdsAccessToken();
     const customerId = GOOGLE_ADS_CONFIG.customerId.replace(/-/g, '');
     
-    const url = `https://googleads.googleapis.com/v15/customers/${customerId}/googleAds:searchStream`;
+    // Use v18 (latest stable version)
+    const url = `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:search`;
     
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
             'developer-token': GOOGLE_ADS_CONFIG.developerToken,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'login-customer-id': customerId
         },
         body: JSON.stringify({ query })
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        console.error('Google Ads API response:', text.substring(0, 500));
+        throw new Error('Invalid response from Google Ads API');
+    }
     
     if (data.error) {
         console.error('Google Ads API error:', data.error);
         throw new Error(data.error.message || 'Google Ads API error');
     }
     
-    // Parse the streaming response
-    const results = [];
-    if (Array.isArray(data)) {
-        data.forEach(batch => {
-            if (batch.results) {
-                results.push(...batch.results);
-            }
-        });
-    }
-    
-    return results;
+    return data.results || [];
 }
 
 // TikTok Ads API Configuration
