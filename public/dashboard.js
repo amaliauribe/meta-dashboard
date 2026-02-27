@@ -33,6 +33,11 @@ let googleKeywordsDataLoaded = false;
 let googleQsHistoryDataLoaded = false;
 let qsHistoryChart = null;
 
+// Keywords sorting state
+let keywordsRawData = [];
+let keywordsSortColumn = 'clicks';
+let keywordsSortDirection = 'desc';
+
 // Summary State
 let summaryDataLoaded = false;
 
@@ -294,6 +299,30 @@ function initializeDashboard() {
             
             // Re-render with new sort
             renderAdsTable();
+        });
+    });
+    
+    // Sortable column headers for Keywords table
+    document.querySelectorAll('#keywordsFullTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            
+            // Toggle direction if same column, otherwise default to desc
+            if (keywordsSortColumn === sortKey) {
+                keywordsSortDirection = keywordsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                keywordsSortColumn = sortKey;
+                keywordsSortDirection = 'desc';
+            }
+            
+            // Update header styles
+            document.querySelectorAll('#keywordsFullTable th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            th.classList.add(keywordsSortDirection);
+            
+            // Re-render with new sort
+            renderKeywordsTable();
         });
     });
 
@@ -1974,8 +2003,12 @@ async function loadGoogleKeywordsData() {
             return;
         }
 
-        // Sort by clicks descending
-        keywords.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+        // Store raw data for sorting
+        keywordsRawData = keywords.map(kw => ({
+            ...kw,
+            ctr: kw.impressions > 0 ? (kw.clicks / kw.impressions) * 100 : 0,
+            costPerConv: kw.conversions > 0 ? kw.cost / kw.conversions : 0
+        }));
         
         // Calculate totals for KPI cards
         let totalClicks = 0, totalCost = 0, totalImpressions = 0, totalConversions = 0;
@@ -2000,28 +2033,8 @@ async function loadGoogleKeywordsData() {
         document.getElementById('keywordsAvgQs').textContent = qsCount > 0 ? (qsSum / qsCount).toFixed(1) : '-';
         document.getElementById('keywordsTotalImpressions').textContent = totalImpressions.toLocaleString();
 
-        // Build table
-        document.getElementById('keywordsFullBody').innerHTML = keywords.map(kw => {
-            const qualityScore = kw.qualityScore ? kw.qualityScore : '-';
-            const qsClass = kw.qualityScore >= 7 ? 'qs-good' : (kw.qualityScore >= 5 ? 'qs-ok' : 'qs-low');
-            const ctr = kw.impressions > 0 ? ((kw.clicks / kw.impressions) * 100).toFixed(2) + '%' : '0.00%';
-            const costPerConv = kw.conversions > 0 ? '$' + (kw.cost / kw.conversions).toFixed(2) : '-';
-            
-            return `
-                <tr>
-                    <td>${kw.keyword}</td>
-                    <td>${kw.matchType || '-'}</td>
-                    <td class="${qsClass}">${qualityScore}</td>
-                    <td>${(kw.impressions || 0).toLocaleString()}</td>
-                    <td>${(kw.clicks || 0).toLocaleString()}</td>
-                    <td>${ctr}</td>
-                    <td>$${(kw.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td>$${(kw.cpc || 0).toFixed(2)}</td>
-                    <td>${(kw.conversions || 0).toFixed(1)}</td>
-                    <td>${costPerConv}</td>
-                </tr>
-            `;
-        }).join('');
+        // Render table with current sort
+        renderKeywordsTable();
         
         googleKeywordsDataLoaded = true;
         updateLastUpdated();
@@ -2029,6 +2042,62 @@ async function loadGoogleKeywordsData() {
         console.error('Google Keywords error:', e);
         document.getElementById('keywordsFullBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
+}
+
+// Render Keywords table with sorting
+function renderKeywordsTable() {
+    if (keywordsRawData.length === 0) return;
+    
+    // Sort data
+    const sorted = [...keywordsRawData].sort((a, b) => {
+        let aVal = a[keywordsSortColumn];
+        let bVal = b[keywordsSortColumn];
+        
+        // Handle nulls
+        if (aVal === null || aVal === undefined) aVal = keywordsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = keywordsSortDirection === 'desc' ? -Infinity : Infinity;
+        
+        // String comparison for keyword and matchType
+        if (keywordsSortColumn === 'keyword' || keywordsSortColumn === 'matchType') {
+            aVal = (aVal || '').toLowerCase();
+            bVal = (bVal || '').toLowerCase();
+            if (keywordsSortDirection === 'asc') {
+                return aVal.localeCompare(bVal);
+            } else {
+                return bVal.localeCompare(aVal);
+            }
+        }
+        
+        // Numeric comparison
+        if (keywordsSortDirection === 'asc') {
+            return aVal - bVal;
+        } else {
+            return bVal - aVal;
+        }
+    });
+    
+    // Build table
+    document.getElementById('keywordsFullBody').innerHTML = sorted.map(kw => {
+        const qualityScore = kw.qualityScore ? kw.qualityScore : '-';
+        const qsClass = kw.qualityScore >= 7 ? 'qs-good' : (kw.qualityScore >= 5 ? 'qs-ok' : 'qs-low');
+        const ctr = kw.ctr > 0 ? kw.ctr.toFixed(2) + '%' : '0.00%';
+        const costPerConv = kw.costPerConv > 0 ? '$' + kw.costPerConv.toFixed(2) : '-';
+        
+        return `
+            <tr>
+                <td>${kw.keyword}</td>
+                <td>${kw.matchType || '-'}</td>
+                <td class="${qsClass}">${qualityScore}</td>
+                <td>${(kw.impressions || 0).toLocaleString()}</td>
+                <td>${(kw.clicks || 0).toLocaleString()}</td>
+                <td>${ctr}</td>
+                <td>$${(kw.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>$${(kw.cpc || 0).toFixed(2)}</td>
+                <td>${(kw.conversions || 0).toFixed(1)}</td>
+                <td>${costPerConv}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // Load Google QS History Data
