@@ -1167,6 +1167,46 @@ app.post('/api/google/qs-capture', async (req, res) => {
     }
 });
 
+// Helper function to capture QS data
+async function captureQsSnapshot() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const query = `
+        SELECT 
+            ad_group_criterion.keyword.text,
+            ad_group_criterion.quality_info.quality_score,
+            metrics.clicks
+        FROM keyword_view
+        WHERE segments.date DURING LAST_7_DAYS
+        ORDER BY metrics.clicks DESC
+        LIMIT 500
+    `;
+    
+    const results = await googleAdsApiRequest(query);
+    
+    const snapshot = {
+        date: today,
+        keywords: results.map(row => ({
+            keyword: row.ad_group_criterion?.keyword?.text || 'Unknown',
+            qs: row.ad_group_criterion?.quality_info?.quality_score || null
+        })).filter(k => k.keyword !== 'Unknown')
+    };
+    
+    const history = loadQsHistory();
+    history.snapshots = history.snapshots.filter(s => s.date !== today);
+    history.snapshots.push(snapshot);
+    
+    // Keep only last 90 days
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    history.snapshots = history.snapshots.filter(s => new Date(s.date) >= cutoff);
+    
+    history.lastCapture = today;
+    saveQsHistory(history);
+    
+    return snapshot.keywords.length;
+}
+
 // Get QS history data
 app.post('/api/google/qs-history', async (req, res) => {
     if (!isGoogleAdsConfigured()) {
@@ -1174,11 +1214,19 @@ app.post('/api/google/qs-history', async (req, res) => {
     }
     
     try {
-        const history = loadQsHistory();
+        let history = loadQsHistory();
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Auto-capture if no data for today
+        const hasToday = history.snapshots.some(s => s.date === today);
+        if (!hasToday) {
+            console.log('Auto-capturing QS data for today...');
+            await captureQsSnapshot();
+            history = loadQsHistory(); // Reload after capture
+        }
         
         if (history.snapshots.length === 0) {
-            // No history yet - capture current data first
-            return res.json({ history: [], chartData: [], message: 'No history data yet. Capturing initial snapshot...' });
+            return res.json({ history: [], chartData: [], message: 'No history data available' });
         }
         
         // Get current snapshot and historical snapshots
