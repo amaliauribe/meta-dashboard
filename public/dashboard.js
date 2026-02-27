@@ -987,10 +987,21 @@ async function loadSummaryData() {
     document.getElementById('summaryMonthlyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     
     try {
-        // Get date range for 14 days
+        // Get date range based on current filter
+        const range = dateRanges[currentRange];
         const today = getESTDate();
         const dates = [];
-        for (let i = 0; i < 14; i++) {
+        
+        // Determine number of days based on current range
+        let numDays = range.days || 14;
+        if (range.preset === 'today') numDays = 1;
+        if (range.preset === 'yesterday') numDays = 1;
+        
+        // For today/yesterday, adjust the start date
+        let startOffset = 0;
+        if (range.preset === 'yesterday') startOffset = 1;
+        
+        for (let i = startOffset; i < numDays + startOffset; i++) {
             const d = new Date(today);
             d.setDate(today.getDate() - i);
             dates.push(formatDateEST(d));
@@ -1068,9 +1079,12 @@ async function loadSummaryData() {
         
         // Add totals row
         const grandTotal = totalMeta + totalGoogle + totalBing;
+        const rangeLabel = range.preset === 'today' ? 'Today' : 
+                          range.preset === 'yesterday' ? 'Yesterday' : 
+                          `${numDays}-Day Total`;
         document.getElementById('summaryDailyFoot').innerHTML = `
             <tr class="total-row">
-                <td><strong>14-Day Total</strong></td>
+                <td><strong>${rangeLabel}</strong></td>
                 <td></td>
                 <td><strong>$${totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
@@ -1156,7 +1170,7 @@ async function loadSummaryData() {
         const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing;
         weeklyHtml += `
             <tr class="total-row">
-                <td><strong>14-Day Total</strong></td>
+                <td><strong>2-Week Total</strong></td>
                 <td><strong>$${weeklyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
