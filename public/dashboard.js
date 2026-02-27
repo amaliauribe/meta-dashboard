@@ -1115,15 +1115,20 @@ async function loadSummaryData() {
         });
         const dailyData = await dailyResponse.json();
         
-        // Fetch Meta daily data directly
+        // Fetch Meta daily data directly (with conversions)
         let metaByDate = {};
+        let metaConvByDate = {};
         try {
-            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${ACCESS_TOKEN}`;
+            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${ACCESS_TOKEN}`;
             const metaResponse = await fetch(metaUrl);
             const metaData = await metaResponse.json();
             if (metaData.data) {
                 metaData.data.forEach(row => {
                     metaByDate[row.date_start] = parseFloat(row.spend) || 0;
+                    // Get lead conversions from actions
+                    const actions = row.actions || [];
+                    const leadAction = actions.find(a => a.action_type === 'lead' || a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
+                    metaConvByDate[row.date_start] = leadAction ? parseFloat(leadAction.value) : 0;
                 });
             }
         } catch (e) {
@@ -1132,21 +1137,26 @@ async function loadSummaryData() {
         
         // Build daily map
         const googleByDate = {};
+        const googleConvByDate = {};
         const bingByDate = {};
+        const bingConvByDate = {};
         
         (dailyData.google || []).forEach(row => {
             googleByDate[row.date] = row.spend;
+            googleConvByDate[row.date] = row.conversions || 0;
         });
         (dailyData.bing || []).forEach(row => {
             // Bing dates might be formatted differently
             const dateStr = row.date?.split('T')[0] || row.date;
             bingByDate[dateStr] = row.spend;
+            bingConvByDate[dateStr] = row.conversions || 0;
         });
         
         // Build daily table
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         let dailyHtml = '';
         let totalMeta = 0, totalGoogle = 0, totalBing = 0;
+        let totalMetaConv = 0, totalGoogleConv = 0, totalBingConv = 0;
         
         dates.forEach(date => {
             const d = new Date(date + 'T12:00:00');
@@ -1159,6 +1169,9 @@ async function loadSummaryData() {
             totalMeta += meta;
             totalGoogle += google;
             totalBing += bing;
+            totalMetaConv += metaConvByDate[date] || 0;
+            totalGoogleConv += googleConvByDate[date] || 0;
+            totalBingConv += bingConvByDate[date] || 0;
             
             dailyHtml += `
                 <tr>
@@ -1191,10 +1204,15 @@ async function loadSummaryData() {
         `;
         
         // Update KPI cards
+        const grandTotalConv = totalMetaConv + totalGoogleConv + totalBingConv;
         document.getElementById('summaryTotalSpend').textContent = '$' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryTotalConversions').textContent = grandTotalConv.toFixed(1);
         document.getElementById('summaryMetaSpend').textContent = '$' + totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryMetaConversions').textContent = totalMetaConv.toFixed(1);
         document.getElementById('summaryGoogleSpend').textContent = '$' + totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryGoogleConversions').textContent = totalGoogleConv.toFixed(1);
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
         
         // Weekly breakdown
         const weeklyPeriods = [

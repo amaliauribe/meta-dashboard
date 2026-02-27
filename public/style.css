@@ -508,6 +508,12 @@ body {
     color: #1c1e21;
 }
 
+.kpi-subvalue {
+    font-size: 13px;
+    color: #666;
+    margin-top: 4px;
+}
+
 /* Charts */
 .chart-section {
     background: white;

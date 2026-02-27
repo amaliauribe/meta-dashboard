@@ -1432,7 +1432,8 @@ app.post('/api/summary/daily', async (req, res) => {
             const googleData = await googleAdsApiRequest(`
                 SELECT 
                     segments.date,
-                    metrics.cost_micros
+                    metrics.cost_micros,
+                    metrics.conversions
                 FROM customer
                 WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                 ORDER BY segments.date DESC
@@ -1440,7 +1441,8 @@ app.post('/api/summary/daily', async (req, res) => {
             
             results.google = googleData.map(row => ({
                 date: row.segments?.date,
-                spend: (parseInt(row.metrics?.cost_micros) || 0) / 1000000
+                spend: (parseInt(row.metrics?.cost_micros) || 0) / 1000000,
+                conversions: parseFloat(row.metrics?.conversions) || 0
             }));
         } catch (e) {
             console.error('Google summary error:', e.message);
@@ -1450,12 +1452,13 @@ app.post('/api/summary/daily', async (req, res) => {
     // Fetch Bing daily data
     if (isBingConfigured()) {
         try {
-            const columns = ['TimePeriod', 'Spend'];
+            const columns = ['TimePeriod', 'Spend', 'Conversions'];
             const report = await submitAndDownloadReport('account', startDate, endDate, columns);
             
             results.bing = report.rows.map(row => ({
                 date: row.TimePeriod,
-                spend: parseFloat(row.Spend) || 0
+                spend: parseFloat(row.Spend) || 0,
+                conversions: parseFloat(row.Conversions) || 0
             }));
         } catch (e) {
             console.error('Bing summary error:', e.message);
