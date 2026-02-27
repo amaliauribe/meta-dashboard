@@ -29,6 +29,7 @@ let bingConversionsChart = null;
 let googleDataLoaded = false;
 let googleSpendChart = null;
 let googleConversionsChart = null;
+let googleKeywordsDataLoaded = false;
 
 // Summary State
 let summaryDataLoaded = false;
@@ -176,6 +177,7 @@ function initializeDashboard() {
             adsDataLoaded = false; // Reset ads data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
             googleDataLoaded = false; // Reset google data when date changes
+            googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
@@ -187,6 +189,8 @@ function initializeDashboard() {
                 loadBingData();
             } else if (currentView === 'google') {
                 loadGoogleData();
+            } else if (currentView === 'googleKeywords') {
+                loadGoogleKeywordsData();
             }
         });
     });
@@ -204,6 +208,7 @@ function initializeDashboard() {
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
+            document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
             
             // Load data for the selected view
             if (currentView === 'summary' && !summaryDataLoaded) {
@@ -217,6 +222,9 @@ function initializeDashboard() {
             }
             if (currentView === 'google' && !googleDataLoaded) {
                 loadGoogleData();
+            }
+            if (currentView === 'googleKeywords' && !googleKeywordsDataLoaded) {
+                loadGoogleKeywordsData();
             }
         });
     });
@@ -236,6 +244,7 @@ function initializeDashboard() {
         adsDataLoaded = false;
         bingDataLoaded = false;
         googleDataLoaded = false;
+        googleKeywordsDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
             loadSummaryData();
@@ -247,6 +256,8 @@ function initializeDashboard() {
             loadBingData();
         } else if (currentView === 'google') {
             loadGoogleData();
+        } else if (currentView === 'googleKeywords') {
+            loadGoogleKeywordsData();
         }
     });
 
@@ -1889,7 +1900,7 @@ async function loadGoogleDailyData() {
     }
 }
 
-// Load Google Keyword Data
+// Load Google Keyword Data (simple view on Google Campaigns page)
 async function loadGoogleKeywordData() {
     try {
         const data = await googleApiCall('keyword-performance', {});
@@ -1923,5 +1934,75 @@ async function loadGoogleKeywordData() {
     } catch (e) { 
         console.error('Google Keyword error:', e);
         document.getElementById('googleKeywordBody').innerHTML = `<tr><td colspan="5" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+// Load Google Keywords Data (detailed Keywords tab)
+async function loadGoogleKeywordsData() {
+    document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="10" class="loading">Loading keywords...</td></tr>';
+    
+    try {
+        const data = await googleApiCall('keyword-performance-full', {});
+        const keywords = data?.keywords || [];
+        
+        if (keywords.length === 0) {
+            document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="10" class="loading">No keyword data available</td></tr>';
+            return;
+        }
+
+        // Sort by clicks descending
+        keywords.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+        
+        // Calculate totals for KPI cards
+        let totalClicks = 0, totalCost = 0, totalImpressions = 0, totalConversions = 0;
+        let qsSum = 0, qsCount = 0;
+        
+        keywords.forEach(kw => {
+            totalClicks += kw.clicks || 0;
+            totalCost += kw.cost || 0;
+            totalImpressions += kw.impressions || 0;
+            totalConversions += kw.conversions || 0;
+            if (kw.qualityScore) {
+                qsSum += kw.qualityScore;
+                qsCount++;
+            }
+        });
+        
+        // Update KPI cards
+        document.getElementById('keywordsTotalCount').textContent = keywords.length.toLocaleString();
+        document.getElementById('keywordsTotalClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('keywordsTotalCost').textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('keywordsAvgCpc').textContent = totalClicks > 0 ? '$' + (totalCost / totalClicks).toFixed(2) : '$0.00';
+        document.getElementById('keywordsAvgQs').textContent = qsCount > 0 ? (qsSum / qsCount).toFixed(1) : '-';
+        document.getElementById('keywordsTotalImpressions').textContent = totalImpressions.toLocaleString();
+
+        // Build table
+        document.getElementById('keywordsFullBody').innerHTML = keywords.map(kw => {
+            const qualityScore = kw.qualityScore ? kw.qualityScore : '-';
+            const qsClass = kw.qualityScore >= 7 ? 'qs-good' : (kw.qualityScore >= 5 ? 'qs-ok' : 'qs-low');
+            const ctr = kw.impressions > 0 ? ((kw.clicks / kw.impressions) * 100).toFixed(2) + '%' : '0.00%';
+            const costPerConv = kw.conversions > 0 ? '$' + (kw.cost / kw.conversions).toFixed(2) : '-';
+            
+            return `
+                <tr>
+                    <td>${kw.keyword}</td>
+                    <td>${kw.matchType || '-'}</td>
+                    <td class="${qsClass}">${qualityScore}</td>
+                    <td>${(kw.impressions || 0).toLocaleString()}</td>
+                    <td>${(kw.clicks || 0).toLocaleString()}</td>
+                    <td>${ctr}</td>
+                    <td>$${(kw.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td>$${(kw.cpc || 0).toFixed(2)}</td>
+                    <td>${(kw.conversions || 0).toFixed(1)}</td>
+                    <td>${costPerConv}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        googleKeywordsDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) { 
+        console.error('Google Keywords error:', e);
+        document.getElementById('keywordsFullBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
 }

@@ -1027,6 +1027,68 @@ app.post('/api/google/keyword-performance', async (req, res) => {
     }
 });
 
+// Google Ads: Full Keyword performance (for dedicated Keywords tab)
+app.post('/api/google/keyword-performance-full', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const query = `
+            SELECT 
+                ad_group_criterion.keyword.text,
+                ad_group_criterion.keyword.match_type,
+                ad_group_criterion.quality_info.quality_score,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.average_cpc,
+                metrics.conversions
+            FROM keyword_view
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            ORDER BY metrics.clicks DESC
+            LIMIT 200
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        // Match type mapping
+        const matchTypes = {
+            'EXACT': 'Exact',
+            'PHRASE': 'Phrase',
+            'BROAD': 'Broad',
+            '2': 'Exact',
+            '3': 'Phrase',
+            '4': 'Broad'
+        };
+        
+        const keywords = results.map(row => {
+            const criterion = row.adGroupCriterion || {};
+            const keyword = criterion.keyword || {};
+            const qualityInfo = criterion.qualityInfo || {};
+            const metrics = row.metrics || {};
+            
+            return {
+                keyword: keyword.text || 'Unknown',
+                matchType: matchTypes[keyword.matchType] || keyword.matchType || '-',
+                qualityScore: qualityInfo.qualityScore || null,
+                impressions: parseInt(metrics.impressions) || 0,
+                clicks: parseInt(metrics.clicks) || 0,
+                cost: (parseInt(metrics.cost_micros) || 0) / 1000000,
+                cpc: (parseInt(metrics.average_cpc) || 0) / 1000000,
+                conversions: parseFloat(metrics.conversions) || 0
+            };
+        });
+        
+        res.json({ keywords });
+    } catch (error) {
+        console.error('Google keyword performance full error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Summary API ====================
 
 // Summary: Get daily spend data for all platforms

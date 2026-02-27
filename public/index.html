@@ -53,7 +53,14 @@
                     <button class="nav-item nav-item-main" data-view="bing">🔷 Bing</button>
                 </div>
                 <div class="nav-section">
-                    <button class="nav-item nav-item-main" data-view="google">🔴 Google</button>
+                    <div class="nav-section-title" data-toggle="google">
+                        <span>🔴 Google</span>
+                        <span class="nav-arrow">▼</span>
+                    </div>
+                    <div class="nav-section-items" id="googleItems">
+                        <button class="nav-item" data-view="google">Campaigns</button>
+                        <button class="nav-item" data-view="googleKeywords">Keywords</button>
+                    </div>
                 </div>
             </nav>
             <div class="sidebar-footer">
@@ -527,6 +534,65 @@
             </section>
 
         </div><!-- End Google View -->
+
+        <!-- Google Keywords View -->
+        <div id="googleKeywordsView" class="view-content hidden">
+            
+            <!-- Keywords KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Keywords</div>
+                    <div class="kpi-value" id="keywordsTotalCount">0</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total Clicks</div>
+                    <div class="kpi-value" id="keywordsTotalClicks">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Cost</div>
+                    <div class="kpi-value" id="keywordsTotalCost">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg. CPC</div>
+                    <div class="kpi-value" id="keywordsAvgCpc">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg. Quality Score</div>
+                    <div class="kpi-value" id="keywordsAvgQs">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Impressions</div>
+                    <div class="kpi-value" id="keywordsTotalImpressions">0</div>
+                </div>
+            </section>
+
+            <!-- Keywords Performance Table -->
+            <section class="table-section">
+                <h2>🔑 Keyword Performance</h2>
+                <div class="table-wrapper">
+                    <table id="keywordsFullTable">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Match Type</th>
+                                <th>Quality Score</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>Cost</th>
+                                <th>Avg. CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keywordsFullBody">
+                            <tr><td colspan="10" class="loading">Select this tab to load keywords...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </div><!-- End Google Keywords View -->
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
