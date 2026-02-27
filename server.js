@@ -1005,14 +1005,14 @@ app.post('/api/google/keyword-performance', async (req, res) => {
         const results = await googleAdsApiRequest(query);
         
         const keywords = results.map(row => {
-            const criterion = row.adGroupCriterion || {};
+            const criterion = row.ad_group_criterion || {};
             const keyword = criterion.keyword || {};
-            const qualityInfo = criterion.qualityInfo || {};
+            const qualityInfo = criterion.quality_info || {};
             const metrics = row.metrics || {};
             
             return {
                 keyword: keyword.text || 'Unknown',
-                qualityScore: qualityInfo.qualityScore || null,
+                qualityScore: qualityInfo.quality_score || null,
                 impressions: parseInt(metrics.impressions) || 0,
                 clicks: parseInt(metrics.clicks) || 0,
                 cost: (parseInt(metrics.cost_micros) || 0) / 1000000,
@@ -1065,15 +1065,15 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
         };
         
         const keywords = results.map(row => {
-            const criterion = row.adGroupCriterion || {};
+            const criterion = row.ad_group_criterion || {};
             const keyword = criterion.keyword || {};
-            const qualityInfo = criterion.qualityInfo || {};
+            const qualityInfo = criterion.quality_info || {};
             const metrics = row.metrics || {};
             
             return {
                 keyword: keyword.text || 'Unknown',
-                matchType: matchTypes[keyword.matchType] || keyword.matchType || '-',
-                qualityScore: qualityInfo.qualityScore || null,
+                matchType: matchTypes[keyword.match_type] || keyword.match_type || '-',
+                qualityScore: qualityInfo.quality_score || null,
                 impressions: parseInt(metrics.impressions) || 0,
                 clicks: parseInt(metrics.clicks) || 0,
                 cost: (parseInt(metrics.cost_micros) || 0) / 1000000,
@@ -1138,8 +1138,8 @@ app.post('/api/google/qs-capture', async (req, res) => {
         const snapshot = {
             date: today,
             keywords: results.map(row => ({
-                keyword: row.adGroupCriterion?.keyword?.text || 'Unknown',
-                qs: row.adGroupCriterion?.qualityInfo?.qualityScore || null
+                keyword: row.ad_group_criterion?.keyword?.text || 'Unknown',
+                qs: row.ad_group_criterion?.quality_info?.quality_score || null
             })).filter(k => k.qs !== null)
         };
         
