@@ -93,15 +93,16 @@ async function googleAdsApiRequest(query) {
     try {
         data = JSON.parse(text);
     } catch (e) {
-        console.error('Google Ads API response:', text.substring(0, 500));
-        throw new Error('Invalid response from Google Ads API');
+        console.error('Google Ads API raw response:', text.substring(0, 1000));
+        throw new Error('Invalid response from Google Ads API: ' + text.substring(0, 200));
     }
     
     if (data.error) {
-        console.error('Google Ads API error:', data.error);
-        throw new Error(data.error.message || 'Google Ads API error');
+        console.error('Google Ads API error:', JSON.stringify(data.error));
+        throw new Error(data.error.message || data.error.status || 'Google Ads API error');
     }
     
+    console.log('Google Ads API success, results:', data.results?.length || 0);
     return data.results || [];
 }
 
