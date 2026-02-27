@@ -92,26 +92,22 @@ function getDateRange(range) {
     return `time_range={"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"}`;
 }
 
-// Get results from actions array - OLAC custom conversion event
+// Get results from actions array - Custom Pixel Conversions + Lead Forms
 function getResults(actions) {
     if (!actions) return 0;
     
     let total = 0;
     
-    // Look for OLAC custom conversion event
-    actions.forEach(a => {
-        // Check for olac in action type (case-insensitive)
-        if (a.action_type && a.action_type.toLowerCase().includes('olac')) {
-            total += parseInt(a.value) || 0;
-        }
-    });
+    // Custom pixel conversions (use aggregate total, not individual custom.XXX to avoid double-counting)
+    const pixelCustom = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_custom');
+    if (pixelCustom) {
+        total += parseInt(pixelCustom.value) || 0;
+    }
     
-    // Fallback: if no OLAC found, try standard custom pixel conversions
-    if (total === 0) {
-        const pixelCustom = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_custom');
-        if (pixelCustom) {
-            total += parseInt(pixelCustom.value) || 0;
-        }
+    // Lead form submissions
+    const lead = actions.find(a => a.action_type === 'lead');
+    if (lead) {
+        total += parseInt(lead.value) || 0;
     }
     
     return total;
