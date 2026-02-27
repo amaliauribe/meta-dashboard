@@ -70,8 +70,8 @@ async function googleAdsApiRequest(query) {
     const customerId = GOOGLE_ADS_CONFIG.customerId.replace(/-/g, '');
     const loginCustomerId = GOOGLE_ADS_CONFIG.loginCustomerId.replace(/-/g, '');
     
-    // Use v16 (stable version)
-    const url = `https://googleads.googleapis.com/v16/customers/${customerId}/googleAds:search`;
+    // Use v14 (confirmed stable version)
+    const url = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
     
     console.log('Google Ads API request to:', url);
     console.log('Login customer ID:', loginCustomerId);
