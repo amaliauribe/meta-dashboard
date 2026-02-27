@@ -30,6 +30,8 @@ let googleDataLoaded = false;
 let googleSpendChart = null;
 let googleConversionsChart = null;
 let googleKeywordsDataLoaded = false;
+let googleQsHistoryDataLoaded = false;
+let qsHistoryChart = null;
 
 // Summary State
 let summaryDataLoaded = false;
@@ -178,6 +180,7 @@ function initializeDashboard() {
             bingDataLoaded = false; // Reset bing data when date changes
             googleDataLoaded = false; // Reset google data when date changes
             googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
+            googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
@@ -191,6 +194,8 @@ function initializeDashboard() {
                 loadGoogleData();
             } else if (currentView === 'googleKeywords') {
                 loadGoogleKeywordsData();
+            } else if (currentView === 'googleQsHistory') {
+                loadGoogleQsHistoryData();
             }
         });
     });
@@ -209,6 +214,7 @@ function initializeDashboard() {
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
+            document.getElementById('googleQsHistoryView').classList.toggle('hidden', currentView !== 'googleQsHistory');
             
             // Load data for the selected view
             if (currentView === 'summary' && !summaryDataLoaded) {
@@ -225,6 +231,9 @@ function initializeDashboard() {
             }
             if (currentView === 'googleKeywords' && !googleKeywordsDataLoaded) {
                 loadGoogleKeywordsData();
+            }
+            if (currentView === 'googleQsHistory' && !googleQsHistoryDataLoaded) {
+                loadGoogleQsHistoryData();
             }
         });
     });
@@ -245,6 +254,7 @@ function initializeDashboard() {
         bingDataLoaded = false;
         googleDataLoaded = false;
         googleKeywordsDataLoaded = false;
+        googleQsHistoryDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
             loadSummaryData();
@@ -258,6 +268,8 @@ function initializeDashboard() {
             loadGoogleData();
         } else if (currentView === 'googleKeywords') {
             loadGoogleKeywordsData();
+        } else if (currentView === 'googleQsHistory') {
+            loadGoogleQsHistoryData();
         }
     });
 
@@ -2005,4 +2017,142 @@ async function loadGoogleKeywordsData() {
         console.error('Google Keywords error:', e);
         document.getElementById('keywordsFullBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
+}
+
+// Load Google QS History Data
+async function loadGoogleQsHistoryData() {
+    document.getElementById('qsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">Loading QS history...</td></tr>';
+    
+    try {
+        const data = await googleApiCall('qs-history', {});
+        const history = data?.history || [];
+        const chartData = data?.chartData || [];
+        
+        if (history.length === 0) {
+            document.getElementById('qsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No QS history data available yet. Data will accumulate over time.</td></tr>';
+            
+            // Reset KPI cards
+            document.getElementById('qsImprovedCount').textContent = '0';
+            document.getElementById('qsStableCount').textContent = '0';
+            document.getElementById('qsDeclinedCount').textContent = '0';
+            document.getElementById('qsAvgCurrent').textContent = '-';
+            document.getElementById('qsAvg30d').textContent = '-';
+            document.getElementById('qsTotalKeywords').textContent = '0';
+            return;
+        }
+
+        // Calculate summary stats
+        let improved = 0, stable = 0, declined = 0;
+        let currentQsSum = 0, currentQsCount = 0;
+        let oldQsSum = 0, oldQsCount = 0;
+        
+        history.forEach(kw => {
+            if (kw.currentQs) {
+                currentQsSum += kw.currentQs;
+                currentQsCount++;
+            }
+            if (kw.qs30dAgo) {
+                oldQsSum += kw.qs30dAgo;
+                oldQsCount++;
+            }
+            
+            const change = (kw.currentQs || 0) - (kw.qs30dAgo || kw.currentQs || 0);
+            if (change > 0) improved++;
+            else if (change < 0) declined++;
+            else stable++;
+        });
+        
+        // Update KPI cards
+        document.getElementById('qsImprovedCount').textContent = improved;
+        document.getElementById('qsStableCount').textContent = stable;
+        document.getElementById('qsDeclinedCount').textContent = declined;
+        document.getElementById('qsAvgCurrent').textContent = currentQsCount > 0 ? (currentQsSum / currentQsCount).toFixed(1) : '-';
+        document.getElementById('qsAvg30d').textContent = oldQsCount > 0 ? (oldQsSum / oldQsCount).toFixed(1) : '-';
+        document.getElementById('qsTotalKeywords').textContent = history.length;
+
+        // Build table
+        document.getElementById('qsHistoryBody').innerHTML = history.map(kw => {
+            const currentQs = kw.currentQs || '-';
+            const qs7d = kw.qs7dAgo || '-';
+            const qs30d = kw.qs30dAgo || '-';
+            
+            const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+            let trendIcon, trendClass, changeText;
+            
+            if (change > 0) {
+                trendIcon = '↑';
+                trendClass = 'qs-good';
+                changeText = `+${change} 🟢`;
+            } else if (change < 0) {
+                trendIcon = '↓';
+                trendClass = 'qs-low';
+                changeText = `${change} 🔴`;
+            } else {
+                trendIcon = '→';
+                trendClass = '';
+                changeText = '0';
+            }
+            
+            const qsClass = kw.currentQs >= 7 ? 'qs-good' : (kw.currentQs >= 5 ? 'qs-ok' : 'qs-low');
+            
+            return `
+                <tr>
+                    <td>${kw.keyword}</td>
+                    <td class="${qsClass}">${currentQs}</td>
+                    <td>${qs7d}</td>
+                    <td>${qs30d}</td>
+                    <td class="${trendClass}">${trendIcon}</td>
+                    <td class="${trendClass}">${changeText}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Update chart
+        if (chartData.length > 0) {
+            updateQsHistoryChart(chartData);
+        }
+        
+        googleQsHistoryDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) { 
+        console.error('Google QS History error:', e);
+        document.getElementById('qsHistoryBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function updateQsHistoryChart(chartData) {
+    const ctx = document.getElementById('qsHistoryChart').getContext('2d');
+    
+    if (qsHistoryChart) {
+        qsHistoryChart.destroy();
+    }
+    
+    qsHistoryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => d.date),
+            datasets: [{
+                label: 'Average Quality Score',
+                data: chartData.map(d => d.avgQs),
+                borderColor: '#4285f4',
+                backgroundColor: 'rgba(66, 133, 244, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 10,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
 }

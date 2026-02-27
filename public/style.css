@@ -737,3 +737,29 @@ footer {
 .kpi-card.tiktok-card {
     border-left: 4px solid #000000;
 }
+
+/* QS History Styles */
+.kpi-card.qs-improved {
+    border-left: 4px solid #31a24c;
+}
+
+.kpi-card.qs-stable {
+    border-left: 4px solid #999;
+}
+
+.kpi-card.qs-declined {
+    border-left: 4px solid #e74c3c;
+}
+
+.info-section {
+    padding: 20px;
+}
+
+.info-note {
+    background: #f0f7ff;
+    border: 1px solid #cce5ff;
+    border-radius: 8px;
+    padding: 15px 20px;
+    color: #004085;
+    font-size: 14px;
+}

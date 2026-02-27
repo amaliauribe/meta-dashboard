@@ -1089,6 +1089,154 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
     }
 });
 
+// ==================== QS History API ====================
+
+// Simple file-based storage for QS history
+const fs = require('fs');
+const QS_HISTORY_FILE = '/tmp/qs-history.json';
+
+function loadQsHistory() {
+    try {
+        if (fs.existsSync(QS_HISTORY_FILE)) {
+            return JSON.parse(fs.readFileSync(QS_HISTORY_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Error loading QS history:', e);
+    }
+    return { snapshots: [], lastCapture: null };
+}
+
+function saveQsHistory(data) {
+    try {
+        fs.writeFileSync(QS_HISTORY_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('Error saving QS history:', e);
+    }
+}
+
+// Capture current QS data (call this daily via cron or manually)
+app.post('/api/google/qs-capture', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Get current keyword QS
+        const query = `
+            SELECT 
+                ad_group_criterion.keyword.text,
+                ad_group_criterion.quality_info.quality_score
+            FROM keyword_view
+            WHERE ad_group_criterion.status = 'ENABLED'
+            LIMIT 500
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        const snapshot = {
+            date: today,
+            keywords: results.map(row => ({
+                keyword: row.adGroupCriterion?.keyword?.text || 'Unknown',
+                qs: row.adGroupCriterion?.qualityInfo?.qualityScore || null
+            })).filter(k => k.qs !== null)
+        };
+        
+        // Load existing history and add snapshot
+        const history = loadQsHistory();
+        
+        // Remove any existing snapshot for today
+        history.snapshots = history.snapshots.filter(s => s.date !== today);
+        history.snapshots.push(snapshot);
+        
+        // Keep only last 90 days
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 90);
+        history.snapshots = history.snapshots.filter(s => new Date(s.date) >= cutoff);
+        
+        history.lastCapture = today;
+        saveQsHistory(history);
+        
+        res.json({ success: true, date: today, keywordsCount: snapshot.keywords.length });
+    } catch (error) {
+        console.error('QS capture error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get QS history data
+app.post('/api/google/qs-history', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    try {
+        const history = loadQsHistory();
+        
+        if (history.snapshots.length === 0) {
+            // No history yet - capture current data first
+            return res.json({ history: [], chartData: [], message: 'No history data yet. Capturing initial snapshot...' });
+        }
+        
+        // Get current snapshot and historical snapshots
+        const today = new Date().toISOString().split('T')[0];
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        // Find relevant snapshots
+        const currentSnapshot = history.snapshots.find(s => s.date === today) || history.snapshots[history.snapshots.length - 1];
+        const snapshot7d = history.snapshots.find(s => new Date(s.date) <= sevenDaysAgo);
+        const snapshot30d = history.snapshots.find(s => new Date(s.date) <= thirtyDaysAgo);
+        
+        // Build keyword-level history
+        const keywordMap = {};
+        
+        if (currentSnapshot) {
+            currentSnapshot.keywords.forEach(k => {
+                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs };
+            });
+        }
+        
+        if (snapshot7d) {
+            snapshot7d.keywords.forEach(k => {
+                if (keywordMap[k.keyword]) {
+                    keywordMap[k.keyword].qs7dAgo = k.qs;
+                }
+            });
+        }
+        
+        if (snapshot30d) {
+            snapshot30d.keywords.forEach(k => {
+                if (keywordMap[k.keyword]) {
+                    keywordMap[k.keyword].qs30dAgo = k.qs;
+                }
+            });
+        }
+        
+        const historyArray = Object.values(keywordMap)
+            .filter(k => k.currentQs)
+            .sort((a, b) => (b.currentQs || 0) - (a.currentQs || 0));
+        
+        // Build chart data (average QS per day)
+        const chartData = history.snapshots.map(snapshot => {
+            const qsValues = snapshot.keywords.map(k => k.qs).filter(q => q);
+            const avgQs = qsValues.length > 0 ? qsValues.reduce((a, b) => a + b, 0) / qsValues.length : null;
+            return {
+                date: snapshot.date,
+                avgQs: avgQs ? parseFloat(avgQs.toFixed(2)) : null
+            };
+        }).filter(d => d.avgQs !== null);
+        
+        res.json({ history: historyArray, chartData });
+    } catch (error) {
+        console.error('QS history error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Summary API ====================
 
 // Summary: Get daily spend data for all platforms

@@ -60,6 +60,7 @@
                     <div class="nav-section-items" id="googleItems">
                         <button class="nav-item" data-view="google">Campaigns</button>
                         <button class="nav-item" data-view="googleKeywords">Keywords</button>
+                        <button class="nav-item" data-view="googleQsHistory">QS History</button>
                     </div>
                 </div>
             </nav>
@@ -593,6 +594,73 @@
             </section>
 
         </div><!-- End Google Keywords View -->
+
+        <!-- Google QS History View -->
+        <div id="googleQsHistoryView" class="view-content hidden">
+            
+            <!-- QS Summary Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card qs-improved">
+                    <div class="kpi-label">🟢 Improved</div>
+                    <div class="kpi-value" id="qsImprovedCount">0</div>
+                </div>
+                <div class="kpi-card qs-stable">
+                    <div class="kpi-label">⚪ Stable</div>
+                    <div class="kpi-value" id="qsStableCount">0</div>
+                </div>
+                <div class="kpi-card qs-declined">
+                    <div class="kpi-label">🔴 Declined</div>
+                    <div class="kpi-value" id="qsDeclinedCount">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg QS (Current)</div>
+                    <div class="kpi-value" id="qsAvgCurrent">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg QS (30d Ago)</div>
+                    <div class="kpi-value" id="qsAvg30d">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Keywords</div>
+                    <div class="kpi-value" id="qsTotalKeywords">0</div>
+                </div>
+            </section>
+
+            <!-- QS Trend Chart -->
+            <section class="chart-section">
+                <h2>📈 Average Quality Score Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="qsHistoryChart"></canvas>
+                </div>
+            </section>
+
+            <!-- QS History Table -->
+            <section class="table-section">
+                <h2>🎯 Keyword Quality Score Trends</h2>
+                <div class="table-wrapper">
+                    <table id="qsHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Current QS</th>
+                                <th>7d Ago</th>
+                                <th>30d Ago</th>
+                                <th>Trend</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qsHistoryBody">
+                            <tr><td colspan="6" class="loading">Loading QS history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="info-section">
+                <p class="info-note">💡 <strong>Note:</strong> QS history requires daily data collection. Historical data will accumulate over time as the system captures daily snapshots.</p>
+            </section>
+
+        </div><!-- End Google QS History View -->
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
