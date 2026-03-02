@@ -1986,6 +1986,7 @@ app.listen(PORT, () => {
     console.log(`Google Ads API configured: ${isGoogleAdsConfigured()}`);
 });
 
+
 // ==================== Zipcode Heatmap ====================
 
 // Get combined zipcode performance data from Google + Bing
@@ -1996,7 +1997,7 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
     // Fetch Google geographic data
     if (isGoogleAdsConfigured()) {
         try {
-            const googleData = await googleAdsApiRequest(\`
+            const query = `
                 SELECT 
                     campaign_criterion.location.geo_target_constant,
                     metrics.impressions,
@@ -2004,18 +2005,18 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
                     metrics.cost_micros,
                     metrics.conversions
                 FROM location_view
-                WHERE segments.date BETWEEN '\${startDate}' AND '\${endDate}'
+                WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                     AND campaign_criterion.location.geo_target_constant IS NOT NULL
-            \`);
+            `;
+            const googleData = await googleAdsApiRequest(query);
             
             googleData.forEach(row => {
                 const metrics = row.metrics || {};
                 const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
-                const match = geoConstant.match(/geoTargetConstants\\/(\d+)/);
+                const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
                 if (!match) return;
                 
                 const geoId = match[1];
-                // Extract zipcode from canonical name if available
                 const name = row.campaign_criterion?.location?.geo_target_constant_name || '';
                 const zipMatch = name.match(/^(\d{5})/);
                 if (!zipMatch) return;
@@ -2054,7 +2055,6 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
             
             report.rows.forEach(row => {
                 const location = row.MostSpecificLocation || '';
-                // Check if it's a zipcode (5 digits)
                 if (!/^\d{5}$/.test(location)) return;
                 
                 const zipcode = location;
@@ -2082,7 +2082,6 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
         }
     }
     
-    // Convert to array and sort by conversions
     const results = Object.values(zipcodeData)
         .filter(z => z.conversions > 0 || z.clicks > 0)
         .sort((a, b) => b.conversions - a.conversions);
