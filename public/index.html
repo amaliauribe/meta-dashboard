@@ -232,17 +232,38 @@
                 
                 <div class="table-section" style="margin-top: 20px;">
                     <h3>📍 Top Converting Zipcodes</h3>
+                    <div class="table-filters" style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
+                        <div>
+                            <label for="heatmapSourceFilter" style="margin-right: 8px; font-weight: 500;">Source:</label>
+                            <select id="heatmapSourceFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd;">
+                                <option value="all">All Platforms</option>
+                                <option value="Google">Google</option>
+                                <option value="Bing">Bing</option>
+                                <option value="both">Both (Google + Bing)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="heatmapStateFilter" style="margin-right: 8px; font-weight: 500;">State:</label>
+                            <select id="heatmapStateFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd;">
+                                <option value="all">All States</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input type="text" id="heatmapSearch" placeholder="Search zipcode..." style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; width: 150px;">
+                        </div>
+                    </div>
                     <div class="table-wrapper">
                         <table id="zipcodeTable">
                             <thead>
                                 <tr>
-                                    <th>Zipcode</th>
-                                    <th>Source</th>
-                                    <th>Impressions</th>
-                                    <th>Clicks</th>
-                                    <th>Cost</th>
-                                    <th>Conversions</th>
-                                    <th>Cost/Conv</th>
+                                    <th class="sortable" data-sort="zipcode">Zipcode</th>
+                                    <th class="sortable" data-sort="source">Source</th>
+                                    <th class="sortable" data-sort="state">State</th>
+                                    <th class="sortable" data-sort="impressions">Impressions</th>
+                                    <th class="sortable" data-sort="clicks">Clicks</th>
+                                    <th class="sortable" data-sort="cost">Cost</th>
+                                    <th class="sortable desc" data-sort="conversions">Conversions ↓</th>
+                                    <th class="sortable" data-sort="costPerConv">Cost/Conv</th>
                                 </tr>
                             </thead>
                             <tbody id="zipcodeTableBody">

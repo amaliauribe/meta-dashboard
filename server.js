@@ -2022,15 +2022,25 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
                 if (!zipMatch) return;
                 
                 const zipcode = zipMatch[1];
+                // Extract state from canonical name (format: "12345,State,United States")
+                const nameParts = name.split(',');
+                const state = nameParts.length >= 2 ? nameParts[1].trim() : '';
+                
                 if (!zipcodeData[zipcode]) {
                     zipcodeData[zipcode] = { 
-                        zipcode, 
+                        zipcode,
+                        state: state,
+                        city: '',
                         impressions: 0, 
                         clicks: 0, 
                         cost: 0, 
                         conversions: 0,
                         sources: []
                     };
+                }
+                // Update state if we have it and don't already
+                if (state && !zipcodeData[zipcode].state) {
+                    zipcodeData[zipcode].state = state;
                 }
                 
                 zipcodeData[zipcode].impressions += parseInt(metrics.impressions) || 0;
@@ -2058,15 +2068,27 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
                 if (!/^\d{5}$/.test(location)) return;
                 
                 const zipcode = location;
+                const state = row.State || '';
+                const city = row.City || '';
+                
                 if (!zipcodeData[zipcode]) {
                     zipcodeData[zipcode] = { 
-                        zipcode, 
+                        zipcode,
+                        state: state,
+                        city: city,
                         impressions: 0, 
                         clicks: 0, 
                         cost: 0, 
                         conversions: 0,
                         sources: []
                     };
+                }
+                // Update state/city if we have it from Bing
+                if (state && !zipcodeData[zipcode].state) {
+                    zipcodeData[zipcode].state = state;
+                }
+                if (city && !zipcodeData[zipcode].city) {
+                    zipcodeData[zipcode].city = city;
                 }
                 
                 zipcodeData[zipcode].impressions += parseInt(row.Impressions) || 0;
