@@ -38,6 +38,11 @@ let qsHistoryChart = null;
 let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
 let keywordsSortDirection = 'desc';
+let keywordsSearchText = '';
+
+// QS History search
+let qsHistorySearchText = '';
+let qsHistoryRawData = [];
 
 // Geographic state
 let geoDataLoaded = false;
@@ -360,6 +365,18 @@ function initializeDashboard() {
             // Re-render with new sort
             renderKeywordsTable();
         });
+    });
+    
+    // Keywords search
+    document.getElementById('keywordsSearch').addEventListener('input', (e) => {
+        keywordsSearchText = e.target.value.toLowerCase();
+        renderKeywordsTable();
+    });
+    
+    // QS History search
+    document.getElementById('qsHistorySearch').addEventListener('input', (e) => {
+        qsHistorySearchText = e.target.value.toLowerCase();
+        renderQsHistoryTable();
     });
     
     // Sortable column headers for Geographic table
@@ -2163,8 +2180,16 @@ async function loadGoogleKeywordsData() {
 function renderKeywordsTable() {
     if (keywordsRawData.length === 0) return;
     
+    // Filter by search text
+    let filtered = keywordsRawData;
+    if (keywordsSearchText) {
+        filtered = keywordsRawData.filter(kw => 
+            kw.keyword.toLowerCase().includes(keywordsSearchText)
+        );
+    }
+    
     // Sort data
-    const sorted = [...keywordsRawData].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
         let aVal = a[keywordsSortColumn];
         let bVal = b[keywordsSortColumn];
         
@@ -2213,6 +2238,10 @@ function renderKeywordsTable() {
             </tr>
         `;
     }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="10" class="loading">No keywords match the search</td></tr>';
+    }
 }
 
 // Load Google QS History Data
@@ -2266,42 +2295,11 @@ async function loadGoogleQsHistoryData() {
         document.getElementById('qsAvg30d').textContent = oldQsCount > 0 ? (oldQsSum / oldQsCount).toFixed(1) : '-';
         document.getElementById('qsTotalKeywords').textContent = history.length;
 
-        // Build table
-        document.getElementById('qsHistoryBody').innerHTML = history.map(kw => {
-            const currentQs = kw.currentQs || '-';
-            const qs7d = kw.qs7dAgo || '-';
-            const qs30d = kw.qs30dAgo || '-';
-            
-            const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
-            let trendIcon, trendClass, changeText;
-            
-            if (change > 0) {
-                trendIcon = '↑';
-                trendClass = 'qs-good';
-                changeText = `+${change} 🟢`;
-            } else if (change < 0) {
-                trendIcon = '↓';
-                trendClass = 'qs-low';
-                changeText = `${change} 🔴`;
-            } else {
-                trendIcon = '→';
-                trendClass = '';
-                changeText = '0';
-            }
-            
-            const qsClass = kw.currentQs >= 7 ? 'qs-good' : (kw.currentQs >= 5 ? 'qs-ok' : 'qs-low');
-            
-            return `
-                <tr>
-                    <td>${kw.keyword}</td>
-                    <td class="${qsClass}">${currentQs}</td>
-                    <td>${qs7d}</td>
-                    <td>${qs30d}</td>
-                    <td class="${trendClass}">${trendIcon}</td>
-                    <td class="${trendClass}">${changeText}</td>
-                </tr>
-            `;
-        }).join('');
+        // Store data for search filtering
+        qsHistoryRawData = history;
+        
+        // Render table
+        renderQsHistoryTable();
         
         // Update chart
         if (chartData.length > 0) {
@@ -2313,6 +2311,59 @@ async function loadGoogleQsHistoryData() {
     } catch (e) { 
         console.error('Google QS History error:', e);
         document.getElementById('qsHistoryBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderQsHistoryTable() {
+    if (qsHistoryRawData.length === 0) return;
+    
+    // Filter by search text
+    let filtered = qsHistoryRawData;
+    if (qsHistorySearchText) {
+        filtered = qsHistoryRawData.filter(kw => 
+            kw.keyword.toLowerCase().includes(qsHistorySearchText)
+        );
+    }
+    
+    // Build table
+    document.getElementById('qsHistoryBody').innerHTML = filtered.map(kw => {
+        const currentQs = kw.currentQs || '-';
+        const qs7d = kw.qs7dAgo || '-';
+        const qs30d = kw.qs30dAgo || '-';
+        
+        const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+        let trendIcon, trendClass, changeText;
+        
+        if (change > 0) {
+            trendIcon = '↑';
+            trendClass = 'qs-good';
+            changeText = `+${change} 🟢`;
+        } else if (change < 0) {
+            trendIcon = '↓';
+            trendClass = 'qs-low';
+            changeText = `${change} 🔴`;
+        } else {
+            trendIcon = '→';
+            trendClass = '';
+            changeText = '0';
+        }
+        
+        const qsClass = kw.currentQs >= 7 ? 'qs-good' : (kw.currentQs >= 5 ? 'qs-ok' : 'qs-low');
+        
+        return `
+            <tr>
+                <td>${kw.keyword}</td>
+                <td class="${qsClass}">${currentQs}</td>
+                <td>${qs7d}</td>
+                <td>${qs30d}</td>
+                <td class="${trendClass}">${trendIcon}</td>
+                <td class="${trendClass}">${changeText}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    if (filtered.length === 0) {
+        document.getElementById('qsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the search</td></tr>';
     }
 }
 
