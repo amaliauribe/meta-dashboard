@@ -851,6 +851,31 @@ async function loadCampaignData() {
         `;
     }
     
+    // Show/hide pacing legend and update text based on Today vs Yesterday
+    const pacingLegend = document.getElementById('pacingLegend');
+    if (pacingLegend) {
+        if (showBudget) {
+            pacingLegend.style.display = 'flex';
+            if (isToday) {
+                pacingLegend.innerHTML = `
+                    <span class="legend-title">Pacing:</span>
+                    <span class="legend-item"><span class="dot green"></span> 50%+ budget remaining</span>
+                    <span class="legend-item"><span class="dot yellow"></span> 20-50% remaining</span>
+                    <span class="legend-item"><span class="dot red"></span> &lt;20% remaining</span>
+                `;
+            } else {
+                pacingLegend.innerHTML = `
+                    <span class="legend-title">Utilization:</span>
+                    <span class="legend-item"><span class="dot green"></span> 85%+ budget spent</span>
+                    <span class="legend-item"><span class="dot yellow"></span> 50-85% spent</span>
+                    <span class="legend-item"><span class="dot red"></span> &lt;50% spent</span>
+                `;
+            }
+        } else {
+            pacingLegend.style.display = 'none';
+        }
+    }
+    
     // Build the insights query based on date range (using EST)
     let insightsQuery;
     if (range.preset) {
