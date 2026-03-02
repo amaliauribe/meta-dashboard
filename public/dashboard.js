@@ -3214,3 +3214,62 @@ function renderBingSearchTermsTable() {
         document.getElementById('bingSearchTermsBody').innerHTML = '<tr><td colspan="11" class="loading">No search terms match the filter</td></tr>';
     }
 }
+
+// ==================== Resizable Columns ====================
+
+function makeTableResizable(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    table.classList.add('resizable-table');
+    const headerRow = table.querySelector('thead tr');
+    if (!headerRow) return;
+    
+    const headers = headerRow.querySelectorAll('th');
+    
+    headers.forEach((th, index) => {
+        // Don't add handle to last column
+        if (index === headers.length - 1) return;
+        
+        // Remove existing handle if any
+        const existingHandle = th.querySelector('.resize-handle');
+        if (existingHandle) existingHandle.remove();
+        
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle';
+        th.appendChild(handle);
+        
+        let startX, startWidth;
+        
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startX = e.pageX;
+            startWidth = th.offsetWidth;
+            handle.classList.add('resizing');
+            
+            const onMouseMove = (e) => {
+                const diff = e.pageX - startX;
+                const newWidth = Math.max(80, startWidth + diff);
+                th.style.width = newWidth + 'px';
+                th.style.minWidth = newWidth + 'px';
+            };
+            
+            const onMouseUp = () => {
+                handle.classList.remove('resizing');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+}
+
+// Initialize resizable tables when views load
+const originalLoadBingSearchTermsData = loadBingSearchTermsData;
+loadBingSearchTermsData = async function() {
+    await originalLoadBingSearchTermsData();
+    makeTableResizable('bingSearchTermsTable');
+};

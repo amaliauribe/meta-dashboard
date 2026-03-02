@@ -866,3 +866,51 @@ footer {
 #bingSearchTermsView table {
     table-layout: fixed;
 }
+
+/* Resizable columns */
+.resizable-table th {
+    position: relative;
+}
+
+.resizable-table th .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+}
+
+.resizable-table th .resize-handle:hover,
+.resizable-table th .resize-handle.resizing {
+    background: #1877f2;
+}
+
+/* Remove fixed layout for resizable tables */
+#bingSearchTermsView table.resizable-table,
+#googleSearchTermsView table.resizable-table {
+    table-layout: auto;
+}
+
+/* Allow text columns to expand naturally but with sensible defaults */
+#bingSearchTermsView table.resizable-table th:nth-child(1),
+#bingSearchTermsView table.resizable-table td:nth-child(1),
+#googleSearchTermsView table.resizable-table th:nth-child(1),
+#googleSearchTermsView table.resizable-table td:nth-child(1) {
+    min-width: 120px;
+    max-width: none;
+}
+
+#bingSearchTermsView table.resizable-table th:nth-child(2),
+#bingSearchTermsView table.resizable-table td:nth-child(2),
+#bingSearchTermsView table.resizable-table th:nth-child(3),
+#bingSearchTermsView table.resizable-table td:nth-child(3),
+#googleSearchTermsView table.resizable-table th:nth-child(2),
+#googleSearchTermsView table.resizable-table td:nth-child(2),
+#googleSearchTermsView table.resizable-table th:nth-child(3),
+#googleSearchTermsView table.resizable-table td:nth-child(3) {
+    min-width: 100px;
+    max-width: none;
+}
