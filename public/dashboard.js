@@ -3561,7 +3561,13 @@ function renderZipcodeTable(zipcodes) {
     const tbody = document.getElementById('zipcodeTableBody');
     
     if (zipcodes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">No zipcode data available</td></tr>';
+        let message = 'No zipcode data available';
+        if (heatmapSourceFilter === 'Google') {
+            message = 'Google Ads does not provide zipcode-level geographic data. Select "Bing" or "All" to see zipcode performance.';
+        } else if (heatmapSourceFilter === 'both') {
+            message = 'No zipcodes with data from both sources. Google Ads does not report at zipcode level.';
+        }
+        tbody.innerHTML = `<tr><td colspan="8" class="loading">${message}</td></tr>`;
         return;
     }
     
