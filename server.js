@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require('express');
 const path = require('path');
 const fetch = require('node-fetch');
@@ -1994,7 +1995,7 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
     const { startDate, endDate } = req.body;
     const zipcodeData = {};
     
-    // Fetch Google geographic data
+    // Fetch Google geographic data (same approach as geographic-performance endpoint)
     if (isGoogleAdsConfigured()) {
         try {
             const query = `
@@ -2006,24 +2007,71 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
                     metrics.conversions
                 FROM location_view
                 WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-                    AND campaign_criterion.location.geo_target_constant IS NOT NULL
+                    AND metrics.impressions > 0
             `;
             const googleData = await googleAdsApiRequest(query);
             
+            // Extract unique geo IDs to look up names
+            const geoIds = [...new Set(googleData.map(r => {
+                const geoConstant = r.campaign_criterion?.location?.geo_target_constant || '';
+                const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+                return match ? match[1] : null;
+            }).filter(Boolean))];
+            
+            // Look up names for geo IDs not in cache
+            const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
+            if (uncachedIds.length > 0) {
+                const geoQuery = `
+                    SELECT 
+                        geo_target_constant.id,
+                        geo_target_constant.name,
+                        geo_target_constant.canonical_name,
+                        geo_target_constant.target_type
+                    FROM geo_target_constant
+                    WHERE geo_target_constant.id IN (${uncachedIds.join(',')})
+                `;
+                const geoResults = await googleAdsApiRequest(geoQuery);
+                geoResults.forEach(r => {
+                    const g = r.geo_target_constant || {};
+                    geoNameCache[g.id] = {
+                        name: g.name,
+                        canonicalName: g.canonical_name,
+                        targetType: g.target_type
+                    };
+                });
+            }
+            
+            // Aggregate by geo ID first
+            const geoMap = {};
             googleData.forEach(row => {
-                const metrics = row.metrics || {};
                 const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
                 const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
                 if (!match) return;
                 
                 const geoId = match[1];
-                const name = row.campaign_criterion?.location?.geo_target_constant_name || '';
-                const zipMatch = name.match(/^(\d{5})/);
+                const metrics = row.metrics || {};
+                
+                if (!geoMap[geoId]) {
+                    geoMap[geoId] = { impressions: 0, clicks: 0, cost: 0, conversions: 0 };
+                }
+                geoMap[geoId].impressions += parseInt(metrics.impressions) || 0;
+                geoMap[geoId].clicks += parseInt(metrics.clicks) || 0;
+                geoMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+                geoMap[geoId].conversions += parseFloat(metrics.conversions) || 0;
+            });
+            
+            // Now process only Postal Code types
+            Object.entries(geoMap).forEach(([geoId, metrics]) => {
+                const geoInfo = geoNameCache[geoId];
+                if (!geoInfo || geoInfo.targetType !== 'Postal Code') return;
+                
+                // Extract zipcode from name (should be 5-digit)
+                const zipMatch = geoInfo.name.match(/^(\d{5})/);
                 if (!zipMatch) return;
                 
                 const zipcode = zipMatch[1];
                 // Extract state from canonical name (format: "12345,State,United States")
-                const nameParts = name.split(',');
+                const nameParts = (geoInfo.canonicalName || '').split(',');
                 const state = nameParts.length >= 2 ? nameParts[1].trim() : '';
                 
                 if (!zipcodeData[zipcode]) {
@@ -2038,15 +2086,14 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
                         sources: []
                     };
                 }
-                // Update state if we have it and don't already
                 if (state && !zipcodeData[zipcode].state) {
                     zipcodeData[zipcode].state = state;
                 }
                 
-                zipcodeData[zipcode].impressions += parseInt(metrics.impressions) || 0;
-                zipcodeData[zipcode].clicks += parseInt(metrics.clicks) || 0;
-                zipcodeData[zipcode].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
-                zipcodeData[zipcode].conversions += parseFloat(metrics.conversions) || 0;
+                zipcodeData[zipcode].impressions += metrics.impressions;
+                zipcodeData[zipcode].clicks += metrics.clicks;
+                zipcodeData[zipcode].cost += metrics.cost;
+                zipcodeData[zipcode].conversions += metrics.conversions;
                 if (!zipcodeData[zipcode].sources.includes('Google')) {
                     zipcodeData[zipcode].sources.push('Google');
                 }
