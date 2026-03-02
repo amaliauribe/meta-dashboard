@@ -141,6 +141,10 @@ function getESTDate() {
 
 // Get date range string for API (includes today for 7d, 14d, 30d) - using EST
 function getDateRange(range) {
+    if (range.custom && customStartDate && customEndDate) {
+        return `time_range={"since":"${customStartDate}","until":"${customEndDate}"}`;
+    }
+    
     if (range.preset) {
         return `date_preset=${range.preset}`;
     }
@@ -850,15 +854,26 @@ async function loadKPIs() {
 
 async function loadChartData() {
     const range = dateRanges[currentRange];
-    const days = getDaysArray(range.days);
+    
+    // Calculate number of days for custom range
+    let numDays = range.days || 7;
+    let startDate, endDate;
+    
+    if (range.custom && customStartDate && customEndDate) {
+        startDate = new Date(customStartDate + 'T12:00:00');
+        endDate = new Date(customEndDate + 'T12:00:00');
+        numDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    }
+    
+    const days = range.custom ? getDaysArrayCustom(customStartDate, customEndDate) : getDaysArray(numDays);
 
     try {
         const data = await apiCall(
             `${ACCOUNT_ID}/insights?fields=spend,actions&${getDateRange(range)}&time_increment=1`
         );
         
-        const dailySpend = new Array(range.days).fill(0);
-        const dailyResults = new Array(range.days).fill(0);
+        const dailySpend = new Array(numDays).fill(0);
+        const dailyResults = new Array(numDays).fill(0);
 
         if (data.data) {
             const dataByDate = {};
@@ -866,15 +881,31 @@ async function loadChartData() {
                 dataByDate[day.date_start] = day;
             });
             
-            const today = getESTDate();
-            for (let i = 0; i < range.days; i++) {
-                const date = new Date(today);
-                date.setDate(today.getDate() - (range.days - 1 - i));
-                const dateStr = formatDateEST(date);
-                
-                if (dataByDate[dateStr]) {
-                    dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
-                    dailyResults[i] = getResults(dataByDate[dateStr].actions);
+            if (range.custom && customStartDate && customEndDate) {
+                // Custom date range
+                const start = new Date(customStartDate + 'T12:00:00');
+                for (let i = 0; i < numDays; i++) {
+                    const date = new Date(start);
+                    date.setDate(start.getDate() + i);
+                    const dateStr = formatDateEST(date);
+                    
+                    if (dataByDate[dateStr]) {
+                        dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
+                        dailyResults[i] = getResults(dataByDate[dateStr].actions);
+                    }
+                }
+            } else {
+                // Standard date range
+                const today = getESTDate();
+                for (let i = 0; i < numDays; i++) {
+                    const date = new Date(today);
+                    date.setDate(today.getDate() - (numDays - 1 - i));
+                    const dateStr = formatDateEST(date);
+                    
+                    if (dataByDate[dateStr]) {
+                        dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
+                        dailyResults[i] = getResults(dataByDate[dateStr].actions);
+                    }
                 }
             }
         }
@@ -883,8 +914,8 @@ async function loadChartData() {
         renderResultsChart(days, dailyResults);
     } catch (e) { 
         console.error('Chart error:', e);
-        renderSpendChart(days, new Array(range.days).fill(0));
-        renderResultsChart(days, new Array(range.days).fill(0));
+        renderSpendChart(days, new Array(numDays).fill(0));
+        renderResultsChart(days, new Array(numDays).fill(0));
     }
 }
 
@@ -894,6 +925,20 @@ function getDaysArray(numDays) {
     for (let i = numDays - 1; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
+        days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }));
+    }
+    return days;
+}
+
+function getDaysArrayCustom(startDateStr, endDateStr) {
+    const days = [];
+    const start = new Date(startDateStr + 'T12:00:00');
+    const end = new Date(endDateStr + 'T12:00:00');
+    const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    
+    for (let i = 0; i < numDays; i++) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
         days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }));
     }
     return days;
