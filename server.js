@@ -1706,6 +1706,160 @@ app.post('/api/google/qs-history', async (req, res) => {
     }
 });
 
+// ==================== Bing QS History ====================
+
+const BING_QS_HISTORY_FILE = '/tmp/bing-qs-history.json';
+
+function loadBingQsHistory() {
+    try {
+        if (fs.existsSync(BING_QS_HISTORY_FILE)) {
+            return JSON.parse(fs.readFileSync(BING_QS_HISTORY_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Error loading Bing QS history:', e);
+    }
+    return { snapshots: [], lastCapture: null };
+}
+
+function saveBingQsHistory(data) {
+    try {
+        fs.writeFileSync(BING_QS_HISTORY_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('Error saving Bing QS history:', e);
+    }
+}
+
+// Capture current Bing QS data
+async function captureBingQsSnapshot() {
+    const today = new Date().toISOString().split('T')[0];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const startDate = sevenDaysAgo.toISOString().split('T')[0];
+    
+    const columns = ['Keyword', 'QualityScore', 'Clicks'];
+    const report = await submitAndDownloadReport('keyword', startDate, today, columns);
+    
+    const snapshot = {
+        date: today,
+        keywords: report.rows.map(row => ({
+            keyword: row.Keyword || 'Unknown',
+            qs: parseInt(row.QualityScore) || null
+        })).filter(k => k.keyword !== 'Unknown' && k.qs !== null)
+    };
+    
+    const history = loadBingQsHistory();
+    history.snapshots = history.snapshots.filter(s => s.date !== today);
+    history.snapshots.push(snapshot);
+    
+    // Keep only last 90 days
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    history.snapshots = history.snapshots.filter(s => new Date(s.date) >= cutoff);
+    
+    history.lastCapture = today;
+    saveBingQsHistory(history);
+    
+    return snapshot.keywords.length;
+}
+
+// Manual capture endpoint for Bing QS
+app.post('/api/bing/qs-capture', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const count = await captureBingQsSnapshot();
+        const today = new Date().toISOString().split('T')[0];
+        res.json({ success: true, date: today, keywordsCount: count });
+    } catch (error) {
+        console.error('Bing QS capture error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Bing QS history data
+app.post('/api/bing/qs-history', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        let history = loadBingQsHistory();
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Auto-capture if no data for today
+        const hasToday = history.snapshots.some(s => s.date === today);
+        if (!hasToday) {
+            console.log('Auto-capturing Bing QS data for today...');
+            try {
+                await captureBingQsSnapshot();
+                history = loadBingQsHistory();
+            } catch (e) {
+                console.error('Auto-capture failed:', e);
+            }
+        }
+        
+        if (history.snapshots.length === 0) {
+            return res.json({ history: [], chartData: [], message: 'No history data available yet. Data will accumulate over time.' });
+        }
+        
+        // Get current snapshot and historical snapshots
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const currentSnapshot = history.snapshots.find(s => s.date === today) || history.snapshots[history.snapshots.length - 1];
+        const snapshot7d = history.snapshots.find(s => new Date(s.date) <= sevenDaysAgo);
+        const snapshot30d = history.snapshots.find(s => new Date(s.date) <= thirtyDaysAgo);
+        
+        // Build keyword-level history
+        const keywordMap = {};
+        
+        if (currentSnapshot) {
+            currentSnapshot.keywords.forEach(k => {
+                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs };
+            });
+        }
+        
+        if (snapshot7d) {
+            snapshot7d.keywords.forEach(k => {
+                if (keywordMap[k.keyword]) {
+                    keywordMap[k.keyword].qs7dAgo = k.qs;
+                }
+            });
+        }
+        
+        if (snapshot30d) {
+            snapshot30d.keywords.forEach(k => {
+                if (keywordMap[k.keyword]) {
+                    keywordMap[k.keyword].qs30dAgo = k.qs;
+                }
+            });
+        }
+        
+        const historyArray = Object.values(keywordMap)
+            .filter(k => k.currentQs)
+            .sort((a, b) => (b.currentQs || 0) - (a.currentQs || 0));
+        
+        // Build chart data
+        const chartData = history.snapshots.map(snapshot => {
+            const qsValues = snapshot.keywords.map(k => k.qs).filter(q => q);
+            const avgQs = qsValues.length > 0 ? qsValues.reduce((a, b) => a + b, 0) / qsValues.length : null;
+            return {
+                date: snapshot.date,
+                avgQs: avgQs ? parseFloat(avgQs.toFixed(2)) : null
+            };
+        }).filter(d => d.avgQs !== null);
+        
+        res.json({ history: historyArray, chartData });
+    } catch (error) {
+        console.error('Bing QS history error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Summary API ====================
 
 // Summary: Get daily spend data for all platforms

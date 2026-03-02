@@ -57,6 +57,7 @@
                     <div class="nav-section-items" id="bingItems">
                         <button class="nav-item" data-view="bing">Campaigns</button>
                         <button class="nav-item" data-view="bingKeywords">Keywords</button>
+                        <button class="nav-item" data-view="bingQsHistory">QS History</button>
                         <button class="nav-item" data-view="bingGeo">Geographic</button>
                         <button class="nav-item" data-view="bingSearchTerms">Search Terms</button>
                     </div>
@@ -469,6 +470,78 @@
                 </div>
             </section>
         </div><!-- End Bing Keywords View -->
+
+        <!-- Bing QS History View -->
+        <div id="bingQsHistoryView" class="view-content hidden">
+            <h1>🔷 Bing Quality Score History</h1>
+            
+            <!-- QS KPI Cards -->
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">📈 IMPROVED</div>
+                    <div id="bingQsImprovedCount" class="kpi-value qs-good">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">➡️ STABLE</div>
+                    <div id="bingQsStableCount" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">📉 DECLINED</div>
+                    <div id="bingQsDeclinedCount" class="kpi-value qs-low">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">AVG QS (NOW)</div>
+                    <div id="bingQsAvgCurrent" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">AVG QS (30d AGO)</div>
+                    <div id="bingQsAvg30d" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">KEYWORDS TRACKED</div>
+                    <div id="bingQsTotalKeywords" class="kpi-value">-</div>
+                </div>
+            </div>
+            
+            <!-- QS Trend Chart -->
+            <section class="chart-section">
+                <h2>📊 Average Quality Score Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="bingQsHistoryChart"></canvas>
+                </div>
+            </section>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <input type="text" id="bingQsHistorySearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+            </div>
+            
+            <!-- QS History Table -->
+            <section class="table-section">
+                <h2>🎯 Keyword Quality Score Trends</h2>
+                <div class="table-wrapper">
+                    <table id="bingQsHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Current QS</th>
+                                <th>7d Ago</th>
+                                <th>30d Ago</th>
+                                <th>Trend</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingQsHistoryBody">
+                            <tr><td colspan="6" class="loading">Loading QS history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section class="info-section">
+                <p>📝 <strong>Note:</strong> QS history is captured daily. Trends show changes compared to 7 days and 30 days ago. Data accumulates over time.</p>
+            </section>
+        </div><!-- End Bing QS History View -->
 
         <!-- Bing Geographic View -->
         <div id="bingGeoView" class="view-content hidden">

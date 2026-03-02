@@ -27,6 +27,12 @@ let bingConversionsChart = null;
 
 // Bing Keywords state
 let bingKeywordsDataLoaded = false;
+
+// Bing QS History state
+let bingQsHistoryDataLoaded = false;
+let bingQsHistoryRawData = [];
+let bingQsHistorySearchText = '';
+let bingQsHistoryChart = null;
 let bingKeywordsRawData = [];
 let bingKeywordsSortColumn = 'clicks';
 let bingKeywordsSortDirection = 'desc';
@@ -229,6 +235,7 @@ function initializeDashboard() {
             adsDataLoaded = false; // Reset ads data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
             bingKeywordsDataLoaded = false;
+            bingQsHistoryDataLoaded = false;
             bingGeoDataLoaded = false;
             bingSearchTermsDataLoaded = false;
             googleDataLoaded = false; // Reset google data when date changes
@@ -272,6 +279,7 @@ function initializeDashboard() {
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
             document.getElementById('bingKeywordsView').classList.toggle('hidden', currentView !== 'bingKeywords');
+            document.getElementById('bingQsHistoryView').classList.toggle('hidden', currentView !== 'bingQsHistory');
             document.getElementById('bingGeoView').classList.toggle('hidden', currentView !== 'bingGeo');
             document.getElementById('bingSearchTermsView').classList.toggle('hidden', currentView !== 'bingSearchTerms');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
@@ -292,6 +300,9 @@ function initializeDashboard() {
             }
             if (currentView === 'bingKeywords' && !bingKeywordsDataLoaded) {
                 loadBingKeywordsData();
+            }
+            if (currentView === 'bingQsHistory' && !bingQsHistoryDataLoaded) {
+                loadBingQsHistoryData();
             }
             if (currentView === 'bingGeo' && !bingGeoDataLoaded) {
                 loadBingGeoData();
@@ -332,6 +343,7 @@ function initializeDashboard() {
         adsDataLoaded = false;
         bingDataLoaded = false;
         bingKeywordsDataLoaded = false;
+        bingQsHistoryDataLoaded = false;
         bingGeoDataLoaded = false;
         bingSearchTermsDataLoaded = false;
         googleDataLoaded = false;
@@ -350,6 +362,8 @@ function initializeDashboard() {
             loadBingData();
         } else if (currentView === 'bingKeywords') {
             loadBingKeywordsData();
+        } else if (currentView === 'bingQsHistory') {
+            loadBingQsHistoryData();
         } else if (currentView === 'bingGeo') {
             loadBingGeoData();
         } else if (currentView === 'bingSearchTerms') {
@@ -515,6 +529,12 @@ function initializeDashboard() {
             th.classList.add(bingKeywordsSortDirection);
             renderBingKeywordsTable();
         });
+    });
+    
+    // Bing QS History search
+    document.getElementById('bingQsHistorySearch').addEventListener('input', (e) => {
+        bingQsHistorySearchText = e.target.value.toLowerCase();
+        renderBingQsHistoryTable();
     });
     
     // Bing Geographic search
@@ -2796,6 +2816,158 @@ function renderSearchTermsTable() {
     if (sorted.length === 0) {
         document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="12" class="loading">No search terms match the filter</td></tr>';
     }
+}
+
+// ==================== Bing QS History ====================
+
+async function loadBingQsHistoryData() {
+    document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">Loading QS history...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/bing/qs-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Bing QS history');
+        const data = await response.json();
+        
+        const history = data.history || [];
+        const chartData = data.chartData || [];
+        
+        if (history.length === 0) {
+            document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No QS history data available yet. Data will accumulate over time.</td></tr>';
+            return;
+        }
+        
+        bingQsHistoryRawData = history;
+        
+        // Calculate KPI stats
+        let improved = 0, declined = 0, stable = 0;
+        let currentQsSum = 0, currentQsCount = 0;
+        let oldQsSum = 0, oldQsCount = 0;
+        
+        history.forEach(kw => {
+            if (kw.currentQs) {
+                currentQsSum += kw.currentQs;
+                currentQsCount++;
+            }
+            if (kw.qs30dAgo) {
+                oldQsSum += kw.qs30dAgo;
+                oldQsCount++;
+            }
+            
+            const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+            if (change > 0) improved++;
+            else if (change < 0) declined++;
+            else stable++;
+        });
+        
+        document.getElementById('bingQsImprovedCount').textContent = improved;
+        document.getElementById('bingQsStableCount').textContent = stable;
+        document.getElementById('bingQsDeclinedCount').textContent = declined;
+        document.getElementById('bingQsAvgCurrent').textContent = currentQsCount > 0 ? (currentQsSum / currentQsCount).toFixed(1) : '-';
+        document.getElementById('bingQsAvg30d').textContent = oldQsCount > 0 ? (oldQsSum / oldQsCount).toFixed(1) : '-';
+        document.getElementById('bingQsTotalKeywords').textContent = history.length;
+        
+        renderBingQsHistoryTable();
+        
+        // Update chart
+        if (chartData.length > 0) {
+            updateBingQsHistoryChart(chartData);
+        }
+        
+        bingQsHistoryDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Bing QS History error:', e);
+        document.getElementById('bingQsHistoryBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderBingQsHistoryTable() {
+    if (bingQsHistoryRawData.length === 0) return;
+    
+    let filtered = bingQsHistoryRawData;
+    if (bingQsHistorySearchText) {
+        filtered = filtered.filter(kw => kw.keyword.toLowerCase().includes(bingQsHistorySearchText));
+    }
+    
+    document.getElementById('bingQsHistoryBody').innerHTML = filtered.map(kw => {
+        const currentQs = kw.currentQs || '-';
+        const qs7d = kw.qs7dAgo || '-';
+        const qs30d = kw.qs30dAgo || '-';
+        
+        const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+        let trendIcon, trendClass, changeText;
+        
+        if (change > 0) {
+            trendIcon = '↑';
+            trendClass = 'qs-good';
+            changeText = `+${change} 🟢`;
+        } else if (change < 0) {
+            trendIcon = '↓';
+            trendClass = 'qs-low';
+            changeText = `${change} 🔴`;
+        } else {
+            trendIcon = '→';
+            trendClass = '';
+            changeText = '0';
+        }
+        
+        const qsClass = kw.currentQs >= 7 ? 'qs-good' : (kw.currentQs >= 5 ? 'qs-ok' : 'qs-low');
+        
+        return `<tr>
+            <td>${kw.keyword}</td>
+            <td class="${qsClass}">${currentQs}</td>
+            <td>${qs7d}</td>
+            <td>${qs30d}</td>
+            <td class="${trendClass}">${trendIcon}</td>
+            <td class="${trendClass}">${changeText}</td>
+        </tr>`;
+    }).join('');
+    
+    if (filtered.length === 0) {
+        document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the search</td></tr>';
+    }
+}
+
+function updateBingQsHistoryChart(chartData) {
+    const ctx = document.getElementById('bingQsHistoryChart').getContext('2d');
+    
+    if (bingQsHistoryChart) {
+        bingQsHistoryChart.destroy();
+    }
+    
+    bingQsHistoryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => d.date),
+            datasets: [{
+                label: 'Average Quality Score',
+                data: chartData.map(d => d.avgQs),
+                borderColor: '#0078d4',
+                backgroundColor: 'rgba(0, 120, 212, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 10,
+                    title: { display: true, text: 'Quality Score' }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
 }
 
 // ==================== Bing Keywords ====================
