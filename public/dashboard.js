@@ -244,6 +244,7 @@ function initializeDashboard() {
             googleGeoDataLoaded = false; // Reset google geo data when date changes
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
+            heatmapDataLoaded = false; // Reset heatmap data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
             } else if (currentView === 'campaigns') {
@@ -275,6 +276,7 @@ function initializeDashboard() {
             
             // Show/hide views
             document.getElementById('summaryView').classList.toggle('hidden', currentView !== 'summary');
+            document.getElementById('heatmapView').classList.toggle('hidden', currentView !== 'heatmap');
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
@@ -289,6 +291,9 @@ function initializeDashboard() {
             document.getElementById('googleSearchTermsView').classList.toggle('hidden', currentView !== 'googleSearchTerms');
             
             // Load data for the selected view
+            if (currentView === 'heatmap' && !heatmapDataLoaded) {
+                loadHeatmapData();
+            }
             if (currentView === 'summary' && !summaryDataLoaded) {
                 loadSummaryData();
             }
@@ -3290,3 +3295,190 @@ updateLastUpdated = function() {
     originalUpdateLastUpdated();
     setTimeout(initResizableTables, 100);
 };
+
+// ==================== Heatmap ====================
+
+let heatmapDataLoaded = false;
+let heatmapMap = null;
+let heatmapLayer = null;
+let zipcodeMarkers = [];
+
+// US Zipcode coordinates cache (loaded dynamically)
+const zipcodeCoords = {};
+
+async function loadZipcodeCoordinates(zipcodes) {
+    // Use a free geocoding API to get coordinates
+    // We'll batch geocode using the Census Geocoder or a zipcode database
+    const uncached = zipcodes.filter(z => !zipcodeCoords[z]);
+    
+    if (uncached.length === 0) return;
+    
+    // Use zipcodebase or similar API, or hardcode common ones
+    // For now, use a free zipcode API
+    for (const zip of uncached.slice(0, 100)) { // Limit to 100 to avoid rate limits
+        try {
+            const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.places && data.places[0]) {
+                    zipcodeCoords[zip] = {
+                        lat: parseFloat(data.places[0].latitude),
+                        lng: parseFloat(data.places[0].longitude),
+                        city: data.places[0]['place name'],
+                        state: data.places[0]['state abbreviation']
+                    };
+                }
+            }
+        } catch (e) {
+            // Skip failed geocoding
+        }
+    }
+}
+
+async function loadHeatmapData() {
+    if (heatmapDataLoaded) return;
+    
+    document.getElementById('zipcodeTableBody').innerHTML = '<tr><td colspan="7" class="loading">Loading zipcode data...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const dateRange = getBingDateRange(range);
+        
+        const response = await fetch('/api/heatmap/zipcode-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load heatmap data');
+        const data = await response.json();
+        
+        const zipcodes = data.zipcodes || [];
+        
+        // Update stats
+        document.getElementById('heatmapZipcodeCount').textContent = zipcodes.length.toLocaleString();
+        document.getElementById('heatmapTotalConversions').textContent = 
+            zipcodes.reduce((sum, z) => sum + z.conversions, 0).toFixed(1);
+        document.getElementById('heatmapTotalSpend').textContent = 
+            '$' + zipcodes.reduce((sum, z) => sum + z.cost, 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        // Load coordinates for zipcodes
+        await loadZipcodeCoordinates(zipcodes.map(z => z.zipcode));
+        
+        // Initialize or update map
+        renderHeatmap(zipcodes);
+        renderZipcodeTable(zipcodes);
+        
+        heatmapDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Heatmap error:', e);
+        document.getElementById('zipcodeTableBody').innerHTML = `<tr><td colspan="7" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderHeatmap(zipcodes) {
+    // Initialize map if not exists
+    if (!heatmapMap) {
+        heatmapMap = L.map('heatmapContainer').setView([39.8283, -98.5795], 4); // Center of US
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(heatmapMap);
+    }
+    
+    // Clear existing layers
+    if (heatmapLayer) {
+        heatmapMap.removeLayer(heatmapLayer);
+    }
+    zipcodeMarkers.forEach(m => heatmapMap.removeLayer(m));
+    zipcodeMarkers = [];
+    
+    // Prepare heatmap data
+    const heatData = [];
+    const maxConversions = Math.max(...zipcodes.map(z => z.conversions), 1);
+    
+    zipcodes.forEach(z => {
+        const coords = zipcodeCoords[z.zipcode];
+        if (coords) {
+            // Add to heatmap with intensity based on conversions
+            const intensity = z.conversions / maxConversions;
+            heatData.push([coords.lat, coords.lng, intensity]);
+            
+            // Add marker for top zipcodes
+            if (z.conversions >= 1) {
+                const marker = L.circleMarker([coords.lat, coords.lng], {
+                    radius: Math.min(5 + (z.conversions / maxConversions) * 15, 20),
+                    fillColor: getHeatColor(z.conversions / maxConversions),
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(heatmapMap);
+                
+                marker.bindPopup(`
+                    <div class="popup-zipcode">${z.zipcode}</div>
+                    <div class="popup-stats">
+                        ${coords.city ? `<strong>${coords.city}, ${coords.state}</strong><br>` : ''}
+                        <strong>Conversions:</strong> ${z.conversions.toFixed(1)}<br>
+                        <strong>Clicks:</strong> ${z.clicks.toLocaleString()}<br>
+                        <strong>Cost:</strong> $${z.cost.toFixed(2)}<br>
+                        <strong>Cost/Conv:</strong> ${z.conversions > 0 ? '$' + (z.cost / z.conversions).toFixed(2) : '-'}<br>
+                        <strong>Source:</strong> ${z.sources.join(', ')}
+                    </div>
+                `);
+                
+                zipcodeMarkers.push(marker);
+            }
+        }
+    });
+    
+    // Add heatmap layer
+    if (heatData.length > 0) {
+        heatmapLayer = L.heatLayer(heatData, {
+            radius: 25,
+            blur: 15,
+            maxZoom: 10,
+            gradient: {
+                0.0: '#ffffcc',
+                0.2: '#ffeda0',
+                0.4: '#feb24c',
+                0.6: '#fd8d3c',
+                0.8: '#e31a1c',
+                1.0: '#800026'
+            }
+        }).addTo(heatmapMap);
+    }
+}
+
+function getHeatColor(intensity) {
+    const colors = ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#bd0026', '#800026'];
+    const index = Math.min(Math.floor(intensity * colors.length), colors.length - 1);
+    return colors[index];
+}
+
+function renderZipcodeTable(zipcodes) {
+    const tbody = document.getElementById('zipcodeTableBody');
+    
+    if (zipcodes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">No zipcode data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = zipcodes.slice(0, 100).map(z => {
+        const coords = zipcodeCoords[z.zipcode];
+        const location = coords ? `${z.zipcode} (${coords.city}, ${coords.state})` : z.zipcode;
+        const costPerConv = z.conversions > 0 ? '$' + (z.cost / z.conversions).toFixed(2) : '-';
+        
+        return `<tr>
+            <td>${location}</td>
+            <td>${z.sources.join(', ')}</td>
+            <td>${z.impressions.toLocaleString()}</td>
+            <td>${z.clicks.toLocaleString()}</td>
+            <td>$${z.cost.toFixed(2)}</td>
+            <td>${z.conversions.toFixed(1)}</td>
+            <td>${costPerConv}</td>
+        </tr>`;
+    }).join('');
+}
+

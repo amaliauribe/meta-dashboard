@@ -1985,3 +1985,108 @@ app.listen(PORT, () => {
     console.log(`TikTok API configured: ${isTikTokConfigured()}`);
     console.log(`Google Ads API configured: ${isGoogleAdsConfigured()}`);
 });
+
+// ==================== Zipcode Heatmap ====================
+
+// Get combined zipcode performance data from Google + Bing
+app.post('/api/heatmap/zipcode-performance', async (req, res) => {
+    const { startDate, endDate } = req.body;
+    const zipcodeData = {};
+    
+    // Fetch Google geographic data
+    if (isGoogleAdsConfigured()) {
+        try {
+            const googleData = await googleAdsApiRequest(\`
+                SELECT 
+                    campaign_criterion.location.geo_target_constant,
+                    metrics.impressions,
+                    metrics.clicks,
+                    metrics.cost_micros,
+                    metrics.conversions
+                FROM location_view
+                WHERE segments.date BETWEEN '\${startDate}' AND '\${endDate}'
+                    AND campaign_criterion.location.geo_target_constant IS NOT NULL
+            \`);
+            
+            googleData.forEach(row => {
+                const metrics = row.metrics || {};
+                const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
+                const match = geoConstant.match(/geoTargetConstants\\/(\d+)/);
+                if (!match) return;
+                
+                const geoId = match[1];
+                // Extract zipcode from canonical name if available
+                const name = row.campaign_criterion?.location?.geo_target_constant_name || '';
+                const zipMatch = name.match(/^(\d{5})/);
+                if (!zipMatch) return;
+                
+                const zipcode = zipMatch[1];
+                if (!zipcodeData[zipcode]) {
+                    zipcodeData[zipcode] = { 
+                        zipcode, 
+                        impressions: 0, 
+                        clicks: 0, 
+                        cost: 0, 
+                        conversions: 0,
+                        sources: []
+                    };
+                }
+                
+                zipcodeData[zipcode].impressions += parseInt(metrics.impressions) || 0;
+                zipcodeData[zipcode].clicks += parseInt(metrics.clicks) || 0;
+                zipcodeData[zipcode].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+                zipcodeData[zipcode].conversions += parseFloat(metrics.conversions) || 0;
+                if (!zipcodeData[zipcode].sources.includes('Google')) {
+                    zipcodeData[zipcode].sources.push('Google');
+                }
+            });
+        } catch (e) {
+            console.error('Google heatmap error:', e.message);
+        }
+    }
+    
+    // Fetch Bing geographic data  
+    if (isBingConfigured()) {
+        try {
+            const columns = ['MostSpecificLocation', 'Country', 'State', 'City', 'LocationType', 
+                           'Impressions', 'Clicks', 'Spend', 'Conversions'];
+            const report = await submitAndDownloadReport('geographic', startDate, endDate, columns);
+            
+            report.rows.forEach(row => {
+                const location = row.MostSpecificLocation || '';
+                // Check if it's a zipcode (5 digits)
+                if (!/^\d{5}$/.test(location)) return;
+                
+                const zipcode = location;
+                if (!zipcodeData[zipcode]) {
+                    zipcodeData[zipcode] = { 
+                        zipcode, 
+                        impressions: 0, 
+                        clicks: 0, 
+                        cost: 0, 
+                        conversions: 0,
+                        sources: []
+                    };
+                }
+                
+                zipcodeData[zipcode].impressions += parseInt(row.Impressions) || 0;
+                zipcodeData[zipcode].clicks += parseInt(row.Clicks) || 0;
+                zipcodeData[zipcode].cost += parseFloat(row.Spend) || 0;
+                zipcodeData[zipcode].conversions += parseFloat(row.Conversions) || 0;
+                if (!zipcodeData[zipcode].sources.includes('Bing')) {
+                    zipcodeData[zipcode].sources.push('Bing');
+                }
+            });
+        } catch (e) {
+            console.error('Bing heatmap error:', e.message);
+        }
+    }
+    
+    // Convert to array and sort by conversions
+    const results = Object.values(zipcodeData)
+        .filter(z => z.conversions > 0 || z.clicks > 0)
+        .sort((a, b) => b.conversions - a.conversions);
+    
+    res.json({ zipcodes: results });
+});
+

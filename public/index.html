@@ -6,6 +6,9 @@
     <title>Meta Ads Dashboard | Meta Business VTC</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 </head>
 <body>
     <!-- Login Screen -->
@@ -38,6 +41,7 @@
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <button class="nav-item nav-item-main active" data-view="summary">📊 Summary</button>
+                    <button class="nav-item nav-item-main" data-view="heatmap">🗺️ Heatmap</button>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title" data-toggle="meta">
@@ -195,6 +199,60 @@
             </section>
 
         </div><!-- End Summary View -->
+
+        <!-- Heatmap View -->
+        <div id="heatmapView" class="view-content hidden">
+            <section class="content-section">
+                <h2>🗺️ Zipcode Conversion Heatmap</h2>
+                <p class="section-subtitle">Geographic performance by zipcode (Google + Bing combined)</p>
+                
+                <div class="heatmap-controls">
+                    <div class="heatmap-stats">
+                        <div class="stat-box">
+                            <span class="stat-label">Total Zipcodes</span>
+                            <span class="stat-value" id="heatmapZipcodeCount">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Total Conversions</span>
+                            <span class="stat-value" id="heatmapTotalConversions">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Total Spend</span>
+                            <span class="stat-value" id="heatmapTotalSpend">$0</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-legend">
+                        <span>Low</span>
+                        <div class="legend-gradient"></div>
+                        <span>High</span>
+                    </div>
+                </div>
+                
+                <div id="heatmapContainer" style="height: 600px; width: 100%; border-radius: 8px; overflow: hidden;"></div>
+                
+                <div class="table-section" style="margin-top: 20px;">
+                    <h3>📍 Top Converting Zipcodes</h3>
+                    <div class="table-wrapper">
+                        <table id="zipcodeTable">
+                            <thead>
+                                <tr>
+                                    <th>Zipcode</th>
+                                    <th>Source</th>
+                                    <th>Impressions</th>
+                                    <th>Clicks</th>
+                                    <th>Cost</th>
+                                    <th>Conversions</th>
+                                    <th>Cost/Conv</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zipcodeTableBody">
+                                <tr><td colspan="7" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div><!-- End Heatmap View -->
 
         <!-- Campaigns View -->
         <div id="campaignsView" class="view-content hidden">

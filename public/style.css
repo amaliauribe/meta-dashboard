@@ -899,3 +899,78 @@ table.resizable-table td {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Heatmap styles */
+.heatmap-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.heatmap-stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat-box {
+    background: #f8f9fa;
+    padding: 15px 25px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1877f2;
+}
+
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend-gradient {
+    width: 150px;
+    height: 15px;
+    background: linear-gradient(to right, #ffffcc, #ffeda0, #fed976, #feb24c, #fd8d3c, #fc4e2a, #e31a1c, #bd0026, #800026);
+    border-radius: 3px;
+}
+
+#heatmapContainer {
+    background: #e8e8e8;
+}
+
+.leaflet-popup-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.popup-zipcode {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #1877f2;
+}
+
+.popup-stats {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.popup-stats strong {
+    color: #333;
+}
