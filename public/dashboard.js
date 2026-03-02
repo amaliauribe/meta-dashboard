@@ -504,7 +504,7 @@ function showError(message) {
 async function loadData() {
     const campaignCols = (currentRange === 'today' || currentRange === 'yesterday') ? 10 : 8;
     document.getElementById('campaignBody').innerHTML = `<tr><td colspan="${campaignCols}" class="loading">Loading...</td></tr>`;
-    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
@@ -823,7 +823,7 @@ async function loadDailyData() {
         const tbody = document.getElementById('dailyBody');
         
         if (!data.data || data.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -862,7 +862,7 @@ async function loadDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Daily error:', e);
-        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="9" class="loading">Error loading daily data</td></tr>';
+        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading daily data</td></tr>';
     }
 }
 
@@ -1414,7 +1414,7 @@ async function loadSummaryData() {
 // Main Bing data loading function
 async function loadBingData() {
     document.getElementById('bingCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading Bing data...</td></tr>';
-    document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('bingDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
 
     try {
         await Promise.all([
@@ -1444,7 +1444,7 @@ function showBingLoadingError(errorMsg) {
         </tr>
     `;
     document.getElementById('bingCampaignBody').innerHTML = message;
-    document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="9" class="loading">${errorMsg}</td></tr>`;
+    document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="10" class="loading">${errorMsg}</td></tr>`;
     
     // Reset KPIs
     document.getElementById('bingTotalSpend').textContent = '$0.00';
@@ -1465,7 +1465,7 @@ function showBingError(message) {
     document.getElementById('bingCampaignBody').innerHTML = 
         `<tr><td colspan="8" class="loading">${message}</td></tr>`;
     document.getElementById('bingDailyBody').innerHTML = 
-        `<tr><td colspan="9" class="loading">${message}</td></tr>`;
+        `<tr><td colspan="10" class="loading">${message}</td></tr>`;
 }
 
 // Bing API call helper - calls the backend proxy
@@ -1688,7 +1688,7 @@ async function loadBingDailyData() {
         const tbody = document.getElementById('bingDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -1737,7 +1737,7 @@ async function loadBingDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -1771,7 +1771,7 @@ function getGoogleDateRange(range) {
 // Main Google data loading function
 async function loadGoogleData() {
     document.getElementById('googleCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading Google Ads data...</td></tr>';
-    document.getElementById('googleDailyBody').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    document.getElementById('googleDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
     document.getElementById('googleKeywordBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
 
     try {
@@ -1803,7 +1803,7 @@ function showGoogleLoadingError(errorMsg) {
         </tr>
     `;
     document.getElementById('googleCampaignBody').innerHTML = message;
-    document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="9" class="loading">${errorMsg}</td></tr>`;
+    document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="10" class="loading">${errorMsg}</td></tr>`;
     document.getElementById('googleKeywordBody').innerHTML = `<tr><td colspan="5" class="loading">${errorMsg}</td></tr>`;
     
     // Reset KPIs
@@ -2034,7 +2034,7 @@ async function loadGoogleDailyData() {
         const tbody = document.getElementById('googleDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -2073,7 +2073,7 @@ async function loadGoogleDailyData() {
         }).join('');
     } catch (e) { 
         console.error('Google Daily error:', e);
-        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -2538,7 +2538,7 @@ function renderGeoTable() {
 // ==================== Search Terms ====================
 
 async function loadGoogleSearchTermsData() {
-    document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">Loading search terms...</td></tr>';
+    document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading search terms...</td></tr>';
     
     try {
         const range = dateRanges[currentRange];
@@ -2552,7 +2552,7 @@ async function loadGoogleSearchTermsData() {
         const searchTerms = data?.searchTerms || [];
         
         if (searchTerms.length === 0) {
-            document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">No search terms data available</td></tr>';
+            document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="10" class="loading">No search terms data available</td></tr>';
             return;
         }
         
@@ -2595,7 +2595,7 @@ async function loadGoogleSearchTermsData() {
         updateLastUpdated();
     } catch (e) {
         console.error('Search Terms error:', e);
-        document.getElementById('searchTermsBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('searchTermsBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -2656,6 +2656,7 @@ function renderSearchTermsTable() {
                 <td>${(st.clicks || 0).toLocaleString()}</td>
                 <td>${st.ctr?.toFixed(2) || '0.00'}%</td>
                 <td>$${(st.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>$${(st.cpc || 0).toFixed(2)}</td>
                 <td>${(st.conversions || 0).toFixed(1)}</td>
                 <td class="${convRateClass}">${st.convRate?.toFixed(2) || '0.00'}%</td>
                 <td>${st.conversions > 0 ? '$' + st.costPerConv.toFixed(2) : '-'}</td>
@@ -2664,6 +2665,6 @@ function renderSearchTermsTable() {
     }).join('');
     
     if (sorted.length === 0) {
-        document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">No search terms match the filter</td></tr>';
+        document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="10" class="loading">No search terms match the filter</td></tr>';
     }
 }
