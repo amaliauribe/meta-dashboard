@@ -831,3 +831,38 @@ footer {
     color: #004085;
     font-size: 14px;
 }
+
+/* Bing Search Terms table column widths */
+#bingSearchTermsView table th:nth-child(1),
+#bingSearchTermsView table td:nth-child(1) {
+    /* Search Term */
+    max-width: 250px;
+    min-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#bingSearchTermsView table th:nth-child(2),
+#bingSearchTermsView table td:nth-child(2) {
+    /* Keyword */
+    max-width: 180px;
+    min-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#bingSearchTermsView table th:nth-child(3),
+#bingSearchTermsView table td:nth-child(3) {
+    /* Ad Group */
+    max-width: 180px;
+    min-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#bingSearchTermsView table {
+    table-layout: fixed;
+}
