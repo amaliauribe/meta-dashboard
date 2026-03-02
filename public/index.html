@@ -141,16 +141,26 @@
                     <table id="summaryDailyTable" class="summary-table">
                         <thead>
                             <tr>
-                                <th>Period</th>
-                                <th>Day</th>
-                                <th>Meta</th>
-                                <th>Google</th>
-                                <th>Bing</th>
-                                <th>Total</th>
+                                <th rowspan="2">Period</th>
+                                <th rowspan="2">Day</th>
+                                <th colspan="2" class="source-header meta">Meta</th>
+                                <th colspan="2" class="source-header google">Google</th>
+                                <th colspan="2" class="source-header bing">Bing</th>
+                                <th colspan="2" class="source-header total">Total</th>
+                            </tr>
+                            <tr>
+                                <th>Spend</th>
+                                <th>Conv</th>
+                                <th>Spend</th>
+                                <th>Conv</th>
+                                <th>Spend</th>
+                                <th>Conv</th>
+                                <th>Spend</th>
+                                <th>Conv</th>
                             </tr>
                         </thead>
                         <tbody id="summaryDailyBody">
-                            <tr><td colspan="6" class="loading">Loading summary data...</td></tr>
+                            <tr><td colspan="10" class="loading">Loading summary data...</td></tr>
                         </tbody>
                         <tfoot id="summaryDailyFoot">
                         </tfoot>
@@ -1252,6 +1262,6 @@
             </footer>
         </main><!-- End Main Content -->
     </div>
-    <script src="dashboard.js?v=1772481825"></script>
+    <script src="dashboard.js?v=1772482168"></script>
 </body>
 </html>

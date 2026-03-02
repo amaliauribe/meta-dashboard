@@ -1027,3 +1027,13 @@ table.resizable-table td {
     font-size: 14px;
     margin: -10px 0 15px 0;
 }
+
+/* Source header styling for summary tables */
+.source-header {
+    text-align: center;
+    border-bottom: 2px solid #ddd;
+}
+.source-header.meta { background-color: #e3f2fd; }
+.source-header.google { background-color: #ffebee; }
+.source-header.bing { background-color: #e8f5e9; }
+.source-header.total { background-color: #fff3e0; }

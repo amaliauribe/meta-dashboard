@@ -1391,7 +1391,7 @@ function getBingDateRange(range) {
 // ==================== Summary Functions ====================
 
 async function loadSummaryData() {
-    document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="6" class="loading">Loading summary data...</td></tr>';
+    document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading summary data...</td></tr>';
     document.getElementById('summaryWeeklyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     document.getElementById('summaryMonthlyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     
@@ -1476,21 +1476,30 @@ async function loadSummaryData() {
             const bing = bingByDate[date] || 0;
             const total = meta + google + bing;
             
+            const metaConv = metaConvByDate[date] || 0;
+            const googleConv = googleConvByDate[date] || 0;
+            const bingConv = bingConvByDate[date] || 0;
+            const totalConv = metaConv + googleConv + bingConv;
+            
             totalMeta += meta;
             totalGoogle += google;
             totalBing += bing;
-            totalMetaConv += metaConvByDate[date] || 0;
-            totalGoogleConv += googleConvByDate[date] || 0;
-            totalBingConv += bingConvByDate[date] || 0;
+            totalMetaConv += metaConv;
+            totalGoogleConv += googleConv;
+            totalBingConv += bingConv;
             
             dailyHtml += `
                 <tr>
                     <td>${date}</td>
                     <td>${dayName}</td>
                     <td>${meta > 0 ? '$' + meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${metaConv.toFixed(1)}</td>
                     <td>${google > 0 ? '$' + google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${googleConv.toFixed(1)}</td>
                     <td>${bing > 0 ? '$' + bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${bingConv.toFixed(1)}</td>
                     <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                    <td><strong>${totalConv.toFixed(1)}</strong></td>
                 </tr>
             `;
         });
@@ -1499,6 +1508,7 @@ async function loadSummaryData() {
         
         // Add totals row
         const grandTotal = totalMeta + totalGoogle + totalBing;
+        const grandTotalConvDaily = totalMetaConv + totalGoogleConv + totalBingConv;
         const rangeLabel = range.preset === 'today' ? 'Today' : 
                           range.preset === 'yesterday' ? 'Yesterday' : 
                           `${numDays}-Day Total`;
@@ -1507,9 +1517,13 @@ async function loadSummaryData() {
                 <td><strong>${rangeLabel}</strong></td>
                 <td></td>
                 <td><strong>$${totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>${totalMetaConv.toFixed(1)}</strong></td>
                 <td><strong>$${totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>${totalGoogleConv.toFixed(1)}</strong></td>
                 <td><strong>$${totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>${totalBingConv.toFixed(1)}</strong></td>
                 <td><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>${grandTotalConvDaily.toFixed(1)}</strong></td>
             </tr>
         `;
         
@@ -1642,7 +1656,7 @@ async function loadSummaryData() {
         
     } catch (error) {
         console.error('Summary error:', error);
-        document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="6" class="error">Error loading summary data</td></tr>';
+        document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="error">Error loading summary data</td></tr>';
     }
 }
 
