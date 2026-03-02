@@ -1,6 +1,6 @@
 // Authentication
-const VALID_USER = 'ama';
-const VALID_PASS = 'ama123';
+const VALID_USER = 'ranchi';
+const VALID_PASS = 'ranchera2026';
 
 // Meta API Configuration
 const ACCESS_TOKEN = 'EAAWzO6nYvm8BQ2HBleIOJDitEmwZBG7iE9hhiZBNF8tijy0kgimpg8CGKuPBOdhGwvzHtwZCs5jwqMaqSY8gQ3q1fNkFQ2Uk7CVLV4sAnsvp8VuH03l07CelnBRD6uIOE9Aa20FUQVvjX7D52jSrhaZAHaYNBBSN0g1S7ntZAYiSgU3iNyKwx0040ZBUCb';
