@@ -1478,13 +1478,14 @@ app.post('/api/google/ad-performance', async (req, res) => {
             const metrics = row.metrics || {};
             
             // Extract headlines and descriptions based on ad type
+            // Google Ads API returns type as enum number: 15 = RESPONSIVE_SEARCH_AD, 3 = EXPANDED_TEXT_AD
             let headlines = [];
             let descriptions = [];
             
-            if (ad.type === 'RESPONSIVE_SEARCH_AD' && ad.responsive_search_ad) {
+            if ((ad.type === 15 || ad.type === 'RESPONSIVE_SEARCH_AD') && ad.responsive_search_ad) {
                 headlines = (ad.responsive_search_ad.headlines || []).map(h => h.text).filter(Boolean);
                 descriptions = (ad.responsive_search_ad.descriptions || []).map(d => d.text).filter(Boolean);
-            } else if (ad.type === 'EXPANDED_TEXT_AD' && ad.expanded_text_ad) {
+            } else if ((ad.type === 3 || ad.type === 'EXPANDED_TEXT_AD') && ad.expanded_text_ad) {
                 const eta = ad.expanded_text_ad;
                 headlines = [eta.headline_part1, eta.headline_part2, eta.headline_part3].filter(Boolean);
                 descriptions = [eta.description, eta.description2].filter(Boolean);
@@ -1495,11 +1496,15 @@ app.post('/api/google/ad-performance', async (req, res) => {
             const cost = (parseInt(metrics.cost_micros) || 0) / 1000000;
             const conversions = parseFloat(metrics.conversions) || 0;
             
+            // Convert type enum to readable string
+            const adTypeMap = { 15: 'RSA', 3: 'ETA', 2: 'Text' };
+            const typeStr = adTypeMap[ad.type] || ad.type || 'Unknown';
+            
             return {
                 adId: ad.id,
                 campaign: campaign.name || 'Unknown',
                 adGroup: adGroup.name || 'Unknown',
-                type: ad.type || 'Unknown',
+                type: typeStr,
                 status: adGroupAd.status || 'Unknown',
                 headlines: headlines.slice(0, 3),  // First 3 headlines
                 descriptions: descriptions.slice(0, 2),  // First 2 descriptions
@@ -1531,6 +1536,8 @@ app.post('/api/bing/ad-performance', async (req, res) => {
     const { startDate, endDate } = req.body;
     
     try {
+        // Note: TitlePart1/2/3 and AdDescription columns return empty for RSAs
+        // Only Expanded Text Ads return creative text in performance reports
         const columns = [
             'CampaignName', 'AdGroupName', 'AdId', 'AdType', 'AdStatus',
             'TitlePart1', 'TitlePart2', 'TitlePart3',
@@ -1547,8 +1554,14 @@ app.post('/api/bing/ad-performance', async (req, res) => {
             const cost = parseFloat(row.Spend) || 0;
             const conversions = parseFloat(row.Conversions) || 0;
             
-            const headlines = [row.TitlePart1, row.TitlePart2, row.TitlePart3].filter(Boolean);
-            const descriptions = [row.AdDescription, row.AdDescription2].filter(Boolean);
+            // For RSAs, these will be empty - that's expected
+            let headlines = [row.TitlePart1, row.TitlePart2, row.TitlePart3].filter(Boolean);
+            let descriptions = [row.AdDescription, row.AdDescription2].filter(Boolean);
+            
+            // If no headlines (RSA), show indicator
+            if (headlines.length === 0 && row.AdType === 'Responsive search ad') {
+                headlines = ['(Responsive Search Ad)'];
+            }
             
             return {
                 adId: row.AdId,
