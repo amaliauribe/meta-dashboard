@@ -1252,9 +1252,39 @@ async function loadAdsData() {
             return;
         }
         
-        // Get last 7 days baseline for trend comparison
+        // Get previous period baseline for trend comparison
+        // Calculate previous period (same duration, immediately before current period)
+        let prevPeriodQuery;
+        if (range.custom && customStartDate && customEndDate) {
+            const start = new Date(customStartDate + 'T12:00:00');
+            const end = new Date(customEndDate + 'T12:00:00');
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            const prevEnd = new Date(start);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - days + 1);
+            prevPeriodQuery = `time_range={"since":"${formatDateEST(prevStart)}","until":"${formatDateEST(prevEnd)}"}`;
+        } else if (range.preset === 'today') {
+            prevPeriodQuery = 'date_preset=yesterday';
+        } else if (range.preset === 'yesterday') {
+            // Day before yesterday
+            const today = getESTDate();
+            const dayBeforeYesterday = new Date(today);
+            dayBeforeYesterday.setDate(today.getDate() - 2);
+            prevPeriodQuery = `time_range={"since":"${formatDateEST(dayBeforeYesterday)}","until":"${formatDateEST(dayBeforeYesterday)}"}`;
+        } else {
+            // For 7d, 14d, 30d - get the previous equivalent period
+            const today = getESTDate();
+            const days = range.days;
+            const prevEnd = new Date(today);
+            prevEnd.setDate(today.getDate() - days);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevEnd.getDate() - days + 1);
+            prevPeriodQuery = `time_range={"since":"${formatDateEST(prevStart)}","until":"${formatDateEST(prevEnd)}"}`;
+        }
+        
         const baselineData = await apiCall(
-            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,spend,actions&date_preset=last_7d&limit=100`
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,spend,actions&${prevPeriodQuery}&limit=100`
         );
         
         // Build baseline CPR map
@@ -1315,7 +1345,7 @@ async function loadAdsData() {
             const results = getResults(ad.actions);
             const costPerResult = results > 0 ? spend / results : Infinity;
             
-            // Calculate CPR trend vs 7-day baseline
+            // Calculate CPR trend vs previous period baseline
             const baseline = baselineCPR[ad.ad_id];
             let cprTrend = null; // percentage change
             if (baseline && costPerResult !== Infinity && baseline > 0) {
