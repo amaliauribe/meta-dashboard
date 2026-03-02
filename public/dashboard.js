@@ -3267,9 +3267,26 @@ function makeTableResizable(tableId) {
     });
 }
 
-// Initialize resizable tables when views load
-const originalLoadBingSearchTermsData = loadBingSearchTermsData;
-loadBingSearchTermsData = async function() {
-    await originalLoadBingSearchTermsData();
-    makeTableResizable('bingSearchTermsTable');
+// Make all tables resizable after data loads
+function initResizableTables() {
+    const tableIds = [
+        'campaignTable', 'adsTable', 'dailyTable',
+        'bingCampaignTable', 'bingDailyTable', 'bingKeywordsTable', 
+        'bingGeoTable', 'bingSearchTermsTable', 'bingQsHistoryTable',
+        'googleCampaignTable', 'googleDailyTable', 'googleKeywordTable',
+        'geoTable', 'searchTermsTable', 'qsHistoryTable', 'keywordsFullTable'
+    ];
+    tableIds.forEach(id => makeTableResizable(id));
+}
+
+// Initialize on page load and after each data load
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initResizableTables, 1000);
+});
+
+// Re-init after major data loads
+const originalUpdateLastUpdated = updateLastUpdated;
+updateLastUpdated = function() {
+    originalUpdateLastUpdated();
+    setTimeout(initResizableTables, 100);
 };

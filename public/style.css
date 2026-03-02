@@ -889,28 +889,13 @@ footer {
 }
 
 /* Remove fixed layout for resizable tables */
-#bingSearchTermsView table.resizable-table,
-#googleSearchTermsView table.resizable-table {
+table.resizable-table {
     table-layout: auto;
 }
 
-/* Allow text columns to expand naturally but with sensible defaults */
-#bingSearchTermsView table.resizable-table th:nth-child(1),
-#bingSearchTermsView table.resizable-table td:nth-child(1),
-#googleSearchTermsView table.resizable-table th:nth-child(1),
-#googleSearchTermsView table.resizable-table td:nth-child(1) {
-    min-width: 120px;
+table.resizable-table th,
+table.resizable-table td {
     max-width: none;
-}
-
-#bingSearchTermsView table.resizable-table th:nth-child(2),
-#bingSearchTermsView table.resizable-table td:nth-child(2),
-#bingSearchTermsView table.resizable-table th:nth-child(3),
-#bingSearchTermsView table.resizable-table td:nth-child(3),
-#googleSearchTermsView table.resizable-table th:nth-child(2),
-#googleSearchTermsView table.resizable-table td:nth-child(2),
-#googleSearchTermsView table.resizable-table th:nth-child(3),
-#googleSearchTermsView table.resizable-table td:nth-child(3) {
-    min-width: 100px;
-    max-width: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
