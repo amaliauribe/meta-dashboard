@@ -58,7 +58,7 @@ let searchTermsSortColumn = 'clicks';
 let searchTermsSortDirection = 'desc';
 let searchTermsFilter = 'all';
 let searchTermsSearchText = '';
-let searchTermsCampaignText = '';
+let searchTermsCampaignFilter = 'all';
 
 // Summary State
 let summaryDataLoaded = false;
@@ -440,9 +440,9 @@ function initializeDashboard() {
         renderSearchTermsTable();
     });
     
-    // Search Terms campaign filter
-    document.getElementById('searchTermsCampaign').addEventListener('input', (e) => {
-        searchTermsCampaignText = e.target.value.toLowerCase();
+    // Search Terms campaign filter dropdown
+    document.getElementById('searchTermsCampaignFilter').addEventListener('change', (e) => {
+        searchTermsCampaignFilter = e.target.value;
         renderSearchTermsTable();
     });
 
@@ -2559,6 +2559,12 @@ async function loadGoogleSearchTermsData() {
         // Store raw data
         searchTermsRawData = searchTerms;
         
+        // Populate campaign dropdown
+        const campaigns = [...new Set(searchTerms.map(st => st.campaign))].sort();
+        const campaignSelect = document.getElementById('searchTermsCampaignFilter');
+        campaignSelect.innerHTML = '<option value="all">All Campaigns</option>' + 
+            campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+        
         // Calculate totals
         let totalClicks = 0, totalCost = 0, totalConversions = 0, wastedCost = 0;
         
@@ -2616,10 +2622,8 @@ function renderSearchTermsTable() {
     }
     
     // Apply campaign filter
-    if (searchTermsCampaignText) {
-        filtered = filtered.filter(st => 
-            st.campaign.toLowerCase().includes(searchTermsCampaignText)
-        );
+    if (searchTermsCampaignFilter !== 'all') {
+        filtered = filtered.filter(st => st.campaign === searchTermsCampaignFilter);
     }
     
     // Sort data
