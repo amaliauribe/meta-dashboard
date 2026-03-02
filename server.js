@@ -1390,6 +1390,157 @@ app.post('/api/google/search-terms', async (req, res) => {
     }
 });
 
+// ==================== Ad Creative Performance API ====================
+
+// Google Ads: Ad creative performance
+app.post('/api/google/ad-performance', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    const { startDate, endDate } = req.body;
+    
+    try {
+        const query = `
+            SELECT 
+                campaign.name,
+                ad_group.name,
+                ad_group_ad.ad.id,
+                ad_group_ad.ad.type,
+                ad_group_ad.ad.responsive_search_ad.headlines,
+                ad_group_ad.ad.responsive_search_ad.descriptions,
+                ad_group_ad.ad.expanded_text_ad.headline_part1,
+                ad_group_ad.ad.expanded_text_ad.headline_part2,
+                ad_group_ad.ad.expanded_text_ad.headline_part3,
+                ad_group_ad.ad.expanded_text_ad.description,
+                ad_group_ad.ad.expanded_text_ad.description2,
+                ad_group_ad.ad.final_urls,
+                ad_group_ad.status,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.conversions_value
+            FROM ad_group_ad
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                AND ad_group_ad.status != 'REMOVED'
+                AND metrics.impressions > 0
+            ORDER BY metrics.conversions DESC, metrics.clicks DESC
+            LIMIT 200
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        const ads = results.map(row => {
+            const campaign = row.campaign || {};
+            const adGroup = row.ad_group || {};
+            const adGroupAd = row.ad_group_ad || {};
+            const ad = adGroupAd.ad || {};
+            const metrics = row.metrics || {};
+            
+            // Extract headlines and descriptions based on ad type
+            let headlines = [];
+            let descriptions = [];
+            
+            if (ad.type === 'RESPONSIVE_SEARCH_AD' && ad.responsive_search_ad) {
+                headlines = (ad.responsive_search_ad.headlines || []).map(h => h.text).filter(Boolean);
+                descriptions = (ad.responsive_search_ad.descriptions || []).map(d => d.text).filter(Boolean);
+            } else if (ad.type === 'EXPANDED_TEXT_AD' && ad.expanded_text_ad) {
+                const eta = ad.expanded_text_ad;
+                headlines = [eta.headline_part1, eta.headline_part2, eta.headline_part3].filter(Boolean);
+                descriptions = [eta.description, eta.description2].filter(Boolean);
+            }
+            
+            const impressions = parseInt(metrics.impressions) || 0;
+            const clicks = parseInt(metrics.clicks) || 0;
+            const cost = (parseInt(metrics.cost_micros) || 0) / 1000000;
+            const conversions = parseFloat(metrics.conversions) || 0;
+            
+            return {
+                adId: ad.id,
+                campaign: campaign.name || 'Unknown',
+                adGroup: adGroup.name || 'Unknown',
+                type: ad.type || 'Unknown',
+                status: adGroupAd.status || 'Unknown',
+                headlines: headlines.slice(0, 3),  // First 3 headlines
+                descriptions: descriptions.slice(0, 2),  // First 2 descriptions
+                finalUrl: (ad.final_urls || [])[0] || '',
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cost,
+                cpc: clicks > 0 ? cost / clicks : 0,
+                conversions,
+                costPerConv: conversions > 0 ? cost / conversions : 0,
+                convRate: clicks > 0 ? (conversions / clicks) * 100 : 0
+            };
+        });
+        
+        res.json({ ads });
+    } catch (error) {
+        console.error('Google ad performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bing Ads: Ad creative performance
+app.post('/api/bing/ad-performance', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Bing Ads API not configured' });
+    }
+    
+    const { startDate, endDate } = req.body;
+    
+    try {
+        const columns = [
+            'CampaignName', 'AdGroupName', 'AdId', 'AdType', 'AdStatus',
+            'TitlePart1', 'TitlePart2', 'TitlePart3',
+            'AdDescription', 'AdDescription2',
+            'FinalUrl',
+            'Impressions', 'Clicks', 'Spend', 'Conversions'
+        ];
+        
+        const report = await submitAndDownloadReport('ad', startDate, endDate, columns);
+        
+        const ads = report.rows.map(row => {
+            const impressions = parseInt(row.Impressions) || 0;
+            const clicks = parseInt(row.Clicks) || 0;
+            const cost = parseFloat(row.Spend) || 0;
+            const conversions = parseFloat(row.Conversions) || 0;
+            
+            const headlines = [row.TitlePart1, row.TitlePart2, row.TitlePart3].filter(Boolean);
+            const descriptions = [row.AdDescription, row.AdDescription2].filter(Boolean);
+            
+            return {
+                adId: row.AdId,
+                campaign: row.CampaignName || 'Unknown',
+                adGroup: row.AdGroupName || 'Unknown',
+                type: row.AdType || 'Unknown',
+                status: row.AdStatus || 'Unknown',
+                headlines,
+                descriptions,
+                finalUrl: row.FinalUrl || '',
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cost,
+                cpc: clicks > 0 ? cost / clicks : 0,
+                conversions,
+                costPerConv: conversions > 0 ? cost / conversions : 0,
+                convRate: clicks > 0 ? (conversions / clicks) * 100 : 0
+            };
+        });
+        
+        // Sort by conversions, then clicks
+        ads.sort((a, b) => b.conversions - a.conversions || b.clicks - a.clicks);
+        
+        res.json({ ads: ads.slice(0, 200) });
+    } catch (error) {
+        console.error('Bing ad performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Geographic Performance API ====================
 
 // Cache for geo target constant names (to avoid repeated lookups)

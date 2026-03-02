@@ -1011,3 +1011,19 @@ table.resizable-table td {
 .color-legend .dot.green { background-color: #22c55e; }
 .color-legend .dot.yellow { background-color: #eab308; }
 .color-legend .dot.red { background-color: #ef4444; }
+
+/* Ad Creative tables */
+.ad-text {
+    max-width: 250px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.section-subtitle {
+    color: #666;
+    font-size: 14px;
+    margin: -10px 0 15px 0;
+}

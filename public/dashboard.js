@@ -63,6 +63,14 @@ let googleQsHistoryDataLoaded = false;
 let googleGeoDataLoaded = false;
 let qsHistoryChart = null;
 
+// Bing Ads Creative State
+let bingAdsDataLoaded = false;
+let bingAdsRawData = [];
+
+// Google Ads Creative State
+let googleAdsDataLoaded = false;
+let googleAdsRawData = [];
+
 // Keywords sorting state
 let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
@@ -238,10 +246,12 @@ function initializeDashboard() {
             bingQsHistoryDataLoaded = false;
             bingGeoDataLoaded = false;
             bingSearchTermsDataLoaded = false;
+            bingAdsDataLoaded = false;
             googleDataLoaded = false; // Reset google data when date changes
             googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
             googleGeoDataLoaded = false; // Reset google geo data when date changes
+            googleAdsDataLoaded = false;
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             heatmapDataLoaded = false; // Reset heatmap data when date changes
@@ -263,6 +273,10 @@ function initializeDashboard() {
                 loadGoogleGeoData();
             } else if (currentView === 'googleSearchTerms') {
                 loadGoogleSearchTermsData();
+            } else if (currentView === 'bingAds') {
+                loadBingAdsData();
+            } else if (currentView === 'googleAdsCreative') {
+                loadGoogleAdsData();
             }
         });
     });
@@ -284,11 +298,13 @@ function initializeDashboard() {
             document.getElementById('bingQsHistoryView').classList.toggle('hidden', currentView !== 'bingQsHistory');
             document.getElementById('bingGeoView').classList.toggle('hidden', currentView !== 'bingGeo');
             document.getElementById('bingSearchTermsView').classList.toggle('hidden', currentView !== 'bingSearchTerms');
+            document.getElementById('bingAdsView').classList.toggle('hidden', currentView !== 'bingAds');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
             document.getElementById('googleQsHistoryView').classList.toggle('hidden', currentView !== 'googleQsHistory');
             document.getElementById('googleGeoView').classList.toggle('hidden', currentView !== 'googleGeo');
             document.getElementById('googleSearchTermsView').classList.toggle('hidden', currentView !== 'googleSearchTerms');
+            document.getElementById('googleAdsCreativeView').classList.toggle('hidden', currentView !== 'googleAdsCreative');
             
             // Load data for the selected view
             if (currentView === 'heatmap' && !heatmapDataLoaded) {
@@ -330,6 +346,12 @@ function initializeDashboard() {
             if (currentView === 'googleSearchTerms' && !searchTermsDataLoaded) {
                 loadGoogleSearchTermsData();
             }
+            if (currentView === 'bingAds' && !bingAdsDataLoaded) {
+                loadBingAdsData();
+            }
+            if (currentView === 'googleAdsCreative' && !googleAdsDataLoaded) {
+                loadGoogleAdsData();
+            }
         });
     });
     
@@ -351,10 +373,12 @@ function initializeDashboard() {
         bingQsHistoryDataLoaded = false;
         bingGeoDataLoaded = false;
         bingSearchTermsDataLoaded = false;
+        bingAdsDataLoaded = false;
         googleDataLoaded = false;
         googleKeywordsDataLoaded = false;
         googleQsHistoryDataLoaded = false;
         googleGeoDataLoaded = false;
+        googleAdsDataLoaded = false;
         searchTermsDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
@@ -383,6 +407,10 @@ function initializeDashboard() {
             loadGoogleGeoData();
         } else if (currentView === 'googleSearchTerms') {
             loadGoogleSearchTermsData();
+        } else if (currentView === 'bingAds') {
+            loadBingAdsData();
+        } else if (currentView === 'googleAdsCreative') {
+            loadGoogleAdsData();
         }
     });
 
@@ -3614,3 +3642,140 @@ function renderZipcodeTable(zipcodes) {
     }).join('');
 }
 
+
+// ==================== Bing Ads Creative Functions ====================
+
+async function loadBingAdsData() {
+    const range = dateRanges[currentRange];
+    document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/bing/ad-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: range.start, endDate: range.end })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Bing ad data');
+        
+        const data = await response.json();
+        bingAdsRawData = data.ads || [];
+        bingAdsDataLoaded = true;
+        
+        // Update KPIs
+        const totalAds = bingAdsRawData.length;
+        const totalClicks = bingAdsRawData.reduce((sum, ad) => sum + ad.clicks, 0);
+        const totalConversions = bingAdsRawData.reduce((sum, ad) => sum + ad.conversions, 0);
+        const totalImpressions = bingAdsRawData.reduce((sum, ad) => sum + ad.impressions, 0);
+        const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+        
+        document.getElementById('bingAdsTotalAds').textContent = totalAds.toLocaleString();
+        document.getElementById('bingAdsTotalClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('bingAdsTotalConversions').textContent = Math.round(totalConversions).toLocaleString();
+        document.getElementById('bingAdsAvgCtr').textContent = avgCtr.toFixed(2) + '%';
+        
+        renderBingAdsTable(bingAdsRawData);
+    } catch (e) {
+        console.error('Bing ads error:', e);
+        document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading ad data</td></tr>';
+    }
+}
+
+function renderBingAdsTable(ads) {
+    const tbody = document.getElementById('bingAdsBody');
+    
+    if (ads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = ads.slice(0, 100).map(ad => {
+        const headlines = ad.headlines.join(' | ') || '-';
+        const descriptions = ad.descriptions.join(' | ') || '-';
+        const costPerConv = ad.conversions > 0 ? '$' + ad.costPerConv.toFixed(2) : '-';
+        
+        return `<tr>
+            <td title="${ad.campaign}">${truncate(ad.campaign, 25)}</td>
+            <td title="${ad.adGroup}">${truncate(ad.adGroup, 20)}</td>
+            <td class="ad-text" title="${headlines}">${truncate(headlines, 40)}</td>
+            <td class="ad-text" title="${descriptions}">${truncate(descriptions, 40)}</td>
+            <td>${ad.impressions.toLocaleString()}</td>
+            <td>${ad.clicks.toLocaleString()}</td>
+            <td>${ad.ctr.toFixed(2)}%</td>
+            <td>$${ad.cost.toFixed(2)}</td>
+            <td>${ad.conversions.toFixed(1)}</td>
+            <td>${costPerConv}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ==================== Google Ads Creative Functions ====================
+
+async function loadGoogleAdsData() {
+    const range = dateRanges[currentRange];
+    document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/google/ad-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: range.start, endDate: range.end })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Google ad data');
+        
+        const data = await response.json();
+        googleAdsRawData = data.ads || [];
+        googleAdsDataLoaded = true;
+        
+        // Update KPIs
+        const totalAds = googleAdsRawData.length;
+        const totalClicks = googleAdsRawData.reduce((sum, ad) => sum + ad.clicks, 0);
+        const totalConversions = googleAdsRawData.reduce((sum, ad) => sum + ad.conversions, 0);
+        const totalImpressions = googleAdsRawData.reduce((sum, ad) => sum + ad.impressions, 0);
+        const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+        
+        document.getElementById('googleAdsTotalAds').textContent = totalAds.toLocaleString();
+        document.getElementById('googleAdsTotalClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('googleAdsTotalConversions').textContent = Math.round(totalConversions).toLocaleString();
+        document.getElementById('googleAdsAvgCtr').textContent = avgCtr.toFixed(2) + '%';
+        
+        renderGoogleAdsTable(googleAdsRawData);
+    } catch (e) {
+        console.error('Google ads error:', e);
+        document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading ad data</td></tr>';
+    }
+}
+
+function renderGoogleAdsTable(ads) {
+    const tbody = document.getElementById('googleAdsBody');
+    
+    if (ads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = ads.slice(0, 100).map(ad => {
+        const headlines = ad.headlines.join(' | ') || '-';
+        const descriptions = ad.descriptions.join(' | ') || '-';
+        const costPerConv = ad.conversions > 0 ? '$' + ad.costPerConv.toFixed(2) : '-';
+        
+        return `<tr>
+            <td title="${ad.campaign}">${truncate(ad.campaign, 25)}</td>
+            <td title="${ad.adGroup}">${truncate(ad.adGroup, 20)}</td>
+            <td class="ad-text" title="${headlines}">${truncate(headlines, 40)}</td>
+            <td class="ad-text" title="${descriptions}">${truncate(descriptions, 40)}</td>
+            <td>${ad.impressions.toLocaleString()}</td>
+            <td>${ad.clicks.toLocaleString()}</td>
+            <td>${ad.ctr.toFixed(2)}%</td>
+            <td>$${ad.cost.toFixed(2)}</td>
+            <td>${ad.conversions.toFixed(1)}</td>
+            <td>${costPerConv}</td>
+        </tr>`;
+    }).join('');
+}
+
+function truncate(str, maxLen) {
+    if (!str) return '-';
+    return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}

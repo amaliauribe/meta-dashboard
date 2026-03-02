@@ -64,6 +64,7 @@
                         <button class="nav-item" data-view="bingQsHistory">QS History</button>
                         <button class="nav-item" data-view="bingGeo">Geographic</button>
                         <button class="nav-item" data-view="bingSearchTerms">Search Terms</button>
+                        <button class="nav-item" data-view="bingAds">Ads</button>
                     </div>
                 </div>
                 <div class="nav-section">
@@ -77,6 +78,7 @@
                         <button class="nav-item" data-view="googleQsHistory">QS History</button>
                         <button class="nav-item" data-view="googleGeo">Geographic</button>
                         <button class="nav-item" data-view="googleSearchTerms">Search Terms</button>
+                        <button class="nav-item" data-view="googleAdsCreative">Ads</button>
                     </div>
                 </div>
             </nav>
@@ -738,6 +740,56 @@
             </section>
         </div><!-- End Bing Search Terms View -->
 
+        <!-- Bing Ads Creative View -->
+        <div id="bingAdsView" class="view-content hidden">
+            <h1>🔷 Bing Ad Creative Performance</h1>
+            
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Ads</div>
+                    <div class="kpi-value" id="bingAdsTotalAds">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Clicks</div>
+                    <div class="kpi-value" id="bingAdsTotalClicks">0</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total Conversions</div>
+                    <div class="kpi-value" id="bingAdsTotalConversions">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg CTR</div>
+                    <div class="kpi-value" id="bingAdsAvgCtr">0%</div>
+                </div>
+            </section>
+            
+            <section class="table-section">
+                <h2>📝 Ad Creatives</h2>
+                <p class="section-subtitle">Performance by ad creative. Top performers by conversions.</p>
+                <div class="table-wrapper">
+                    <table id="bingAdsTable">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Ad Group</th>
+                                <th>Headlines</th>
+                                <th>Descriptions</th>
+                                <th>Impr</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>Cost</th>
+                                <th>Conv</th>
+                                <th>Cost/Conv</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingAdsBody">
+                            <tr><td colspan="10" class="loading">Loading ad data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Bing Ads View -->
+
         <!-- Google Ads View -->
         <div id="googleView" class="view-content hidden">
             
@@ -1143,6 +1195,56 @@
                 </div>
             </section>
         </div><!-- End Google Search Terms View -->
+
+        <!-- Google Ads Creative View -->
+        <div id="googleAdsCreativeView" class="view-content hidden">
+            <h1>🔴 Google Ad Creative Performance</h1>
+            
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Ads</div>
+                    <div class="kpi-value" id="googleAdsTotalAds">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Clicks</div>
+                    <div class="kpi-value" id="googleAdsTotalClicks">0</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total Conversions</div>
+                    <div class="kpi-value" id="googleAdsTotalConversions">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg CTR</div>
+                    <div class="kpi-value" id="googleAdsAvgCtr">0%</div>
+                </div>
+            </section>
+            
+            <section class="table-section">
+                <h2>📝 Ad Creatives</h2>
+                <p class="section-subtitle">Performance by ad creative. Top performers by conversions.</p>
+                <div class="table-wrapper">
+                    <table id="googleAdsTable">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Ad Group</th>
+                                <th>Headlines</th>
+                                <th>Descriptions</th>
+                                <th>Impr</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>Cost</th>
+                                <th>Conv</th>
+                                <th>Cost/Conv</th>
+                            </tr>
+                        </thead>
+                        <tbody id="googleAdsBody">
+                            <tr><td colspan="10" class="loading">Loading ad data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Google Ads Creative View -->
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
