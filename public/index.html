@@ -96,6 +96,12 @@
                     <button class="filter-btn active" data-range="7d">Last 7 Days</button>
                     <button class="filter-btn" data-range="14d">Last 14 Days</button>
                     <button class="filter-btn" data-range="30d">Last 30 Days</button>
+                    <div class="custom-date-picker">
+                        <input type="date" id="startDate" class="date-input" title="Start Date">
+                        <span class="date-separator">to</span>
+                        <input type="date" id="endDate" class="date-input" title="End Date">
+                        <button class="filter-btn" id="applyCustomDate">Apply</button>
+                    </div>
                 </div>
                 <div class="header-right">
                     <span class="last-updated-top">Last updated: <span id="lastUpdateTop">-</span></span>
@@ -1262,6 +1268,6 @@
             </footer>
         </main><!-- End Main Content -->
     </div>
-    <script src="dashboard.js?v=1772482168"></script>
+    <script src="dashboard.js?v=1772482441"></script>
 </body>
 </html>

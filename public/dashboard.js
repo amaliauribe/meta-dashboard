@@ -117,8 +117,13 @@ const dateRanges = {
     'yesterday': { preset: 'yesterday', days: 1 },
     '7d': { days: 7 },
     '14d': { days: 14 },
-    '30d': { days: 30 }
+    '30d': { days: 30 },
+    'custom': { custom: true }
 };
+
+// Custom date range storage
+let customStartDate = null;
+let customEndDate = null;
 
 // Format date as YYYY-MM-DD using EST timezone
 function formatDateEST(d) {
@@ -284,6 +289,86 @@ function initializeDashboard() {
             }
         });
     });
+
+    // Custom date range picker
+    document.getElementById('applyCustomDate').addEventListener('click', () => {
+        const startInput = document.getElementById('startDate').value;
+        const endInput = document.getElementById('endDate').value;
+        
+        if (!startInput || !endInput) {
+            alert('Please select both start and end dates');
+            return;
+        }
+        
+        if (startInput > endInput) {
+            alert('Start date must be before end date');
+            return;
+        }
+        
+        // Store custom dates
+        customStartDate = startInput;
+        customEndDate = endInput;
+        currentRange = 'custom';
+        
+        // Update button states
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('applyCustomDate').classList.add('active');
+        
+        // Reset all data flags
+        adsDataLoaded = false;
+        bingDataLoaded = false;
+        bingKeywordsDataLoaded = false;
+        bingQsHistoryDataLoaded = false;
+        bingGeoDataLoaded = false;
+        bingSearchTermsDataLoaded = false;
+        bingAdsDataLoaded = false;
+        googleDataLoaded = false;
+        googleKeywordsDataLoaded = false;
+        googleQsHistoryDataLoaded = false;
+        googleGeoDataLoaded = false;
+        googleAdsDataLoaded = false;
+        searchTermsDataLoaded = false;
+        summaryDataLoaded = false;
+        heatmapDataLoaded = false;
+        
+        // Load data for current view
+        if (currentView === 'summary') {
+            loadSummaryData();
+        } else if (currentView === 'campaigns') {
+            loadData();
+        } else if (currentView === 'ads') {
+            loadAdsData();
+        } else if (currentView === 'bing') {
+            loadBingData();
+        } else if (currentView === 'bingKeywords') {
+            loadBingKeywordsData();
+        } else if (currentView === 'bingGeo') {
+            loadBingGeoData();
+        } else if (currentView === 'bingSearchTerms') {
+            loadBingSearchTermsData();
+        } else if (currentView === 'bingAds') {
+            loadBingAdsData();
+        } else if (currentView === 'google') {
+            loadGoogleData();
+        } else if (currentView === 'googleKeywords') {
+            loadGoogleKeywordsData();
+        } else if (currentView === 'googleGeo') {
+            loadGoogleGeoData();
+        } else if (currentView === 'googleSearchTerms') {
+            loadGoogleSearchTermsData();
+        } else if (currentView === 'googleAdsCreative') {
+            loadGoogleAdsData();
+        } else if (currentView === 'heatmap') {
+            loadHeatmapData();
+        }
+    });
+    
+    // Set default dates in the date picker (last 7 days)
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    document.getElementById('startDate').value = sevenDaysAgo.toISOString().split('T')[0];
 
     // Sidebar navigation
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -938,7 +1023,9 @@ async function loadCampaignData() {
     
     // Build the insights query based on date range (using EST)
     let insightsQuery;
-    if (range.preset) {
+    if (range.custom && customStartDate && customEndDate) {
+        insightsQuery = `insights.time_range({"since":"${customStartDate}","until":"${customEndDate}"})`;
+    } else if (range.preset) {
         insightsQuery = `insights.date_preset(${range.preset})`;
     } else {
         const today = getESTDate();
@@ -1370,7 +1457,10 @@ function getBingDateRange(range) {
     const today = getESTDate();
     let since, until;
     
-    if (range.preset === 'today') {
+    if (range.custom && customStartDate && customEndDate) {
+        since = customStartDate;
+        until = customEndDate;
+    } else if (range.preset === 'today') {
         since = formatDateEST(today);
         until = formatDateEST(today);
     } else if (range.preset === 'yesterday') {
@@ -2001,7 +2091,10 @@ function getGoogleDateRange(range) {
     const today = getESTDate();
     let since, until;
     
-    if (range.preset === 'today') {
+    if (range.custom && customStartDate && customEndDate) {
+        since = customStartDate;
+        until = customEndDate;
+    } else if (range.preset === 'today') {
         since = formatDateEST(today);
         until = formatDateEST(today);
     } else if (range.preset === 'yesterday') {

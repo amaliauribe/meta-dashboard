@@ -1037,3 +1037,40 @@ table.resizable-table td {
 .source-header.google { background-color: #ffebee; }
 .source-header.bing { background-color: #e8f5e9; }
 .source-header.total { background-color: #fff3e0; }
+
+/* Custom date picker */
+.custom-date-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 1px solid #ddd;
+}
+
+.date-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: #1877f2;
+}
+
+.date-separator {
+    color: #666;
+    font-size: 14px;
+}
+
+.filter-btn#applyCustomDate {
+    background: #1877f2;
+    color: white;
+}
+
+.filter-btn#applyCustomDate:hover {
+    background: #166fe5;
+}
