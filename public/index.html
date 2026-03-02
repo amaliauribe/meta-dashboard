@@ -62,6 +62,7 @@
                         <button class="nav-item" data-view="googleKeywords">Keywords</button>
                         <button class="nav-item" data-view="googleQsHistory">QS History</button>
                         <button class="nav-item" data-view="googleGeo">Geographic</button>
+                        <button class="nav-item" data-view="googleSearchTerms">Search Terms</button>
                     </div>
                 </div>
             </nav>
@@ -744,6 +745,77 @@
                 </div>
             </section>
         </div><!-- End Google Geographic View -->
+
+        <!-- Google Search Terms View -->
+        <div id="googleSearchTermsView" class="view-content hidden">
+            <h1>🔍 Search Terms Report</h1>
+            
+            <!-- KPI Cards -->
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">UNIQUE SEARCH TERMS</div>
+                    <div id="searchTermsCount" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CLICKS</div>
+                    <div id="searchTermsClicks" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL COST</div>
+                    <div id="searchTermsCost" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CONVERSIONS</div>
+                    <div id="searchTermsConversions" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">AVG. CONV. RATE</div>
+                    <div id="searchTermsConvRate" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">⚠️ WASTED SPEND (0 CONV)</div>
+                    <div id="searchTermsWasted" class="kpi-value">-</div>
+                </div>
+            </div>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <label for="searchTermsFilter">Filter: </label>
+                <select id="searchTermsFilter">
+                    <option value="all">All Search Terms</option>
+                    <option value="wasted">Zero Conversions (Wasted)</option>
+                    <option value="high-cost">High Cost (>$50)</option>
+                    <option value="low-conv">Low Conv Rate (<5%)</option>
+                </select>
+                <input type="text" id="searchTermsSearch" placeholder="Search terms..." style="margin-left: 15px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+            </div>
+            
+            <!-- Search Terms Table -->
+            <section class="table-section">
+                <h2>🔍 Search Terms Performance</h2>
+                <p class="table-subtitle" id="searchTermsDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="searchTermsTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="searchTerm">Search Term</th>
+                                <th class="sortable" data-sort="status">Status</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="cost">Cost</th>
+                                <th class="sortable" data-sort="conversions">Conv.</th>
+                                <th class="sortable" data-sort="convRate">Conv. Rate</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchTermsBody">
+                            <tr><td colspan="9" class="loading">Loading search terms...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Google Search Terms View -->
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>

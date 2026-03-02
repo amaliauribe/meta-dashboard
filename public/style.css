@@ -525,6 +525,14 @@ body {
     margin-left: 6px;
 }
 
+/* Wasted spend row highlight */
+.wasted-row {
+    background-color: #fff3f3 !important;
+}
+.wasted-row:hover {
+    background-color: #ffe6e6 !important;
+}
+
 /* Charts */
 .chart-section {
     background: white;

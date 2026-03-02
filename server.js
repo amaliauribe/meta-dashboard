@@ -1089,6 +1089,79 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
     }
 });
 
+// ==================== Search Terms API ====================
+
+// Google Ads: Search Terms Report
+app.post('/api/google/search-terms', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.status(503).json({ error: 'Google Ads API not configured' });
+    }
+    
+    const { startDate, endDate } = req.body;
+    
+    try {
+        const query = `
+            SELECT 
+                search_term_view.search_term,
+                search_term_view.status,
+                campaign.name,
+                ad_group.name,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.average_cpc
+            FROM search_term_view
+            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                AND metrics.impressions > 0
+            ORDER BY metrics.clicks DESC
+            LIMIT 500
+        `;
+        
+        const results = await googleAdsApiRequest(query);
+        
+        // Status mapping
+        const statusMap = {
+            '2': 'Added',
+            '3': 'Excluded', 
+            '4': 'Added (Excluded)',
+            '5': 'None',
+            'ADDED': 'Added',
+            'EXCLUDED': 'Excluded',
+            'ADDED_EXCLUDED': 'Added (Excluded)',
+            'NONE': 'None'
+        };
+        
+        const searchTerms = results.map(row => {
+            const st = row.search_term_view || {};
+            const metrics = row.metrics || {};
+            const clicks = parseInt(metrics.clicks) || 0;
+            const cost = (parseInt(metrics.cost_micros) || 0) / 1000000;
+            const conversions = parseFloat(metrics.conversions) || 0;
+            
+            return {
+                searchTerm: st.search_term || 'Unknown',
+                status: statusMap[st.status] || st.status || 'None',
+                campaign: row.campaign?.name || 'Unknown',
+                adGroup: row.ad_group?.name || 'Unknown',
+                impressions: parseInt(metrics.impressions) || 0,
+                clicks,
+                cost,
+                conversions,
+                ctr: metrics.impressions > 0 ? (clicks / parseInt(metrics.impressions)) * 100 : 0,
+                cpc: clicks > 0 ? cost / clicks : 0,
+                costPerConv: conversions > 0 ? cost / conversions : 0,
+                convRate: clicks > 0 ? (conversions / clicks) * 100 : 0
+            };
+        });
+        
+        res.json({ searchTerms });
+    } catch (error) {
+        console.error('Google search terms error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Geographic Performance API ====================
 
 // Cache for geo target constant names (to avoid repeated lookups)

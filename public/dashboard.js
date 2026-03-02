@@ -46,6 +46,14 @@ let geoSortColumn = 'clicks';
 let geoSortDirection = 'desc';
 let geoTypeFilter = 'all';
 
+// Search Terms state
+let searchTermsDataLoaded = false;
+let searchTermsRawData = [];
+let searchTermsSortColumn = 'clicks';
+let searchTermsSortDirection = 'desc';
+let searchTermsFilter = 'all';
+let searchTermsSearchText = '';
+
 // Summary State
 let summaryDataLoaded = false;
 
@@ -195,6 +203,7 @@ function initializeDashboard() {
             googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
             googleGeoDataLoaded = false; // Reset google geo data when date changes
+            searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
@@ -212,6 +221,8 @@ function initializeDashboard() {
                 loadGoogleQsHistoryData();
             } else if (currentView === 'googleGeo') {
                 loadGoogleGeoData();
+            } else if (currentView === 'googleSearchTerms') {
+                loadGoogleSearchTermsData();
             }
         });
     });
@@ -232,6 +243,7 @@ function initializeDashboard() {
             document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
             document.getElementById('googleQsHistoryView').classList.toggle('hidden', currentView !== 'googleQsHistory');
             document.getElementById('googleGeoView').classList.toggle('hidden', currentView !== 'googleGeo');
+            document.getElementById('googleSearchTermsView').classList.toggle('hidden', currentView !== 'googleSearchTerms');
             
             // Load data for the selected view
             if (currentView === 'summary' && !summaryDataLoaded) {
@@ -255,6 +267,9 @@ function initializeDashboard() {
             if (currentView === 'googleGeo' && !googleGeoDataLoaded) {
                 loadGoogleGeoData();
             }
+            if (currentView === 'googleSearchTerms' && !searchTermsDataLoaded) {
+                loadGoogleSearchTermsData();
+            }
         });
     });
     
@@ -276,6 +291,7 @@ function initializeDashboard() {
         googleKeywordsDataLoaded = false;
         googleQsHistoryDataLoaded = false;
         googleGeoDataLoaded = false;
+        searchTermsDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
             loadSummaryData();
@@ -293,6 +309,8 @@ function initializeDashboard() {
             loadGoogleQsHistoryData();
         } else if (currentView === 'googleGeo') {
             loadGoogleGeoData();
+        } else if (currentView === 'googleSearchTerms') {
+            loadGoogleSearchTermsData();
         }
     });
 
@@ -369,6 +387,39 @@ function initializeDashboard() {
     document.getElementById('geoTypeFilter').addEventListener('change', (e) => {
         geoTypeFilter = e.target.value;
         renderGeoTable();
+    });
+    
+    // Sortable column headers for Search Terms table
+    document.querySelectorAll('#searchTermsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            
+            if (searchTermsSortColumn === sortKey) {
+                searchTermsSortDirection = searchTermsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                searchTermsSortColumn = sortKey;
+                searchTermsSortDirection = 'desc';
+            }
+            
+            document.querySelectorAll('#searchTermsTable th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            th.classList.add(searchTermsSortDirection);
+            
+            renderSearchTermsTable();
+        });
+    });
+    
+    // Search Terms filter
+    document.getElementById('searchTermsFilter').addEventListener('change', (e) => {
+        searchTermsFilter = e.target.value;
+        renderSearchTermsTable();
+    });
+    
+    // Search Terms text search
+    document.getElementById('searchTermsSearch').addEventListener('input', (e) => {
+        searchTermsSearchText = e.target.value.toLowerCase();
+        renderSearchTermsTable();
     });
 
     // Ads filter dropdowns
@@ -2424,4 +2475,126 @@ function renderGeoTable() {
             </tr>
         `;
     }).join('');
+}
+
+// ==================== Search Terms ====================
+
+async function loadGoogleSearchTermsData() {
+    document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">Loading search terms...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const dateRange = getGoogleDateRange(range);
+        
+        const data = await googleApiCall('search-terms', {
+            startDate: dateRange.since,
+            endDate: dateRange.until
+        });
+        
+        const searchTerms = data?.searchTerms || [];
+        
+        if (searchTerms.length === 0) {
+            document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">No search terms data available</td></tr>';
+            return;
+        }
+        
+        // Store raw data
+        searchTermsRawData = searchTerms;
+        
+        // Calculate totals
+        let totalClicks = 0, totalCost = 0, totalConversions = 0, wastedCost = 0;
+        
+        searchTerms.forEach(st => {
+            totalClicks += st.clicks || 0;
+            totalCost += st.cost || 0;
+            totalConversions += st.conversions || 0;
+            if ((st.conversions || 0) === 0) {
+                wastedCost += st.cost || 0;
+            }
+        });
+        
+        // Update KPI cards
+        document.getElementById('searchTermsCount').textContent = searchTerms.length.toLocaleString();
+        document.getElementById('searchTermsClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('searchTermsCost').textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('searchTermsConversions').textContent = totalConversions.toFixed(1);
+        document.getElementById('searchTermsConvRate').textContent = totalClicks > 0 ? ((totalConversions / totalClicks) * 100).toFixed(2) + '%' : '0%';
+        document.getElementById('searchTermsWasted').textContent = '$' + wastedCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        // Update date range
+        document.getElementById('searchTermsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
+        
+        // Render table
+        renderSearchTermsTable();
+        
+        searchTermsDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Search Terms error:', e);
+        document.getElementById('searchTermsBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderSearchTermsTable() {
+    if (searchTermsRawData.length === 0) return;
+    
+    // Filter data
+    let filtered = searchTermsRawData;
+    
+    // Apply filter dropdown
+    if (searchTermsFilter === 'wasted') {
+        filtered = filtered.filter(st => (st.conversions || 0) === 0);
+    } else if (searchTermsFilter === 'high-cost') {
+        filtered = filtered.filter(st => (st.cost || 0) > 50);
+    } else if (searchTermsFilter === 'low-conv') {
+        filtered = filtered.filter(st => (st.convRate || 0) < 5 && (st.clicks || 0) > 0);
+    }
+    
+    // Apply text search
+    if (searchTermsSearchText) {
+        filtered = filtered.filter(st => 
+            st.searchTerm.toLowerCase().includes(searchTermsSearchText)
+        );
+    }
+    
+    // Sort data
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[searchTermsSortColumn];
+        let bVal = b[searchTermsSortColumn];
+        
+        if (aVal === null || aVal === undefined) aVal = searchTermsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = searchTermsSortDirection === 'desc' ? -Infinity : Infinity;
+        
+        if (searchTermsSortColumn === 'searchTerm' || searchTermsSortColumn === 'status') {
+            aVal = (aVal || '').toLowerCase();
+            bVal = (bVal || '').toLowerCase();
+            return searchTermsSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        
+        return searchTermsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    // Build table
+    document.getElementById('searchTermsBody').innerHTML = sorted.map(st => {
+        const convRateClass = st.convRate >= 10 ? 'qs-good' : (st.convRate >= 5 ? 'qs-ok' : 'qs-low');
+        const wastedClass = (st.conversions || 0) === 0 && (st.cost || 0) > 0 ? 'wasted-row' : '';
+        
+        return `
+            <tr class="${wastedClass}">
+                <td title="Campaign: ${st.campaign}">${st.searchTerm}</td>
+                <td>${st.status}</td>
+                <td>${(st.impressions || 0).toLocaleString()}</td>
+                <td>${(st.clicks || 0).toLocaleString()}</td>
+                <td>${st.ctr?.toFixed(2) || '0.00'}%</td>
+                <td>$${(st.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>${(st.conversions || 0).toFixed(1)}</td>
+                <td class="${convRateClass}">${st.convRate?.toFixed(2) || '0.00'}%</td>
+                <td>${st.conversions > 0 ? '$' + st.costPerConv.toFixed(2) : '-'}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="9" class="loading">No search terms match the filter</td></tr>';
+    }
 }
