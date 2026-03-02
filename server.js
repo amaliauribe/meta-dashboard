@@ -2083,7 +2083,7 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
     }
     
     const results = Object.values(zipcodeData)
-        .filter(z => z.conversions > 0 || z.clicks > 0)
+        
         .sort((a, b) => b.conversions - a.conversions);
     
     res.json({ zipcodes: results });
