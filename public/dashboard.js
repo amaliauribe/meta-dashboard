@@ -2977,17 +2977,18 @@ async function loadBingKeywordsData() {
     
     try {
         const range = dateRanges[currentRange];
+        const dateRange = getBingDateRange(range);
         const response = await fetch('/api/bing/keywords', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
         });
         
         if (!response.ok) throw new Error('Failed to load Bing keywords');
         const data = await response.json();
         
         bingKeywordsRawData = data.keywords || [];
-        document.getElementById('bingKeywordsDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        document.getElementById('bingKeywordsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
         renderBingKeywordsTable();
         bingKeywordsDataLoaded = true;
         updateLastUpdated();
@@ -3045,17 +3046,18 @@ async function loadBingGeoData() {
     
     try {
         const range = dateRanges[currentRange];
+        const dateRange = getBingDateRange(range);
         const response = await fetch('/api/bing/geographic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
         });
         
         if (!response.ok) throw new Error('Failed to load Bing geographic data');
         const data = await response.json();
         
         bingGeoRawData = data.locations || [];
-        document.getElementById('bingGeoDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        document.getElementById('bingGeoDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
         renderBingGeoTable();
         bingGeoDataLoaded = true;
         updateLastUpdated();
@@ -3112,10 +3114,11 @@ async function loadBingSearchTermsData() {
     
     try {
         const range = dateRanges[currentRange];
+        const dateRange = getBingDateRange(range);
         const response = await fetch('/api/bing/search-terms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
         });
         
         if (!response.ok) throw new Error('Failed to load Bing search terms');
@@ -3143,7 +3146,7 @@ async function loadBingSearchTermsData() {
         document.getElementById('bingSearchTermsCost').textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 });
         document.getElementById('bingSearchTermsConversions').textContent = totalConversions.toFixed(1);
         document.getElementById('bingSearchTermsWasted').textContent = '$' + wastedCost.toLocaleString('en-US', { minimumFractionDigits: 2 });
-        document.getElementById('bingSearchTermsDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        document.getElementById('bingSearchTermsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
         
         renderBingSearchTermsTable();
         bingSearchTermsDataLoaded = true;
