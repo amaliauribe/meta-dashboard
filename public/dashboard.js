@@ -58,6 +58,7 @@ let searchTermsSortColumn = 'clicks';
 let searchTermsSortDirection = 'desc';
 let searchTermsFilter = 'all';
 let searchTermsSearchText = '';
+let searchTermsCampaignText = '';
 
 // Summary State
 let summaryDataLoaded = false;
@@ -436,6 +437,12 @@ function initializeDashboard() {
     // Search Terms text search
     document.getElementById('searchTermsSearch').addEventListener('input', (e) => {
         searchTermsSearchText = e.target.value.toLowerCase();
+        renderSearchTermsTable();
+    });
+    
+    // Search Terms campaign filter
+    document.getElementById('searchTermsCampaign').addEventListener('input', (e) => {
+        searchTermsCampaignText = e.target.value.toLowerCase();
         renderSearchTermsTable();
     });
 
@@ -2595,8 +2602,8 @@ function renderSearchTermsTable() {
     // Apply filter dropdown
     if (searchTermsFilter === 'wasted') {
         filtered = filtered.filter(st => (st.conversions || 0) === 0);
-    } else if (searchTermsFilter === 'high-cost') {
-        filtered = filtered.filter(st => (st.cost || 0) > 50);
+    } else if (searchTermsFilter === 'high-cpc') {
+        filtered = filtered.filter(st => (st.cpc || 0) > 100);
     } else if (searchTermsFilter === 'low-conv') {
         filtered = filtered.filter(st => (st.convRate || 0) < 5 && (st.clicks || 0) > 0);
     }
@@ -2605,6 +2612,13 @@ function renderSearchTermsTable() {
     if (searchTermsSearchText) {
         filtered = filtered.filter(st => 
             st.searchTerm.toLowerCase().includes(searchTermsSearchText)
+        );
+    }
+    
+    // Apply campaign filter
+    if (searchTermsCampaignText) {
+        filtered = filtered.filter(st => 
+            st.campaign.toLowerCase().includes(searchTermsCampaignText)
         );
     }
     
