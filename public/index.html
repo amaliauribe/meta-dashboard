@@ -50,7 +50,16 @@
                     </div>
                 </div>
                 <div class="nav-section">
-                    <button class="nav-item nav-item-main" data-view="bing">🔷 Bing</button>
+                    <div class="nav-section-title" data-toggle="bing">
+                        <span>🔷 Bing</span>
+                        <span class="nav-arrow">▼</span>
+                    </div>
+                    <div class="nav-section-items" id="bingItems">
+                        <button class="nav-item" data-view="bing">Campaigns</button>
+                        <button class="nav-item" data-view="bingKeywords">Keywords</button>
+                        <button class="nav-item" data-view="bingGeo">Geographic</button>
+                        <button class="nav-item" data-view="bingSearchTerms">Search Terms</button>
+                    </div>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title" data-toggle="google">
@@ -422,6 +431,153 @@
             </section>
 
         </div><!-- End Bing View -->
+
+        <!-- Bing Keywords View -->
+        <div id="bingKeywordsView" class="view-content hidden">
+            <h1>🔷 Bing Keywords Performance</h1>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <input type="text" id="bingKeywordsSearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+            </div>
+            
+            <!-- Keywords Table -->
+            <section class="table-section">
+                <h2>🔑 Keyword Performance</h2>
+                <p class="table-subtitle" id="bingKeywordsDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="bingKeywordsTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="keyword">Keyword</th>
+                                <th class="sortable" data-sort="campaign">Campaign</th>
+                                <th class="sortable" data-sort="adGroup">Ad Group</th>
+                                <th class="sortable" data-sort="qualityScore">QS</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="cost">Cost</th>
+                                <th class="sortable" data-sort="cpc">Avg CPC</th>
+                                <th class="sortable" data-sort="conversions">Conv.</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingKeywordsBody">
+                            <tr><td colspan="11" class="loading">Loading keywords...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Bing Keywords View -->
+
+        <!-- Bing Geographic View -->
+        <div id="bingGeoView" class="view-content hidden">
+            <h1>🔷 Bing Geographic Performance</h1>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <input type="text" id="bingGeoSearch" placeholder="🔍 Search locations..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+            </div>
+            
+            <!-- Geographic Table -->
+            <section class="table-section">
+                <h2>📍 Location Performance</h2>
+                <p class="table-subtitle" id="bingGeoDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="bingGeoTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="location">Location</th>
+                                <th class="sortable" data-sort="state">State</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="cost">Cost</th>
+                                <th class="sortable" data-sort="cpc">Avg CPC</th>
+                                <th class="sortable" data-sort="conversions">Conv.</th>
+                                <th class="sortable" data-sort="convRate">Conv. Rate</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingGeoBody">
+                            <tr><td colspan="10" class="loading">Loading geographic data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Bing Geographic View -->
+
+        <!-- Bing Search Terms View -->
+        <div id="bingSearchTermsView" class="view-content hidden">
+            <h1>🔷 Bing Search Terms Report</h1>
+            
+            <!-- KPI Cards -->
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">UNIQUE SEARCH TERMS</div>
+                    <div id="bingSearchTermsCount" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CLICKS</div>
+                    <div id="bingSearchTermsClicks" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL COST</div>
+                    <div id="bingSearchTermsCost" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CONVERSIONS</div>
+                    <div id="bingSearchTermsConversions" class="kpi-value">-</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">⚠️ WASTED SPEND (0 CONV)</div>
+                    <div id="bingSearchTermsWasted" class="kpi-value">-</div>
+                </div>
+            </div>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <label for="bingSearchTermsFilter">Filter: </label>
+                <select id="bingSearchTermsFilter">
+                    <option value="all">All Search Terms</option>
+                    <option value="wasted">Zero Conversions (Wasted)</option>
+                    <option value="high-cpc">High Avg. CPC (>$100)</option>
+                    <option value="low-conv">Low Conv Rate (<5%)</option>
+                </select>
+                <select id="bingSearchTermsCampaignFilter" style="margin-left: 15px;">
+                    <option value="all">All Campaigns</option>
+                </select>
+                <input type="text" id="bingSearchTermsSearch" placeholder="🔍 Search terms..." style="margin-left: 15px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+            </div>
+            
+            <!-- Search Terms Table -->
+            <section class="table-section">
+                <h2>🔍 Search Terms Performance</h2>
+                <p class="table-subtitle" id="bingSearchTermsDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="bingSearchTermsTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="searchTerm">Search Term</th>
+                                <th class="sortable" data-sort="keyword">Keyword</th>
+                                <th class="sortable" data-sort="adGroup">Ad Group</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="cost">Cost</th>
+                                <th class="sortable" data-sort="cpc">Avg CPC</th>
+                                <th class="sortable" data-sort="conversions">Conv.</th>
+                                <th class="sortable" data-sort="convRate">Conv. Rate</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bingSearchTermsBody">
+                            <tr><td colspan="11" class="loading">Loading search terms...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Bing Search Terms View -->
 
         <!-- Google Ads View -->
         <div id="googleView" class="view-content hidden">

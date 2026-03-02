@@ -154,6 +154,12 @@ async function submitAndDownloadReport(reportType, startDate, endDate, columns) 
     let reportRequest;
     if (reportType === 'campaign') {
         reportRequest = buildCampaignReportRequest(startDate, endDate, columns);
+    } else if (reportType === 'keyword') {
+        reportRequest = buildKeywordReportRequest(startDate, endDate, columns);
+    } else if (reportType === 'geographic') {
+        reportRequest = buildGeographicReportRequest(startDate, endDate, columns);
+    } else if (reportType === 'searchQuery') {
+        reportRequest = buildSearchQueryReportRequest(startDate, endDate, columns);
     } else {
         reportRequest = buildAccountReportRequest(startDate, endDate, columns);
     }
@@ -337,6 +343,117 @@ function buildCampaignReportRequest(startDate, endDate, columns) {
     </ReportRequest>`;
 }
 
+function buildKeywordReportRequest(startDate, endDate, columns) {
+    const requiredColumns = ['Keyword', 'CampaignName', 'AdGroupName'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<KeywordPerformanceReportColumn>${c}</KeywordPerformanceReportColumn>`).join('\n          ');
+    
+    return `<ReportRequest i:type="KeywordPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
+        <ExcludeReportFooter>true</ExcludeReportFooter>
+        <ExcludeReportHeader>true</ExcludeReportHeader>
+        <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
+        <ReportName>KeywordPerformance</ReportName>
+        <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
+        <Aggregation>Summary</Aggregation>
+        <Columns>
+          ${columnElements}
+        </Columns>
+        <Scope>
+            <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
+            </AccountIds>
+        </Scope>
+        <Time>
+            <CustomDateRangeEnd>
+                <Day>${parseInt(endDate.split('-')[2])}</Day>
+                <Month>${parseInt(endDate.split('-')[1])}</Month>
+                <Year>${parseInt(endDate.split('-')[0])}</Year>
+            </CustomDateRangeEnd>
+            <CustomDateRangeStart>
+                <Day>${parseInt(startDate.split('-')[2])}</Day>
+                <Month>${parseInt(startDate.split('-')[1])}</Month>
+                <Year>${parseInt(startDate.split('-')[0])}</Year>
+            </CustomDateRangeStart>
+        </Time>
+    </ReportRequest>`;
+}
+
+function buildGeographicReportRequest(startDate, endDate, columns) {
+    const requiredColumns = ['LocationType', 'MostSpecificLocation'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<GeographicPerformanceReportColumn>${c}</GeographicPerformanceReportColumn>`).join('\n          ');
+    
+    return `<ReportRequest i:type="GeographicPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
+        <ExcludeReportFooter>true</ExcludeReportFooter>
+        <ExcludeReportHeader>true</ExcludeReportHeader>
+        <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
+        <ReportName>GeographicPerformance</ReportName>
+        <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
+        <Aggregation>Summary</Aggregation>
+        <Columns>
+          ${columnElements}
+        </Columns>
+        <Scope>
+            <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
+            </AccountIds>
+        </Scope>
+        <Time>
+            <CustomDateRangeEnd>
+                <Day>${parseInt(endDate.split('-')[2])}</Day>
+                <Month>${parseInt(endDate.split('-')[1])}</Month>
+                <Year>${parseInt(endDate.split('-')[0])}</Year>
+            </CustomDateRangeEnd>
+            <CustomDateRangeStart>
+                <Day>${parseInt(startDate.split('-')[2])}</Day>
+                <Month>${parseInt(startDate.split('-')[1])}</Month>
+                <Year>${parseInt(startDate.split('-')[0])}</Year>
+            </CustomDateRangeStart>
+        </Time>
+    </ReportRequest>`;
+}
+
+function buildSearchQueryReportRequest(startDate, endDate, columns) {
+    const requiredColumns = ['SearchQuery', 'CampaignName', 'AdGroupName', 'Keyword'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<SearchQueryPerformanceReportColumn>${c}</SearchQueryPerformanceReportColumn>`).join('\n          ');
+    
+    return `<ReportRequest i:type="SearchQueryPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
+        <ExcludeReportFooter>true</ExcludeReportFooter>
+        <ExcludeReportHeader>true</ExcludeReportHeader>
+        <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
+        <ReportName>SearchQueryPerformance</ReportName>
+        <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
+        <Aggregation>Summary</Aggregation>
+        <Columns>
+          ${columnElements}
+        </Columns>
+        <Scope>
+            <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
+            </AccountIds>
+        </Scope>
+        <Time>
+            <CustomDateRangeEnd>
+                <Day>${parseInt(endDate.split('-')[2])}</Day>
+                <Month>${parseInt(endDate.split('-')[1])}</Month>
+                <Year>${parseInt(endDate.split('-')[0])}</Year>
+            </CustomDateRangeEnd>
+            <CustomDateRangeStart>
+                <Day>${parseInt(startDate.split('-')[2])}</Day>
+                <Month>${parseInt(startDate.split('-')[1])}</Month>
+                <Year>${parseInt(startDate.split('-')[0])}</Year>
+            </CustomDateRangeStart>
+        </Time>
+    </ReportRequest>`;
+}
+
 function parseReportCsv(csvText) {
     const lines = csvText.trim().split('\n');
     if (lines.length < 2) return { rows: [] };
@@ -466,6 +583,114 @@ app.post('/api/bing/campaign-performance', async (req, res) => {
         res.json({ campaigns });
     } catch (error) {
         console.error('Campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bing Keywords Performance
+app.post('/api/bing/keywords', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['Keyword', 'CampaignName', 'AdGroupName', 'QualityScore', 'Impressions', 'Clicks', 'Ctr', 'Spend', 'AverageCpc', 'Conversions', 'CostPerConversion'];
+        const report = await submitAndDownloadReport('keyword', startDate, endDate, columns);
+        
+        const keywords = report.rows.map(row => ({
+            keyword: row.Keyword || 'Unknown',
+            campaign: row.CampaignName || 'Unknown',
+            adGroup: row.AdGroupName || 'Unknown',
+            qualityScore: parseInt(row.QualityScore) || null,
+            impressions: parseInt(row.Impressions) || 0,
+            clicks: parseInt(row.Clicks) || 0,
+            ctr: parseFloat(row.Ctr?.replace('%', '')) || 0,
+            cost: parseFloat(row.Spend) || 0,
+            cpc: parseFloat(row.AverageCpc) || 0,
+            conversions: parseFloat(row.Conversions) || 0,
+            costPerConv: parseFloat(row.CostPerConversion) || 0
+        }));
+        
+        res.json({ keywords });
+    } catch (error) {
+        console.error('Bing keywords error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bing Geographic Performance
+app.post('/api/bing/geographic', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['LocationType', 'MostSpecificLocation', 'Country', 'State', 'City', 'Impressions', 'Clicks', 'Ctr', 'Spend', 'AverageCpc', 'Conversions', 'CostPerConversion'];
+        const report = await submitAndDownloadReport('geographic', startDate, endDate, columns);
+        
+        const locations = report.rows.map(row => ({
+            locationType: row.LocationType || 'Unknown',
+            location: row.MostSpecificLocation || row.City || row.State || row.Country || 'Unknown',
+            country: row.Country || '',
+            state: row.State || '',
+            city: row.City || '',
+            impressions: parseInt(row.Impressions) || 0,
+            clicks: parseInt(row.Clicks) || 0,
+            ctr: parseFloat(row.Ctr?.replace('%', '')) || 0,
+            cost: parseFloat(row.Spend) || 0,
+            cpc: parseFloat(row.AverageCpc) || 0,
+            conversions: parseFloat(row.Conversions) || 0,
+            costPerConv: parseFloat(row.CostPerConversion) || 0,
+            convRate: row.Clicks > 0 ? (parseFloat(row.Conversions) / parseInt(row.Clicks)) * 100 : 0
+        }));
+        
+        res.json({ locations });
+    } catch (error) {
+        console.error('Bing geographic error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bing Search Terms (Search Query Performance)
+app.post('/api/bing/search-terms', async (req, res) => {
+    if (!isBingConfigured()) {
+        return res.status(503).json({ error: 'Microsoft Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        const columns = ['SearchQuery', 'CampaignName', 'AdGroupName', 'Keyword', 'Impressions', 'Clicks', 'Ctr', 'Spend', 'AverageCpc', 'Conversions', 'CostPerConversion'];
+        const report = await submitAndDownloadReport('searchQuery', startDate, endDate, columns);
+        
+        const searchTerms = report.rows.map(row => {
+            const clicks = parseInt(row.Clicks) || 0;
+            const cost = parseFloat(row.Spend) || 0;
+            const conversions = parseFloat(row.Conversions) || 0;
+            
+            return {
+                searchTerm: row.SearchQuery || 'Unknown',
+                campaign: row.CampaignName || 'Unknown',
+                adGroup: row.AdGroupName || 'Unknown',
+                keyword: row.Keyword || '-',
+                impressions: parseInt(row.Impressions) || 0,
+                clicks,
+                ctr: parseFloat(row.Ctr?.replace('%', '')) || 0,
+                cost,
+                cpc: clicks > 0 ? cost / clicks : 0,
+                conversions,
+                costPerConv: conversions > 0 ? cost / conversions : 0,
+                convRate: clicks > 0 ? (conversions / clicks) * 100 : 0
+            };
+        });
+        
+        res.json({ searchTerms });
+    } catch (error) {
+        console.error('Bing search terms error:', error);
         res.status(500).json({ error: error.message });
     }
 });

@@ -25,6 +25,29 @@ let bingDataLoaded = false;
 let bingSpendChart = null;
 let bingConversionsChart = null;
 
+// Bing Keywords state
+let bingKeywordsDataLoaded = false;
+let bingKeywordsRawData = [];
+let bingKeywordsSortColumn = 'clicks';
+let bingKeywordsSortDirection = 'desc';
+let bingKeywordsSearchText = '';
+
+// Bing Geographic state
+let bingGeoDataLoaded = false;
+let bingGeoRawData = [];
+let bingGeoSortColumn = 'clicks';
+let bingGeoSortDirection = 'desc';
+let bingGeoSearchText = '';
+
+// Bing Search Terms state
+let bingSearchTermsDataLoaded = false;
+let bingSearchTermsRawData = [];
+let bingSearchTermsSortColumn = 'clicks';
+let bingSearchTermsSortDirection = 'desc';
+let bingSearchTermsFilter = 'all';
+let bingSearchTermsSearchText = '';
+let bingSearchTermsCampaignFilter = 'all';
+
 // Google Ads State
 let googleDataLoaded = false;
 let googleSpendChart = null;
@@ -205,6 +228,9 @@ function initializeDashboard() {
             currentRange = btn.dataset.range;
             adsDataLoaded = false; // Reset ads data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
+            bingKeywordsDataLoaded = false;
+            bingGeoDataLoaded = false;
+            bingSearchTermsDataLoaded = false;
             googleDataLoaded = false; // Reset google data when date changes
             googleKeywordsDataLoaded = false; // Reset google keywords data when date changes
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
@@ -245,6 +271,9 @@ function initializeDashboard() {
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
+            document.getElementById('bingKeywordsView').classList.toggle('hidden', currentView !== 'bingKeywords');
+            document.getElementById('bingGeoView').classList.toggle('hidden', currentView !== 'bingGeo');
+            document.getElementById('bingSearchTermsView').classList.toggle('hidden', currentView !== 'bingSearchTerms');
             document.getElementById('googleView').classList.toggle('hidden', currentView !== 'google');
             document.getElementById('googleKeywordsView').classList.toggle('hidden', currentView !== 'googleKeywords');
             document.getElementById('googleQsHistoryView').classList.toggle('hidden', currentView !== 'googleQsHistory');
@@ -260,6 +289,15 @@ function initializeDashboard() {
             }
             if (currentView === 'bing' && !bingDataLoaded) {
                 loadBingData();
+            }
+            if (currentView === 'bingKeywords' && !bingKeywordsDataLoaded) {
+                loadBingKeywordsData();
+            }
+            if (currentView === 'bingGeo' && !bingGeoDataLoaded) {
+                loadBingGeoData();
+            }
+            if (currentView === 'bingSearchTerms' && !bingSearchTermsDataLoaded) {
+                loadBingSearchTermsData();
             }
             if (currentView === 'google' && !googleDataLoaded) {
                 loadGoogleData();
@@ -293,6 +331,9 @@ function initializeDashboard() {
     document.getElementById('refreshBtn').addEventListener('click', () => {
         adsDataLoaded = false;
         bingDataLoaded = false;
+        bingKeywordsDataLoaded = false;
+        bingGeoDataLoaded = false;
+        bingSearchTermsDataLoaded = false;
         googleDataLoaded = false;
         googleKeywordsDataLoaded = false;
         googleQsHistoryDataLoaded = false;
@@ -307,6 +348,12 @@ function initializeDashboard() {
             loadAdsData();
         } else if (currentView === 'bing') {
             loadBingData();
+        } else if (currentView === 'bingKeywords') {
+            loadBingKeywordsData();
+        } else if (currentView === 'bingGeo') {
+            loadBingGeoData();
+        } else if (currentView === 'bingSearchTerms') {
+            loadBingSearchTermsData();
         } else if (currentView === 'google') {
             loadGoogleData();
         } else if (currentView === 'googleKeywords') {
@@ -444,6 +491,86 @@ function initializeDashboard() {
     document.getElementById('searchTermsCampaignFilter').addEventListener('change', (e) => {
         searchTermsCampaignFilter = e.target.value;
         renderSearchTermsTable();
+    });
+
+    // ==================== Bing Event Listeners ====================
+    
+    // Bing Keywords search
+    document.getElementById('bingKeywordsSearch').addEventListener('input', (e) => {
+        bingKeywordsSearchText = e.target.value.toLowerCase();
+        renderBingKeywordsTable();
+    });
+    
+    // Bing Keywords table sorting
+    document.querySelectorAll('#bingKeywordsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (bingKeywordsSortColumn === sortKey) {
+                bingKeywordsSortDirection = bingKeywordsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                bingKeywordsSortColumn = sortKey;
+                bingKeywordsSortDirection = 'desc';
+            }
+            document.querySelectorAll('#bingKeywordsTable th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+            th.classList.add(bingKeywordsSortDirection);
+            renderBingKeywordsTable();
+        });
+    });
+    
+    // Bing Geographic search
+    document.getElementById('bingGeoSearch').addEventListener('input', (e) => {
+        bingGeoSearchText = e.target.value.toLowerCase();
+        renderBingGeoTable();
+    });
+    
+    // Bing Geographic table sorting
+    document.querySelectorAll('#bingGeoTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (bingGeoSortColumn === sortKey) {
+                bingGeoSortDirection = bingGeoSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                bingGeoSortColumn = sortKey;
+                bingGeoSortDirection = 'desc';
+            }
+            document.querySelectorAll('#bingGeoTable th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+            th.classList.add(bingGeoSortDirection);
+            renderBingGeoTable();
+        });
+    });
+    
+    // Bing Search Terms filter
+    document.getElementById('bingSearchTermsFilter').addEventListener('change', (e) => {
+        bingSearchTermsFilter = e.target.value;
+        renderBingSearchTermsTable();
+    });
+    
+    // Bing Search Terms campaign filter
+    document.getElementById('bingSearchTermsCampaignFilter').addEventListener('change', (e) => {
+        bingSearchTermsCampaignFilter = e.target.value;
+        renderBingSearchTermsTable();
+    });
+    
+    // Bing Search Terms search
+    document.getElementById('bingSearchTermsSearch').addEventListener('input', (e) => {
+        bingSearchTermsSearchText = e.target.value.toLowerCase();
+        renderBingSearchTermsTable();
+    });
+    
+    // Bing Search Terms table sorting
+    document.querySelectorAll('#bingSearchTermsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (bingSearchTermsSortColumn === sortKey) {
+                bingSearchTermsSortDirection = bingSearchTermsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                bingSearchTermsSortColumn = sortKey;
+                bingSearchTermsSortDirection = 'desc';
+            }
+            document.querySelectorAll('#bingSearchTermsTable th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+            th.classList.add(bingSearchTermsSortDirection);
+            renderBingSearchTermsTable();
+        });
     });
 
     // Ads filter dropdowns
@@ -2668,5 +2795,247 @@ function renderSearchTermsTable() {
     
     if (sorted.length === 0) {
         document.getElementById('searchTermsBody').innerHTML = '<tr><td colspan="12" class="loading">No search terms match the filter</td></tr>';
+    }
+}
+
+// ==================== Bing Keywords ====================
+
+async function loadBingKeywordsData() {
+    document.getElementById('bingKeywordsBody').innerHTML = '<tr><td colspan="11" class="loading">Loading keywords...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const response = await fetch('/api/bing/keywords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Bing keywords');
+        const data = await response.json();
+        
+        bingKeywordsRawData = data.keywords || [];
+        document.getElementById('bingKeywordsDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        renderBingKeywordsTable();
+        bingKeywordsDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Bing keywords error:', e);
+        document.getElementById('bingKeywordsBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderBingKeywordsTable() {
+    if (bingKeywordsRawData.length === 0) return;
+    
+    let filtered = bingKeywordsRawData;
+    if (bingKeywordsSearchText) {
+        filtered = filtered.filter(kw => kw.keyword.toLowerCase().includes(bingKeywordsSearchText));
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[bingKeywordsSortColumn];
+        let bVal = b[bingKeywordsSortColumn];
+        if (aVal === null || aVal === undefined) aVal = bingKeywordsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = bingKeywordsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bingKeywordsSortColumn === 'keyword' || bingKeywordsSortColumn === 'campaign' || bingKeywordsSortColumn === 'adGroup') {
+            return bingKeywordsSortDirection === 'asc' ? (aVal || '').localeCompare(bVal || '') : (bVal || '').localeCompare(aVal || '');
+        }
+        return bingKeywordsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    document.getElementById('bingKeywordsBody').innerHTML = sorted.map(kw => {
+        const qsClass = kw.qualityScore >= 7 ? 'qs-good' : (kw.qualityScore >= 5 ? 'qs-ok' : 'qs-low');
+        return `<tr>
+            <td>${kw.keyword}</td>
+            <td>${kw.campaign}</td>
+            <td>${kw.adGroup}</td>
+            <td class="${qsClass}">${kw.qualityScore || '-'}</td>
+            <td>${(kw.impressions || 0).toLocaleString()}</td>
+            <td>${(kw.clicks || 0).toLocaleString()}</td>
+            <td>${kw.ctr?.toFixed(2) || '0.00'}%</td>
+            <td>$${(kw.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td>$${(kw.cpc || 0).toFixed(2)}</td>
+            <td>${(kw.conversions || 0).toFixed(1)}</td>
+            <td>${kw.conversions > 0 ? '$' + kw.costPerConv.toFixed(2) : '-'}</td>
+        </tr>`;
+    }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('bingKeywordsBody').innerHTML = '<tr><td colspan="11" class="loading">No keywords match the search</td></tr>';
+    }
+}
+
+// ==================== Bing Geographic ====================
+
+async function loadBingGeoData() {
+    document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="10" class="loading">Loading geographic data...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const response = await fetch('/api/bing/geographic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Bing geographic data');
+        const data = await response.json();
+        
+        bingGeoRawData = data.locations || [];
+        document.getElementById('bingGeoDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        renderBingGeoTable();
+        bingGeoDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Bing geographic error:', e);
+        document.getElementById('bingGeoBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderBingGeoTable() {
+    if (bingGeoRawData.length === 0) return;
+    
+    let filtered = bingGeoRawData;
+    if (bingGeoSearchText) {
+        filtered = filtered.filter(loc => loc.location.toLowerCase().includes(bingGeoSearchText) || (loc.state || '').toLowerCase().includes(bingGeoSearchText));
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[bingGeoSortColumn];
+        let bVal = b[bingGeoSortColumn];
+        if (aVal === null || aVal === undefined) aVal = bingGeoSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = bingGeoSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bingGeoSortColumn === 'location' || bingGeoSortColumn === 'state') {
+            return bingGeoSortDirection === 'asc' ? (aVal || '').localeCompare(bVal || '') : (bVal || '').localeCompare(aVal || '');
+        }
+        return bingGeoSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    document.getElementById('bingGeoBody').innerHTML = sorted.map(loc => {
+        const convRateClass = loc.convRate >= 10 ? 'qs-good' : (loc.convRate >= 5 ? 'qs-ok' : 'qs-low');
+        return `<tr>
+            <td>${loc.location}</td>
+            <td>${loc.state || '-'}</td>
+            <td>${(loc.impressions || 0).toLocaleString()}</td>
+            <td>${(loc.clicks || 0).toLocaleString()}</td>
+            <td>${loc.ctr?.toFixed(2) || '0.00'}%</td>
+            <td>$${(loc.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td>$${(loc.cpc || 0).toFixed(2)}</td>
+            <td>${(loc.conversions || 0).toFixed(1)}</td>
+            <td class="${convRateClass}">${loc.convRate?.toFixed(2) || '0.00'}%</td>
+            <td>${loc.conversions > 0 ? '$' + loc.costPerConv.toFixed(2) : '-'}</td>
+        </tr>`;
+    }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="10" class="loading">No locations match the search</td></tr>';
+    }
+}
+
+// ==================== Bing Search Terms ====================
+
+async function loadBingSearchTermsData() {
+    document.getElementById('bingSearchTermsBody').innerHTML = '<tr><td colspan="11" class="loading">Loading search terms...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const response = await fetch('/api/bing/search-terms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: range.since, endDate: range.until })
+        });
+        
+        if (!response.ok) throw new Error('Failed to load Bing search terms');
+        const data = await response.json();
+        
+        bingSearchTermsRawData = data.searchTerms || [];
+        
+        // Populate campaign dropdown
+        const campaigns = [...new Set(bingSearchTermsRawData.map(st => st.campaign))].sort();
+        const campaignSelect = document.getElementById('bingSearchTermsCampaignFilter');
+        campaignSelect.innerHTML = '<option value="all">All Campaigns</option>' + 
+            campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+        
+        // Calculate totals
+        let totalClicks = 0, totalCost = 0, totalConversions = 0, wastedCost = 0;
+        bingSearchTermsRawData.forEach(st => {
+            totalClicks += st.clicks || 0;
+            totalCost += st.cost || 0;
+            totalConversions += st.conversions || 0;
+            if ((st.conversions || 0) === 0) wastedCost += st.cost || 0;
+        });
+        
+        document.getElementById('bingSearchTermsCount').textContent = bingSearchTermsRawData.length.toLocaleString();
+        document.getElementById('bingSearchTermsClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('bingSearchTermsCost').textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 });
+        document.getElementById('bingSearchTermsConversions').textContent = totalConversions.toFixed(1);
+        document.getElementById('bingSearchTermsWasted').textContent = '$' + wastedCost.toLocaleString('en-US', { minimumFractionDigits: 2 });
+        document.getElementById('bingSearchTermsDateRange').textContent = `Data from ${range.since} to ${range.until}`;
+        
+        renderBingSearchTermsTable();
+        bingSearchTermsDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Bing search terms error:', e);
+        document.getElementById('bingSearchTermsBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderBingSearchTermsTable() {
+    if (bingSearchTermsRawData.length === 0) return;
+    
+    let filtered = bingSearchTermsRawData;
+    
+    // Apply filter dropdown
+    if (bingSearchTermsFilter === 'wasted') {
+        filtered = filtered.filter(st => (st.conversions || 0) === 0);
+    } else if (bingSearchTermsFilter === 'high-cpc') {
+        filtered = filtered.filter(st => (st.cpc || 0) > 100);
+    } else if (bingSearchTermsFilter === 'low-conv') {
+        filtered = filtered.filter(st => (st.convRate || 0) < 5 && (st.clicks || 0) > 0);
+    }
+    
+    // Apply text search
+    if (bingSearchTermsSearchText) {
+        filtered = filtered.filter(st => st.searchTerm.toLowerCase().includes(bingSearchTermsSearchText));
+    }
+    
+    // Apply campaign filter
+    if (bingSearchTermsCampaignFilter !== 'all') {
+        filtered = filtered.filter(st => st.campaign === bingSearchTermsCampaignFilter);
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[bingSearchTermsSortColumn];
+        let bVal = b[bingSearchTermsSortColumn];
+        if (aVal === null || aVal === undefined) aVal = bingSearchTermsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = bingSearchTermsSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bingSearchTermsSortColumn === 'searchTerm' || bingSearchTermsSortColumn === 'keyword' || bingSearchTermsSortColumn === 'adGroup') {
+            return bingSearchTermsSortDirection === 'asc' ? (aVal || '').localeCompare(bVal || '') : (bVal || '').localeCompare(aVal || '');
+        }
+        return bingSearchTermsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    document.getElementById('bingSearchTermsBody').innerHTML = sorted.map(st => {
+        const convRateClass = st.convRate >= 10 ? 'qs-good' : (st.convRate >= 5 ? 'qs-ok' : 'qs-low');
+        const wastedClass = (st.conversions || 0) === 0 && (st.cost || 0) > 0 ? 'wasted-row' : '';
+        return `<tr class="${wastedClass}">
+            <td title="Campaign: ${st.campaign}">${st.searchTerm}</td>
+            <td>${st.keyword || '-'}</td>
+            <td>${st.adGroup || '-'}</td>
+            <td>${(st.impressions || 0).toLocaleString()}</td>
+            <td>${(st.clicks || 0).toLocaleString()}</td>
+            <td>${st.ctr?.toFixed(2) || '0.00'}%</td>
+            <td>$${(st.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td>$${(st.cpc || 0).toFixed(2)}</td>
+            <td>${(st.conversions || 0).toFixed(1)}</td>
+            <td class="${convRateClass}">${st.convRate?.toFixed(2) || '0.00'}%</td>
+            <td>${st.conversions > 0 ? '$' + st.costPerConv.toFixed(2) : '-'}</td>
+        </tr>`;
+    }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('bingSearchTermsBody').innerHTML = '<tr><td colspan="11" class="loading">No search terms match the filter</td></tr>';
     }
 }
