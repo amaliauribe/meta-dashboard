@@ -3647,13 +3647,14 @@ function renderZipcodeTable(zipcodes) {
 
 async function loadBingAdsData() {
     const range = dateRanges[currentRange];
+    const dateRange = getBingDateRange(range);
     document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
     
     try {
         const response = await fetch('/api/bing/ad-performance', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: range.start, endDate: range.end })
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
         });
         
         if (!response.ok) throw new Error('Failed to load Bing ad data');
@@ -3713,13 +3714,14 @@ function renderBingAdsTable(ads) {
 
 async function loadGoogleAdsData() {
     const range = dateRanges[currentRange];
+    const dateRange = getGoogleDateRange(range);
     document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
     
     try {
         const response = await fetch('/api/google/ad-performance', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: range.start, endDate: range.end })
+            body: JSON.stringify({ startDate: dateRange.since, endDate: dateRange.until })
         });
         
         if (!response.ok) throw new Error('Failed to load Google ad data');

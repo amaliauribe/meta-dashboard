@@ -161,6 +161,8 @@ async function submitAndDownloadReport(reportType, startDate, endDate, columns) 
         reportRequest = buildGeographicReportRequest(startDate, endDate, columns);
     } else if (reportType === 'searchQuery') {
         reportRequest = buildSearchQueryReportRequest(startDate, endDate, columns);
+    } else if (reportType === 'ad') {
+        reportRequest = buildAdReportRequest(startDate, endDate, columns);
     } else {
         reportRequest = buildAccountReportRequest(startDate, endDate, columns);
     }
@@ -430,6 +432,43 @@ function buildSearchQueryReportRequest(startDate, endDate, columns) {
         <Format>Csv</Format>
         <FormatVersion>2.0</FormatVersion>
         <ReportName>SearchQueryPerformance</ReportName>
+        <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
+        <Aggregation>Summary</Aggregation>
+        <Columns>
+          ${columnElements}
+        </Columns>
+        <Scope>
+            <AccountIds xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                <a:long>${MSADS_CONFIG.accountId}</a:long>
+            </AccountIds>
+        </Scope>
+        <Time>
+            <CustomDateRangeEnd>
+                <Day>${parseInt(endDate.split('-')[2])}</Day>
+                <Month>${parseInt(endDate.split('-')[1])}</Month>
+                <Year>${parseInt(endDate.split('-')[0])}</Year>
+            </CustomDateRangeEnd>
+            <CustomDateRangeStart>
+                <Day>${parseInt(startDate.split('-')[2])}</Day>
+                <Month>${parseInt(startDate.split('-')[1])}</Month>
+                <Year>${parseInt(startDate.split('-')[0])}</Year>
+            </CustomDateRangeStart>
+        </Time>
+    </ReportRequest>`;
+}
+
+function buildAdReportRequest(startDate, endDate, columns) {
+    const requiredColumns = ['AdId', 'CampaignName', 'AdGroupName'];
+    const allColumns = [...new Set([...requiredColumns, ...columns])];
+    const columnElements = allColumns.map(c => `<AdPerformanceReportColumn>${c}</AdPerformanceReportColumn>`).join('\n          ');
+    
+    return `<ReportRequest i:type="AdPerformanceReportRequest" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <ExcludeColumnHeaders>false</ExcludeColumnHeaders>
+        <ExcludeReportFooter>true</ExcludeReportFooter>
+        <ExcludeReportHeader>true</ExcludeReportHeader>
+        <Format>Csv</Format>
+        <FormatVersion>2.0</FormatVersion>
+        <ReportName>AdPerformance</ReportName>
         <ReturnOnlyCompleteData>false</ReturnOnlyCompleteData>
         <Aggregation>Summary</Aggregation>
         <Columns>
