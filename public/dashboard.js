@@ -66,10 +66,14 @@ let qsHistoryChart = null;
 // Bing Ads Creative State
 let bingAdsDataLoaded = false;
 let bingAdsRawData = [];
+let bingAdsSortColumn = 'conversions';
+let bingAdsSortDirection = 'desc';
 
 // Google Ads Creative State
 let googleAdsDataLoaded = false;
 let googleAdsRawData = [];
+let googleAdsSortColumn = 'conversions';
+let googleAdsSortDirection = 'desc';
 
 // Keywords sorting state
 let keywordsRawData = [];
@@ -589,6 +593,34 @@ function initializeDashboard() {
             document.querySelectorAll('#bingGeoTable th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
             th.classList.add(bingGeoSortDirection);
             renderBingGeoTable();
+        });
+    });
+    
+    // Bing Ads Creative table sorting
+    document.querySelectorAll('#bingAdsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (bingAdsSortColumn === sortKey) {
+                bingAdsSortDirection = bingAdsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                bingAdsSortColumn = sortKey;
+                bingAdsSortDirection = 'desc';
+            }
+            renderBingAdsTable(bingAdsRawData);
+        });
+    });
+    
+    // Google Ads Creative table sorting
+    document.querySelectorAll('#googleAdsTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (googleAdsSortColumn === sortKey) {
+                googleAdsSortDirection = googleAdsSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                googleAdsSortColumn = sortKey;
+                googleAdsSortDirection = 'desc';
+            }
+            renderGoogleAdsTable(googleAdsRawData);
         });
     });
     
@@ -3690,7 +3722,27 @@ function renderBingAdsTable(ads) {
         return;
     }
     
-    tbody.innerHTML = ads.slice(0, 100).map(ad => {
+    // Sort the ads
+    const sorted = [...ads].sort((a, b) => {
+        let aVal = a[bingAdsSortColumn];
+        let bVal = b[bingAdsSortColumn];
+        if (typeof aVal === 'string') {
+            return bingAdsSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return bingAdsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    // Update header sort indicators
+    document.querySelectorAll('#bingAdsTable th.sortable').forEach(th => {
+        th.classList.remove('asc', 'desc');
+        th.textContent = th.textContent.replace(/ [↑↓]$/, '');
+        if (th.dataset.sort === bingAdsSortColumn) {
+            th.classList.add(bingAdsSortDirection);
+            th.textContent += bingAdsSortDirection === 'asc' ? ' ↑' : ' ↓';
+        }
+    });
+    
+    tbody.innerHTML = sorted.slice(0, 100).map(ad => {
         const headlines = ad.headlines.join(' | ') || '-';
         const descriptions = ad.descriptions.join(' | ') || '-';
         const costPerConv = ad.conversions > 0 ? '$' + ad.costPerConv.toFixed(2) : '-';
@@ -3757,7 +3809,27 @@ function renderGoogleAdsTable(ads) {
         return;
     }
     
-    tbody.innerHTML = ads.slice(0, 100).map(ad => {
+    // Sort the ads
+    const sorted = [...ads].sort((a, b) => {
+        let aVal = a[googleAdsSortColumn];
+        let bVal = b[googleAdsSortColumn];
+        if (typeof aVal === 'string') {
+            return googleAdsSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return googleAdsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    // Update header sort indicators
+    document.querySelectorAll('#googleAdsTable th.sortable').forEach(th => {
+        th.classList.remove('asc', 'desc');
+        th.textContent = th.textContent.replace(/ [↑↓]$/, '');
+        if (th.dataset.sort === googleAdsSortColumn) {
+            th.classList.add(googleAdsSortDirection);
+            th.textContent += googleAdsSortDirection === 'asc' ? ' ↑' : ' ↓';
+        }
+    });
+    
+    tbody.innerHTML = sorted.slice(0, 100).map(ad => {
         const headlines = ad.headlines.join(' | ') || '-';
         const descriptions = ad.descriptions.join(' | ') || '-';
         const costPerConv = ad.conversions > 0 ? '$' + ad.costPerConv.toFixed(2) : '-';
