@@ -944,6 +944,11 @@ table.resizable-table td {
     color: #666;
 }
 
+.heatmap-legend .legend-label {
+    font-weight: 600;
+    color: #333;
+}
+
 .legend-gradient {
     width: 150px;
     height: 15px;
