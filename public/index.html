@@ -400,27 +400,31 @@
 
         <!-- Ads View -->
         <div id="adsView" class="view-content hidden">
-            <!-- Winner Analysis Section -->
-            <section id="winnerAnalysis" class="winner-analysis-section hidden">
-                <h2>🏆 Top Performers</h2>
-                <div class="winner-cards">
-                    <div class="winner-card gold">
-                        <div class="winner-badge">🥇 Best Efficiency</div>
-                        <div class="winner-name" id="winner1Name">-</div>
-                        <div class="winner-stats" id="winner1Stats"></div>
+            <!-- Winner Section -->
+            <section id="winnerAnalysis" class="winner-section hidden">
+                <div class="winner-container">
+                    <div class="winner-creative" id="winnerCreative">
+                        <div class="no-thumbnail">🖼️</div>
                     </div>
-                    <div class="winner-card silver">
-                        <div class="winner-badge">🥈 Highest CTR</div>
-                        <div class="winner-name" id="winner2Name">-</div>
-                        <div class="winner-stats" id="winner2Stats"></div>
-                    </div>
-                    <div class="winner-card bronze">
-                        <div class="winner-badge">🥉 Best Engagement</div>
-                        <div class="winner-name" id="winner3Name">-</div>
-                        <div class="winner-stats" id="winner3Stats"></div>
+                    <div class="winner-info">
+                        <div class="winner-label">🏆 Top Performing Ad</div>
+                        <div class="winner-name" id="winnerName">-</div>
+                        <div class="winner-metrics">
+                            <div class="winner-metric">
+                                <span class="metric-value" id="winnerResults">0</span>
+                                <span class="metric-label">Results</span>
+                            </div>
+                            <div class="winner-metric">
+                                <span class="metric-value" id="winnerCPR">$0</span>
+                                <span class="metric-label">Cost/Result</span>
+                            </div>
+                            <div class="winner-metric">
+                                <span class="metric-value" id="winnerSpend">$0</span>
+                                <span class="metric-label">Spend</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="winner-insights" id="winnerInsights"></div>
             </section>
 
             <section class="table-section">

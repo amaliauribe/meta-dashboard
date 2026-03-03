@@ -1537,7 +1537,7 @@ function renderAdsTable() {
     analyzeWinner();
 }
 
-// Analyze and display top performers
+// Display top performing ad by results
 function analyzeWinner() {
     const section = document.getElementById('winnerAnalysis');
     if (!adsRawData || adsRawData.length === 0) {
@@ -1545,95 +1545,39 @@ function analyzeWinner() {
         return;
     }
     
-    // Filter ads with meaningful data (at least $50 spend and some results)
-    const qualifiedAds = adsRawData.filter(ad => ad.spend >= 50 && ad.clicks >= 10);
+    // Find ad with most results
+    const adsWithResults = adsRawData.filter(ad => ad.results > 0);
     
-    if (qualifiedAds.length < 3) {
+    if (adsWithResults.length === 0) {
         section.classList.add('hidden');
         return;
     }
     
+    const winner = adsWithResults.sort((a, b) => b.results - a.results)[0];
+    
     section.classList.remove('hidden');
     
-    // Calculate CPC for each ad
-    const adsWithCpc = qualifiedAds.map(ad => ({
-        ...ad,
-        cpc: ad.clicks > 0 ? ad.spend / ad.clicks : Infinity
-    }));
-    
-    // 1. Best Efficiency (lowest cost per result with at least 1 result)
-    const adsWithResults = adsWithCpc.filter(ad => ad.results > 0 && ad.cost_per_result !== Infinity);
-    const bestEfficiency = adsWithResults.length > 0 
-        ? adsWithResults.sort((a, b) => a.cost_per_result - b.cost_per_result)[0]
-        : adsWithCpc.sort((a, b) => a.cpc - b.cpc)[0];
-    
-    // 2. Highest CTR
-    const bestCtr = [...adsWithCpc].sort((a, b) => b.ctr - a.ctr)[0];
-    
-    // 3. Best Engagement (highest avg watch time with decent spend)
-    const adsWithWatch = adsWithCpc.filter(ad => ad.avg_watch_time !== null && ad.avg_watch_time > 0);
-    const bestEngagement = adsWithWatch.length > 0
-        ? adsWithWatch.sort((a, b) => b.avg_watch_time - a.avg_watch_time)[0]
-        : [...adsWithCpc].sort((a, b) => b.clicks - a.clicks)[0];
-    
-    // Populate winner cards
-    document.getElementById('winner1Name').textContent = bestEfficiency.ad_name;
-    document.getElementById('winner1Stats').innerHTML = bestEfficiency.results > 0
-        ? `<span class="stat-highlight">$${bestEfficiency.cost_per_result.toFixed(2)}</span> per result • ${bestEfficiency.results} conversions • $${bestEfficiency.spend.toLocaleString()} spend`
-        : `<span class="stat-highlight">$${bestEfficiency.cpc.toFixed(2)}</span> CPC • ${bestEfficiency.clicks.toLocaleString()} clicks • $${bestEfficiency.spend.toLocaleString()} spend`;
-    
-    document.getElementById('winner2Name').textContent = bestCtr.ad_name;
-    document.getElementById('winner2Stats').innerHTML = `<span class="stat-highlight">${bestCtr.ctr.toFixed(2)}%</span> CTR • $${bestCtr.cpc.toFixed(2)} CPC • ${bestCtr.impressions.toLocaleString()} impressions`;
-    
-    document.getElementById('winner3Name').textContent = bestEngagement.ad_name;
-    document.getElementById('winner3Stats').innerHTML = bestEngagement.avg_watch_time
-        ? `<span class="stat-highlight">${bestEngagement.avg_watch_time}s</span> avg watch • ${bestEngagement.ctr.toFixed(2)}% CTR • ${bestEngagement.clicks.toLocaleString()} clicks`
-        : `<span class="stat-highlight">${bestEngagement.clicks.toLocaleString()}</span> clicks • ${bestEngagement.ctr.toFixed(2)}% CTR`;
-    
-    // Generate insights
-    const avgCtr = adsWithCpc.reduce((sum, ad) => sum + ad.ctr, 0) / adsWithCpc.length;
-    const avgCpc = adsWithCpc.reduce((sum, ad) => sum + ad.cpc, 0) / adsWithCpc.length;
-    const avgWatch = adsWithWatch.length > 0 
-        ? adsWithWatch.reduce((sum, ad) => sum + ad.avg_watch_time, 0) / adsWithWatch.length
-        : null;
-    
-    let insights = `<h3>📊 Key Insights</h3><ul>`;
-    
-    // CTR insight
-    if (bestCtr.ctr > avgCtr * 1.5) {
-        insights += `<li><strong>${bestCtr.ad_name}</strong> has ${(bestCtr.ctr / avgCtr).toFixed(1)}x better CTR than average</li>`;
+    // Set creative thumbnail with video link
+    const creativeEl = document.getElementById('winnerCreative');
+    if (winner.thumbnail && winner.videoId) {
+        creativeEl.innerHTML = `
+            <a href="https://www.facebook.com/watch/?v=${winner.videoId}" target="_blank" title="Watch video">
+                <img src="${winner.thumbnail}" alt="${winner.ad_name}">
+            </a>
+        `;
+    } else if (winner.thumbnail) {
+        creativeEl.innerHTML = `<img src="${winner.thumbnail}" alt="${winner.ad_name}">`;
+    } else {
+        creativeEl.innerHTML = `<div class="no-thumbnail">🖼️</div>`;
     }
     
-    // Watch time insight
-    if (avgWatch && bestEngagement.avg_watch_time > avgWatch * 1.3) {
-        insights += `<li>Videos with <strong>${Math.round(avgWatch)}s+ watch time</strong> tend to have higher CTR</li>`;
-    }
-    
-    // Efficiency insight
-    if (bestEfficiency.results > 0) {
-        const avgCpr = adsWithResults.reduce((sum, ad) => sum + ad.cost_per_result, 0) / adsWithResults.length;
-        if (bestEfficiency.cost_per_result < avgCpr * 0.7) {
-            insights += `<li><strong>${bestEfficiency.ad_name}</strong> converts ${((avgCpr / bestEfficiency.cost_per_result - 1) * 100).toFixed(0)}% cheaper than average</li>`;
-        }
-    }
-    
-    // Pattern detection
-    const topPerformers = adsWithCpc.filter(ad => ad.ctr > avgCtr * 1.3);
-    const patterns = {};
-    topPerformers.forEach(ad => {
-        const name = ad.ad_name.toLowerCase();
-        if (name.includes('vs') || name.includes('versus')) patterns['comparison'] = (patterns['comparison'] || 0) + 1;
-        if (name.includes('tour') || name.includes('clinic')) patterns['clinic tour'] = (patterns['clinic tour'] || 0) + 1;
-        if (name.includes('dr.') || name.includes('doctor')) patterns['doctor feature'] = (patterns['doctor feature'] || 0) + 1;
-    });
-    
-    const topPattern = Object.entries(patterns).sort((a, b) => b[1] - a[1])[0];
-    if (topPattern && topPattern[1] >= 2) {
-        insights += `<li><strong>"${topPattern[0]}" style ads</strong> appear frequently among top performers</li>`;
-    }
-    
-    insights += `</ul>`;
-    document.getElementById('winnerInsights').innerHTML = insights;
+    // Set winner info
+    document.getElementById('winnerName').textContent = winner.ad_name;
+    document.getElementById('winnerResults').textContent = winner.results.toLocaleString();
+    document.getElementById('winnerCPR').textContent = winner.cost_per_result !== Infinity 
+        ? '$' + winner.cost_per_result.toFixed(2) 
+        : '-';
+    document.getElementById('winnerSpend').textContent = '$' + winner.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 // =====================================================

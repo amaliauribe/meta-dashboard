@@ -1172,3 +1172,102 @@ table.resizable-table td {
 .winner-insights li {
     margin-bottom: 6px;
 }
+
+/* Winner Section - Simplified */
+.winner-section {
+    background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.winner-container {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.winner-creative {
+    flex-shrink: 0;
+    width: 120px;
+    height: 120px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.winner-creative a {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.winner-creative img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s;
+}
+
+.winner-creative a:hover img {
+    transform: scale(1.05);
+}
+
+.winner-creative .no-thumbnail {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+.winner-info {
+    flex: 1;
+}
+
+.winner-label {
+    color: #ffd700;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.winner-section .winner-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 16px;
+}
+
+.winner-metrics {
+    display: flex;
+    gap: 32px;
+}
+
+.winner-metric {
+    display: flex;
+    flex-direction: column;
+}
+
+.winner-metric .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #4ade80;
+}
+
+.winner-metric .metric-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+    .winner-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .winner-metrics {
+        justify-content: center;
+    }
+}
