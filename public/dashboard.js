@@ -17,6 +17,7 @@ let spendChart = null;
 let resultsChart = null;
 let adsDataLoaded = false;
 let adsRawData = []; // Store ads data for sorting
+let placementRawData = []; // Store placement data for filtering
 let adsSortColumn = 'results';
 let adsSortDirection = 'desc';
 
@@ -115,6 +116,7 @@ const BING_API_ENABLED = true;
 let filterCampaign = '';
 let filterAdset = '';
 let filterAd = '';
+let filterPlatform = ''; // For platform → placement filtering
 
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
@@ -1799,8 +1801,29 @@ async function refreshPlatformPlacementData() {
     }
 }
 
+// Select platform to filter placements
+function selectPlatform(platform) {
+    if (filterPlatform === platform) {
+        filterPlatform = ''; // Toggle off if already selected
+    } else {
+        filterPlatform = platform;
+    }
+    // Re-render both sections
+    renderPlatformCards();
+    renderPlacementCards();
+}
+
+// Store current platform data for re-rendering
+let platformRawData = [];
+
 // Render platform comparison (Facebook vs Instagram)
 function renderPlatformComparison(platformData) {
+    platformRawData = platformData; // Store for re-rendering
+    renderPlatformCards();
+}
+
+function renderPlatformCards() {
+    const platformData = platformRawData;
     const section = document.getElementById('platformComparison');
     const container = document.getElementById('platformCards');
     
@@ -1860,14 +1883,16 @@ function renderPlatformComparison(platformData) {
     container.innerHTML = platforms.map(p => {
         const config = platformConfig[p.platform] || { icon: '📱', name: p.platform, class: '' };
         const isWinner = p.platform === bestPlatform;
+        const isSelected = p.platform === filterPlatform;
         const cprDisplay = p.costPerResult !== null ? '$' + p.costPerResult.toFixed(2) : '-';
         
         return `
-            <div class="platform-card ${config.class}">
+            <div class="platform-card ${config.class} ${isSelected ? 'selected' : ''}" onclick="selectPlatform('${p.platform}')" style="cursor: pointer;">
                 <div class="platform-header">
                     <span class="platform-icon">${config.icon}</span>
                     <span class="platform-name">${config.name}</span>
-                    ${isWinner ? '<span class="platform-badge winner">🏆 Best CPR</span>' : ''}
+                    ${isSelected ? '<span class="platform-badge selected-badge">✓ Filtered</span>' : ''}
+                    ${isWinner && !isSelected ? '<span class="platform-badge winner">🏆 Best CPR</span>' : ''}
                 </div>
                 <div class="platform-metrics">
                     <div class="platform-metric">
@@ -1894,10 +1919,27 @@ function renderPlatformComparison(platformData) {
 
 // Render placement breakdown (Feed, Stories, Reels, etc.)
 function renderPlacementBreakdown(placementData) {
+    placementRawData = placementData; // Store for filtering
+    renderPlacementCards();
+}
+
+function renderPlacementCards() {
     const section = document.getElementById('placementBreakdown');
     const container = document.getElementById('placementCards');
     
+    let placementData = placementRawData;
+    
     if (!placementData || placementData.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Filter by selected platform
+    if (filterPlatform) {
+        placementData = placementData.filter(p => p.publisher_platform === filterPlatform);
+    }
+    
+    if (placementData.length === 0) {
         section.classList.add('hidden');
         return;
     }
