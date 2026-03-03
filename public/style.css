@@ -1601,3 +1601,89 @@ table.resizable-table td {
     color: rgba(255, 255, 255, 0.6);
     margin-top: 2px;
 }
+
+/* Placement Breakdown Section */
+.placement-section {
+    background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.placement-title {
+    color: #6ee7b7;
+    font-size: 1.2rem;
+    margin-bottom: 16px;
+}
+
+.placement-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.placement-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: border-color 0.2s;
+}
+
+.placement-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.placement-card.best {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, rgba(74, 222, 128, 0.02) 100%);
+}
+
+.placement-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.placement-icon {
+    font-size: 1.2rem;
+}
+
+.placement-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+}
+
+.placement-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #4ade80;
+    color: #000;
+}
+
+.placement-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.placement-metric {
+    text-align: center;
+}
+
+.placement-metric .metric-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.placement-metric .metric-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+}

@@ -1314,6 +1314,12 @@ async function loadAdsData() {
         );
         renderPlatformComparison(platformData.data || []);
         
+        // Get placement breakdown (Feed, Stories, Reels, etc.)
+        const placementData = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,ctr,reach,actions&breakdowns=publisher_platform,platform_position&${getDateRange(range)}&limit=50`
+        );
+        renderPlacementBreakdown(placementData.data || []);
+        
         // Get previous period baseline for trend comparison
         // Calculate previous period (same duration, immediately before current period)
         let prevPeriodQuery;
@@ -1841,6 +1847,118 @@ function renderPlatformComparison(platformData) {
                         <div class="metric-label">Cost/Result</div>
                     </div>
                     <div class="platform-metric">
+                        <div class="metric-value">${p.ctr.toFixed(2)}%</div>
+                        <div class="metric-label">CTR</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render placement breakdown (Feed, Stories, Reels, etc.)
+function renderPlacementBreakdown(placementData) {
+    const section = document.getElementById('placementBreakdown');
+    const container = document.getElementById('placementCards');
+    
+    if (!placementData || placementData.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Placement icons and display names
+    const placementConfig = {
+        'feed': { icon: '📰', name: 'Feed' },
+        'story': { icon: '📱', name: 'Stories' },
+        'reels': { icon: '🎬', name: 'Reels' },
+        'right_hand_column': { icon: '📌', name: 'Right Column' },
+        'instant_article': { icon: '📄', name: 'Instant Articles' },
+        'marketplace': { icon: '🛒', name: 'Marketplace' },
+        'video_feeds': { icon: '🎥', name: 'Video Feeds' },
+        'search': { icon: '🔍', name: 'Search' },
+        'instream_video': { icon: '▶️', name: 'In-Stream Video' },
+        'explore': { icon: '🧭', name: 'Explore' },
+        'explore_home': { icon: '🏠', name: 'Explore Home' },
+        'profile_feed': { icon: '👤', name: 'Profile Feed' },
+        'an_classic': { icon: '🌐', name: 'Audience Network' },
+        'rewarded_video': { icon: '🎁', name: 'Rewarded Video' },
+        'messenger_inbox': { icon: '💬', name: 'Messenger Inbox' },
+        'messenger_stories': { icon: '💭', name: 'Messenger Stories' }
+    };
+    
+    // Process placement data
+    const placements = placementData.map(p => {
+        const spend = parseFloat(p.spend || 0);
+        const impressions = parseInt(p.impressions || 0);
+        const clicks = parseInt(p.clicks || 0);
+        const ctr = p.ctr ? parseFloat(p.ctr) : (impressions > 0 ? (clicks / impressions) * 100 : 0);
+        const results = getResults(p.actions);
+        const costPerResult = results > 0 ? spend / results : null;
+        
+        // Create readable placement name
+        const platform = p.publisher_platform || '';
+        const position = p.platform_position || '';
+        const key = position.toLowerCase();
+        
+        return {
+            platform,
+            position,
+            key,
+            spend,
+            impressions,
+            clicks,
+            ctr,
+            results,
+            costPerResult
+        };
+    }).filter(p => p.spend > 0);
+    
+    if (placements.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Sort by cost per result (best first)
+    placements.sort((a, b) => {
+        if (a.costPerResult === null && b.costPerResult === null) return b.spend - a.spend;
+        if (a.costPerResult === null) return 1;
+        if (b.costPerResult === null) return -1;
+        return a.costPerResult - b.costPerResult;
+    });
+    
+    // Best performer is first
+    const bestPlacement = placements[0]?.costPerResult !== null ? 0 : -1;
+    
+    section.classList.remove('hidden');
+    
+    container.innerHTML = placements.map((p, index) => {
+        const config = placementConfig[p.key] || { icon: '📍', name: p.position || 'Unknown' };
+        const platformLabel = p.platform ? `${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)}` : '';
+        const displayName = `${platformLabel} ${config.name}`.trim();
+        const isBest = index === bestPlacement;
+        const cprDisplay = p.costPerResult !== null ? '$' + p.costPerResult.toFixed(2) : '-';
+        
+        return `
+            <div class="placement-card ${isBest ? 'best' : ''}">
+                <div class="placement-header">
+                    <span class="placement-icon">${config.icon}</span>
+                    <span class="placement-name">${displayName}</span>
+                    ${isBest ? '<span class="placement-badge">🏆 Best</span>' : ''}
+                </div>
+                <div class="placement-metrics">
+                    <div class="placement-metric">
+                        <div class="metric-value">$${p.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                        <div class="metric-label">Spend</div>
+                    </div>
+                    <div class="placement-metric">
+                        <div class="metric-value">${p.results}</div>
+                        <div class="metric-label">Results</div>
+                    </div>
+                    <div class="placement-metric">
+                        <div class="metric-value">${cprDisplay}</div>
+                        <div class="metric-label">CPR</div>
+                    </div>
+                    <div class="placement-metric">
                         <div class="metric-value">${p.ctr.toFixed(2)}%</div>
                         <div class="metric-label">CTR</div>
                     </div>
