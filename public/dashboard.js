@@ -1606,60 +1606,60 @@ function analyzeWinner() {
     }
 }
 
-// Generate insight explaining why an ad performed well
+// Generate creative insights for designers
 function generateWinnerInsight(ad, avgCtr, avgWatch, avgCpr) {
     const insights = [];
     const name = ad.ad_name.toLowerCase();
     
-    // Check for content patterns in ad name
+    // Content format patterns
     if (name.includes(' vs ') || name.includes(' vs.') || name.includes('versus')) {
-        insights.push('✅ <strong>Comparison format</strong> — educates viewers by contrasting conditions, builds trust through expertise');
+        insights.push('🎯 <strong>Side-by-side comparison</strong> — use split screen or alternating visuals to contrast two conditions');
     }
     if (name.includes('tour') || name.includes('clinic') || name.includes('office') || name.includes('facility')) {
-        insights.push('✅ <strong>Clinic tour</strong> — reduces fear of the unknown, shows real environment, builds comfort');
+        insights.push('🏥 <strong>Clinic walkthrough</strong> — show clean, modern facility with welcoming atmosphere and real staff');
     }
     if (name.includes('dr.') || name.includes('dr ') || name.includes('doctor')) {
-        insights.push('✅ <strong>Doctor featured</strong> — medical authority builds credibility and patient confidence');
+        insights.push('👨‍⚕️ <strong>Doctor on camera</strong> — physician speaking directly to viewer in professional setting with white coat');
     }
     if (name.includes('before') && name.includes('after')) {
-        insights.push('✅ <strong>Before/after</strong> — visual proof of results, highly persuasive for medical procedures');
+        insights.push('📸 <strong>Transformation visuals</strong> — clear before/after shots with consistent lighting and angles');
     }
     if (name.includes('testimonial') || name.includes('patient') || name.includes('review') || name.includes('story')) {
-        insights.push('✅ <strong>Patient testimonial</strong> — social proof from real patients is highly relatable');
+        insights.push('🗣️ <strong>Real patient story</strong> — authentic testimonial with patient speaking naturally, show their journey');
     }
-    if (name.includes('symptom') || name.includes('sign') || name.includes('pain') || name.includes('leg')) {
-        insights.push('✅ <strong>Symptom-focused</strong> — targets people actively experiencing problems, high intent');
+    if (name.includes('symptom') || name.includes('sign') || name.includes('pain') || name.includes('leg') || name.includes('vein')) {
+        insights.push('🔍 <strong>Symptom close-ups</strong> — zoom in on affected areas, use arrows/circles to highlight issues');
     }
     if (name.includes('treatment') || name.includes('procedure') || name.includes('how')) {
-        insights.push('✅ <strong>Treatment explainer</strong> — demystifies the process, reduces anxiety about procedures');
+        insights.push('⚕️ <strong>Procedure demo</strong> — show treatment in action (non-graphic), emphasize quick & minimally invasive');
+    }
+    if (name.includes('free') || name.includes('consultation') || name.includes('insurance')) {
+        insights.push('💬 <strong>Clear CTA overlay</strong> — bold text overlay with offer, use contrasting colors for visibility');
     }
     
-    // Check metrics vs average
-    if (ad.ctr > avgCtr * 1.3) {
-        const multiplier = (ad.ctr / avgCtr).toFixed(1);
-        insights.push(`📈 <strong>${multiplier}x higher CTR</strong> than average — creative captures attention effectively`);
+    // Video style insights based on watch time
+    if (ad.avg_watch_time && ad.avg_watch_time >= 7) {
+        insights.push('⏱️ <strong>Strong hook</strong> — first 3 seconds grab attention; use movement, question, or surprising visual');
+    }
+    if (ad.avg_watch_time && ad.avg_watch_time >= 5) {
+        insights.push('📝 <strong>Text captions</strong> — add subtitles/captions since most watch without sound');
     }
     
-    if (ad.avg_watch_time && avgWatch > 0 && ad.avg_watch_time > avgWatch * 1.2) {
-        insights.push(`⏱️ <strong>${ad.avg_watch_time}s watch time</strong> — high retention suggests compelling content that holds interest`);
-    }
-    
-    if (ad.cost_per_result !== Infinity && avgCpr > 0 && ad.cost_per_result < avgCpr * 0.8) {
-        const savings = ((1 - ad.cost_per_result / avgCpr) * 100).toFixed(0);
-        insights.push(`💰 <strong>${savings}% lower cost/result</strong> than average — highly efficient conversion`);
-    }
-    
-    // Check if video content
+    // Video format
     if (ad.videoId) {
-        insights.push('🎬 <strong>Video format</strong> — video ads typically outperform static images for medical services');
+        if (name.includes('short') || name.includes('reel') || name.includes('tiktok')) {
+            insights.push('📱 <strong>Vertical short-form</strong> — 9:16 ratio, fast cuts, trending audio style');
+        } else {
+            insights.push('🎬 <strong>Video content</strong> — keep 15-30 sec, front-load key message, end with clear CTA');
+        }
     }
     
-    // If no patterns found, add generic insight based on volume
+    // If no patterns found
     if (insights.length === 0) {
-        insights.push('📊 <strong>High volume performer</strong> — this creative has been scaled successfully with consistent results');
+        insights.push('✨ <strong>Clean, professional look</strong> — consistent branding, high quality imagery, trustworthy medical aesthetic');
     }
     
-    // Limit to 3 insights max for readability
+    // Limit to 3 insights max
     return insights.slice(0, 3).join('<br>');
 }
 
