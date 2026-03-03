@@ -1271,3 +1271,75 @@ table.resizable-table td {
         justify-content: center;
     }
 }
+
+/* Winners Grid */
+.winner-section-title {
+    color: #ffd700;
+    font-size: 1.3rem;
+    margin-bottom: 20px;
+}
+
+.winners-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.winner-container.gold {
+    border-color: #ffd700;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 215, 0, 0.02) 100%);
+}
+
+.winner-container.gold .winner-label {
+    color: #ffd700;
+}
+
+.winner-container.silver {
+    border-color: #c0c0c0;
+    background: linear-gradient(135deg, rgba(192, 192, 192, 0.08) 0%, rgba(192, 192, 192, 0.02) 100%);
+}
+
+.winner-container.silver .winner-label {
+    color: #c0c0c0;
+}
+
+.winner-container.bronze {
+    border-color: #cd7f32;
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.08) 0%, rgba(205, 127, 50, 0.02) 100%);
+}
+
+.winner-container.bronze .winner-label {
+    color: #cd7f32;
+}
+
+.winner-container {
+    border: 2px solid;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.winner-container .winner-creative {
+    width: 90px;
+    height: 90px;
+}
+
+.winner-container .winner-metrics {
+    gap: 20px;
+}
+
+.winner-container .winner-metric .metric-value {
+    font-size: 1.2rem;
+}
+
+@media (max-width: 400px) {
+    .winner-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .winner-container .winner-metrics {
+        justify-content: center;
+    }
+}

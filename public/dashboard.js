@@ -1537,7 +1537,7 @@ function renderAdsTable() {
     analyzeWinner();
 }
 
-// Display top performing ad by results
+// Display top 3 performing ads by results
 function analyzeWinner() {
     const section = document.getElementById('winnerAnalysis');
     if (!adsRawData || adsRawData.length === 0) {
@@ -1545,39 +1545,50 @@ function analyzeWinner() {
         return;
     }
     
-    // Find ad with most results
-    const adsWithResults = adsRawData.filter(ad => ad.results > 0);
+    // Find ads with results, sorted by most results
+    const adsWithResults = adsRawData.filter(ad => ad.results > 0).sort((a, b) => b.results - a.results);
     
     if (adsWithResults.length === 0) {
         section.classList.add('hidden');
         return;
     }
     
-    const winner = adsWithResults.sort((a, b) => b.results - a.results)[0];
-    
     section.classList.remove('hidden');
     
-    // Set creative thumbnail with video link
-    const creativeEl = document.getElementById('winnerCreative');
-    if (winner.thumbnail && winner.videoId) {
-        creativeEl.innerHTML = `
-            <a href="https://www.facebook.com/watch/?v=${winner.videoId}" target="_blank" title="Watch video">
-                <img src="${winner.thumbnail}" alt="${winner.ad_name}">
-            </a>
-        `;
-    } else if (winner.thumbnail) {
-        creativeEl.innerHTML = `<img src="${winner.thumbnail}" alt="${winner.ad_name}">`;
-    } else {
-        creativeEl.innerHTML = `<div class="no-thumbnail">🖼️</div>`;
+    // Populate top 3 winners
+    for (let i = 0; i < 3; i++) {
+        const winner = adsWithResults[i];
+        const num = i + 1;
+        
+        if (!winner) {
+            // Hide this winner slot if not enough ads
+            const container = document.querySelector(`.winner-container:nth-child(${num})`);
+            if (container) container.style.display = 'none';
+            continue;
+        }
+        
+        // Set creative thumbnail with video link
+        const creativeEl = document.getElementById(`winner${num}Creative`);
+        if (winner.thumbnail && winner.videoId) {
+            creativeEl.innerHTML = `
+                <a href="https://www.facebook.com/watch/?v=${winner.videoId}" target="_blank" title="Watch video">
+                    <img src="${winner.thumbnail}" alt="${winner.ad_name}">
+                </a>
+            `;
+        } else if (winner.thumbnail) {
+            creativeEl.innerHTML = `<img src="${winner.thumbnail}" alt="${winner.ad_name}">`;
+        } else {
+            creativeEl.innerHTML = `<div class="no-thumbnail">🖼️</div>`;
+        }
+        
+        // Set winner info
+        document.getElementById(`winner${num}Name`).textContent = winner.ad_name;
+        document.getElementById(`winner${num}Results`).textContent = winner.results.toLocaleString();
+        document.getElementById(`winner${num}CPR`).textContent = winner.cost_per_result !== Infinity 
+            ? '$' + winner.cost_per_result.toFixed(2) 
+            : '-';
+        document.getElementById(`winner${num}Spend`).textContent = '$' + winner.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
-    
-    // Set winner info
-    document.getElementById('winnerName').textContent = winner.ad_name;
-    document.getElementById('winnerResults').textContent = winner.results.toLocaleString();
-    document.getElementById('winnerCPR').textContent = winner.cost_per_result !== Infinity 
-        ? '$' + winner.cost_per_result.toFixed(2) 
-        : '-';
-    document.getElementById('winnerSpend').textContent = '$' + winner.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 // =====================================================
