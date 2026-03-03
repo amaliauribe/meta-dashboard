@@ -1343,3 +1343,31 @@ table.resizable-table td {
         justify-content: center;
     }
 }
+
+/* Winner Insight */
+.winner-insight {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.5;
+    border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.winner-container.gold .winner-insight {
+    border-left-color: #ffd700;
+}
+
+.winner-container.silver .winner-insight {
+    border-left-color: #c0c0c0;
+}
+
+.winner-container.bronze .winner-insight {
+    border-left-color: #cd7f32;
+}
+
+.winner-insight strong {
+    color: #4ade80;
+}

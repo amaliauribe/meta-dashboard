@@ -1555,6 +1555,17 @@ function analyzeWinner() {
     
     section.classList.remove('hidden');
     
+    // Calculate averages for comparison
+    const avgCtr = adsRawData.reduce((sum, ad) => sum + ad.ctr, 0) / adsRawData.length;
+    const adsWithWatch = adsRawData.filter(ad => ad.avg_watch_time !== null && ad.avg_watch_time > 0);
+    const avgWatch = adsWithWatch.length > 0 
+        ? adsWithWatch.reduce((sum, ad) => sum + ad.avg_watch_time, 0) / adsWithWatch.length 
+        : 0;
+    const adsWithCpr = adsRawData.filter(ad => ad.results > 0 && ad.cost_per_result !== Infinity);
+    const avgCpr = adsWithCpr.length > 0
+        ? adsWithCpr.reduce((sum, ad) => sum + ad.cost_per_result, 0) / adsWithCpr.length
+        : 0;
+    
     // Populate top 3 winners
     for (let i = 0; i < 3; i++) {
         const winner = adsWithResults[i];
@@ -1588,7 +1599,68 @@ function analyzeWinner() {
             ? '$' + winner.cost_per_result.toFixed(2) 
             : '-';
         document.getElementById(`winner${num}Spend`).textContent = '$' + winner.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        
+        // Generate insight
+        const insight = generateWinnerInsight(winner, avgCtr, avgWatch, avgCpr);
+        document.getElementById(`winner${num}Insight`).innerHTML = insight;
     }
+}
+
+// Generate insight explaining why an ad performed well
+function generateWinnerInsight(ad, avgCtr, avgWatch, avgCpr) {
+    const insights = [];
+    const name = ad.ad_name.toLowerCase();
+    
+    // Check for content patterns in ad name
+    if (name.includes(' vs ') || name.includes(' vs.') || name.includes('versus')) {
+        insights.push('✅ <strong>Comparison format</strong> — educates viewers by contrasting conditions, builds trust through expertise');
+    }
+    if (name.includes('tour') || name.includes('clinic') || name.includes('office') || name.includes('facility')) {
+        insights.push('✅ <strong>Clinic tour</strong> — reduces fear of the unknown, shows real environment, builds comfort');
+    }
+    if (name.includes('dr.') || name.includes('dr ') || name.includes('doctor')) {
+        insights.push('✅ <strong>Doctor featured</strong> — medical authority builds credibility and patient confidence');
+    }
+    if (name.includes('before') && name.includes('after')) {
+        insights.push('✅ <strong>Before/after</strong> — visual proof of results, highly persuasive for medical procedures');
+    }
+    if (name.includes('testimonial') || name.includes('patient') || name.includes('review') || name.includes('story')) {
+        insights.push('✅ <strong>Patient testimonial</strong> — social proof from real patients is highly relatable');
+    }
+    if (name.includes('symptom') || name.includes('sign') || name.includes('pain') || name.includes('leg')) {
+        insights.push('✅ <strong>Symptom-focused</strong> — targets people actively experiencing problems, high intent');
+    }
+    if (name.includes('treatment') || name.includes('procedure') || name.includes('how')) {
+        insights.push('✅ <strong>Treatment explainer</strong> — demystifies the process, reduces anxiety about procedures');
+    }
+    
+    // Check metrics vs average
+    if (ad.ctr > avgCtr * 1.3) {
+        const multiplier = (ad.ctr / avgCtr).toFixed(1);
+        insights.push(`📈 <strong>${multiplier}x higher CTR</strong> than average — creative captures attention effectively`);
+    }
+    
+    if (ad.avg_watch_time && avgWatch > 0 && ad.avg_watch_time > avgWatch * 1.2) {
+        insights.push(`⏱️ <strong>${ad.avg_watch_time}s watch time</strong> — high retention suggests compelling content that holds interest`);
+    }
+    
+    if (ad.cost_per_result !== Infinity && avgCpr > 0 && ad.cost_per_result < avgCpr * 0.8) {
+        const savings = ((1 - ad.cost_per_result / avgCpr) * 100).toFixed(0);
+        insights.push(`💰 <strong>${savings}% lower cost/result</strong> than average — highly efficient conversion`);
+    }
+    
+    // Check if video content
+    if (ad.videoId) {
+        insights.push('🎬 <strong>Video format</strong> — video ads typically outperform static images for medical services');
+    }
+    
+    // If no patterns found, add generic insight based on volume
+    if (insights.length === 0) {
+        insights.push('📊 <strong>High volume performer</strong> — this creative has been scaled successfully with consistent results');
+    }
+    
+    // Limit to 3 insights max for readability
+    return insights.slice(0, 3).join('<br>');
 }
 
 // =====================================================
