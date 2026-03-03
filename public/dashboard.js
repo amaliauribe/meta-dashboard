@@ -1300,7 +1300,7 @@ async function loadAdsData() {
     try {
         // Get ad-level insights for current period
         const insightsData = await apiCall(
-            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions,video_avg_time_watched_actions&${getDateRange(range)}&limit=100`
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,reach,frequency,actions,video_avg_time_watched_actions&${getDateRange(range)}&limit=100`
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
@@ -1398,6 +1398,8 @@ async function loadAdsData() {
             const impressions = parseInt(ad.impressions || 0);
             const clicks = parseInt(ad.clicks || 0);
             const ctr = ad.ctr ? parseFloat(ad.ctr) : 0;
+            const reach = parseInt(ad.reach || 0);
+            const frequency = ad.frequency ? parseFloat(ad.frequency) : 0;
             const results = getResults(ad.actions);
             const costPerResult = results > 0 ? spend / results : Infinity;
             
@@ -1425,6 +1427,8 @@ async function loadAdsData() {
                 impressions,
                 clicks,
                 ctr,
+                reach,
+                frequency,
                 results,
                 cost_per_result: costPerResult,
                 cpr_trend: cprTrend,
@@ -1591,6 +1595,9 @@ function renderAdsTable() {
     
     // Analyze winners after rendering
     analyzeWinner();
+    
+    // Check for creative fatigue
+    analyzeFatigue();
 }
 
 // Display top 3 performing ads by results
@@ -1717,6 +1724,66 @@ function generateWinnerInsight(ad, avgCtr, avgWatch, avgCpr) {
     
     // Limit to 3 insights max
     return insights.slice(0, 3).join('<br>');
+}
+
+// Analyze and display fatigued creatives
+function analyzeFatigue() {
+    const section = document.getElementById('fatigueAlert');
+    const list = document.getElementById('fatigueList');
+    
+    if (!adsRawData || adsRawData.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Find ads with frequency >= 4
+    const fatiguedAds = adsRawData
+        .filter(ad => ad.frequency >= 4)
+        .sort((a, b) => b.frequency - a.frequency);
+    
+    if (fatiguedAds.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    section.classList.remove('hidden');
+    
+    list.innerHTML = fatiguedAds.map(ad => {
+        // Determine severity and recommendation
+        let severity, recommendation;
+        if (ad.frequency >= 7) {
+            severity = 'critical';
+            recommendation = '🚨 <strong>Critical:</strong> Pause immediately. Audience has seen this ad too many times.';
+        } else if (ad.frequency >= 5) {
+            severity = 'high';
+            recommendation = '⚠️ <strong>High fatigue:</strong> Consider pausing soon. Create fresh creative with similar messaging.';
+        } else {
+            severity = 'moderate';
+            recommendation = '💡 <strong>Monitor closely:</strong> Approaching fatigue threshold. Prepare replacement creative.';
+        }
+        
+        // Build thumbnail
+        let thumbnailHtml = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🖼️</div>';
+        if (ad.thumbnail && ad.videoId) {
+            thumbnailHtml = `<a href="https://www.facebook.com/watch/?v=${ad.videoId}" target="_blank"><img src="${ad.thumbnail}" alt="${ad.ad_name}"></a>`;
+        } else if (ad.thumbnail) {
+            thumbnailHtml = `<img src="${ad.thumbnail}" alt="${ad.ad_name}">`;
+        }
+        
+        return `
+            <div class="fatigue-item">
+                <div class="fatigue-creative">${thumbnailHtml}</div>
+                <div class="fatigue-info">
+                    <div class="fatigue-name">${ad.ad_name}</div>
+                    <div class="fatigue-stats">
+                        <span class="frequency-badge">${ad.frequency.toFixed(1)}x frequency</span>
+                        ${ad.reach.toLocaleString()} reach • ${ad.impressions.toLocaleString()} impressions
+                    </div>
+                </div>
+                <div class="fatigue-recommendation">${recommendation}</div>
+            </div>
+        `;
+    }).join('');
 }
 
 // =====================================================

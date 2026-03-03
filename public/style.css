@@ -1371,3 +1371,115 @@ table.resizable-table td {
 .winner-insight strong {
     color: #4ade80;
 }
+
+/* Fatigue Alert Section */
+.fatigue-section {
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 2px solid rgba(239, 68, 68, 0.4);
+}
+
+.fatigue-title {
+    color: #ef4444;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+.fatigue-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+
+.fatigue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fatigue-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 10px;
+    padding: 12px 16px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.fatigue-item .fatigue-creative {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.fatigue-item .fatigue-creative img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fatigue-item .fatigue-creative a {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.fatigue-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.fatigue-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fatigue-stats {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.fatigue-stats .frequency-badge {
+    display: inline-block;
+    background: #ef4444;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-right: 8px;
+}
+
+.fatigue-recommendation {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: #fbbf24;
+    max-width: 250px;
+}
+
+.fatigue-recommendation strong {
+    color: #ef4444;
+}
+
+@media (max-width: 600px) {
+    .fatigue-item {
+        flex-direction: column;
+        text-align: center;
+    }
+    .fatigue-recommendation {
+        max-width: 100%;
+    }
+}
