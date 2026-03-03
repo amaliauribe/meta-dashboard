@@ -1239,16 +1239,16 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="12" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="loading">Loading ads...</td></tr>';
 
     try {
         // Get ad-level insights for current period
         const insightsData = await apiCall(
-            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions&${getDateRange(range)}&limit=100`
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions,video_avg_time_watched_actions&${getDateRange(range)}&limit=100`
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No ad data for this period</td></tr>';
             return;
         }
         
@@ -1354,6 +1354,12 @@ async function loadAdsData() {
             
             const creative = creativeData[ad.ad_id] || {};
             
+            // Extract video average watch time (in seconds)
+            let avgWatchTime = null;
+            if (ad.video_avg_time_watched_actions && ad.video_avg_time_watched_actions.length > 0) {
+                avgWatchTime = parseInt(ad.video_avg_time_watched_actions[0].value) || null;
+            }
+            
             return {
                 ad_id: ad.ad_id,
                 ad_name: ad.ad_name,
@@ -1366,6 +1372,7 @@ async function loadAdsData() {
                 results,
                 cost_per_result: costPerResult,
                 cpr_trend: cprTrend,
+                avg_watch_time: avgWatchTime,
                 thumbnail: creative.thumbnail,
                 videoId: creative.videoId
             };
@@ -1383,7 +1390,7 @@ async function loadAdsData() {
         updateLastUpdated();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="12" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -1505,6 +1512,9 @@ function renderAdsTable() {
             trendHtml = '<span class="trend-neutral">→ 0%</span>';
         }
 
+        // Format watch time
+        const watchTimeDisplay = ad.avg_watch_time !== null ? `${ad.avg_watch_time}s` : '-';
+
         return `
             <tr>
                 <td>${thumbnailHtml}</td>
@@ -1517,6 +1527,7 @@ function renderAdsTable() {
                 <td>${ad.ctr.toFixed(2)}%</td>
                 <td>${ad.results}</td>
                 <td>${costPerResultDisplay}</td>
+                <td>${watchTimeDisplay}</td>
                 <td>${trendHtml}</td>
             </tr>
         `;
