@@ -1498,3 +1498,106 @@ table.resizable-table td {
     color: #ef4444;
     font-weight: 700;
 }
+
+/* Platform Comparison Section */
+.platform-section {
+    background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.platform-title {
+    color: #a5b4fc;
+    font-size: 1.2rem;
+    margin-bottom: 16px;
+}
+
+.platform-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.platform-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 16px;
+    border: 2px solid transparent;
+}
+
+.platform-card.facebook {
+    border-color: #1877f2;
+    background: linear-gradient(135deg, rgba(24, 119, 242, 0.1) 0%, rgba(24, 119, 242, 0.02) 100%);
+}
+
+.platform-card.instagram {
+    border-color: #e4405f;
+    background: linear-gradient(135deg, rgba(228, 64, 95, 0.1) 0%, rgba(228, 64, 95, 0.02) 100%);
+}
+
+.platform-card.audience_network {
+    border-color: #898f9c;
+    background: linear-gradient(135deg, rgba(137, 143, 156, 0.1) 0%, rgba(137, 143, 156, 0.02) 100%);
+}
+
+.platform-card.messenger {
+    border-color: #0084ff;
+    background: linear-gradient(135deg, rgba(0, 132, 255, 0.1) 0%, rgba(0, 132, 255, 0.02) 100%);
+}
+
+.platform-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.platform-icon {
+    font-size: 1.5rem;
+}
+
+.platform-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.platform-badge {
+    margin-left: auto;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.platform-badge.winner {
+    background: #4ade80;
+    color: #000;
+}
+
+.platform-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.platform-metric {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.platform-metric .metric-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.platform-metric .metric-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 2px;
+}

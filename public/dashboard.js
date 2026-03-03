@@ -1308,6 +1308,12 @@ async function loadAdsData() {
             return;
         }
         
+        // Get platform breakdown (Facebook vs Instagram)
+        const platformData = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,ctr,reach,actions&breakdowns=publisher_platform&${getDateRange(range)}&limit=10`
+        );
+        renderPlatformComparison(platformData.data || []);
+        
         // Get previous period baseline for trend comparison
         // Calculate previous period (same duration, immediately before current period)
         let prevPeriodQuery;
@@ -1749,6 +1755,97 @@ function generateWinnerInsight(ad, avgCtr, avgWatch, avgCpr) {
     
     // Limit to 3 insights max
     return insights.slice(0, 3).join('<br>');
+}
+
+// Render platform comparison (Facebook vs Instagram)
+function renderPlatformComparison(platformData) {
+    const section = document.getElementById('platformComparison');
+    const container = document.getElementById('platformCards');
+    
+    if (!platformData || platformData.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    section.classList.remove('hidden');
+    
+    // Platform icons and names
+    const platformConfig = {
+        'facebook': { icon: '📘', name: 'Facebook', class: 'facebook' },
+        'instagram': { icon: '📸', name: 'Instagram', class: 'instagram' },
+        'audience_network': { icon: '🌐', name: 'Audience Network', class: 'audience_network' },
+        'messenger': { icon: '💬', name: 'Messenger', class: 'messenger' }
+    };
+    
+    // Process platform data
+    const platforms = platformData.map(p => {
+        const spend = parseFloat(p.spend || 0);
+        const impressions = parseInt(p.impressions || 0);
+        const clicks = parseInt(p.clicks || 0);
+        const reach = parseInt(p.reach || 0);
+        const ctr = p.ctr ? parseFloat(p.ctr) : (impressions > 0 ? (clicks / impressions) * 100 : 0);
+        const results = getResults(p.actions);
+        const costPerResult = results > 0 ? spend / results : null;
+        
+        return {
+            platform: p.publisher_platform,
+            spend,
+            impressions,
+            clicks,
+            reach,
+            ctr,
+            results,
+            costPerResult
+        };
+    }).filter(p => p.spend > 0); // Only show platforms with spend
+    
+    if (platforms.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Find best performer by cost per result (lower is better)
+    const platformsWithResults = platforms.filter(p => p.costPerResult !== null);
+    let bestPlatform = null;
+    if (platformsWithResults.length > 0) {
+        bestPlatform = platformsWithResults.reduce((best, p) => 
+            p.costPerResult < best.costPerResult ? p : best
+        ).platform;
+    }
+    
+    container.innerHTML = platforms.map(p => {
+        const config = platformConfig[p.platform] || { icon: '📱', name: p.platform, class: '' };
+        const isWinner = p.platform === bestPlatform;
+        const cprDisplay = p.costPerResult !== null ? '$' + p.costPerResult.toFixed(2) : '-';
+        
+        return `
+            <div class="platform-card ${config.class}">
+                <div class="platform-header">
+                    <span class="platform-icon">${config.icon}</span>
+                    <span class="platform-name">${config.name}</span>
+                    ${isWinner ? '<span class="platform-badge winner">🏆 Best CPR</span>' : ''}
+                </div>
+                <div class="platform-metrics">
+                    <div class="platform-metric">
+                        <div class="metric-value">$${p.spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                        <div class="metric-label">Spend</div>
+                    </div>
+                    <div class="platform-metric">
+                        <div class="metric-value">${p.results.toLocaleString()}</div>
+                        <div class="metric-label">Results</div>
+                    </div>
+                    <div class="platform-metric">
+                        <div class="metric-value">${cprDisplay}</div>
+                        <div class="metric-label">Cost/Result</div>
+                    </div>
+                    <div class="platform-metric">
+                        <div class="metric-value">${p.ctr.toFixed(2)}%</div>
+                        <div class="metric-label">CTR</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // Analyze and display fatigued creatives
