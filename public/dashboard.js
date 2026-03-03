@@ -117,6 +117,8 @@ let filterCampaign = '';
 let filterAdset = '';
 let filterAd = '';
 let filterPlatform = ''; // For platform → placement filtering
+let filterPlacement = ''; // For placement → creative filtering
+let filterPlacementPlatform = ''; // Store the platform of selected placement
 
 const dateRanges = {
     'today': { preset: 'today', days: 1 },
@@ -2014,14 +2016,16 @@ function renderPlacementCards() {
         const platformLabel = p.platform ? `${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)}` : '';
         const displayName = `${platformLabel} ${config.name}`.trim();
         const isBest = index === bestPlacement;
+        const isSelected = filterPlacement === p.position && filterPlacementPlatform === p.platform;
         const cprDisplay = p.costPerResult !== null ? '$' + p.costPerResult.toFixed(2) : '-';
         
         return `
-            <div class="placement-card ${isBest ? 'best' : ''}">
+            <div class="placement-card ${isBest ? 'best' : ''} ${isSelected ? 'selected' : ''}" onclick="selectPlacement('${p.platform}', '${p.position}')" style="cursor: pointer;">
                 <div class="placement-header">
                     <span class="placement-icon">${config.icon}</span>
                     <span class="placement-name">${displayName}</span>
-                    ${isBest ? '<span class="placement-badge">🏆 Best</span>' : ''}
+                    ${isSelected ? '<span class="placement-badge selected-badge">✓ Filtered</span>' : ''}
+                    ${isBest && !isSelected ? '<span class="placement-badge">🏆 Best</span>' : ''}
                 </div>
                 <div class="placement-metrics">
                     <div class="placement-metric">
@@ -2042,6 +2046,140 @@ function renderPlacementCards() {
                     </div>
                 </div>
             </div>
+        `;
+    }).join('');
+}
+
+// Select placement to filter ads table
+async function selectPlacement(platform, position) {
+    if (filterPlacement === position && filterPlacementPlatform === platform) {
+        // Toggle off
+        filterPlacement = '';
+        filterPlacementPlatform = '';
+        renderPlacementCards();
+        renderAdsTable();
+        return;
+    }
+    
+    filterPlacement = position;
+    filterPlacementPlatform = platform;
+    renderPlacementCards();
+    
+    // Fetch ad-level data for this specific placement
+    const tbody = document.getElementById('adsBody');
+    tbody.innerHTML = '<tr><td colspan="14" class="loading">Loading ads for this placement...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        const placementAdsData = await apiCall(
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,reach,frequency,actions&breakdowns=publisher_platform,platform_position&${getDateRange(range)}&limit=200`
+        );
+        
+        if (!placementAdsData.data) {
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">No data for this placement</td></tr>';
+            return;
+        }
+        
+        // Filter and aggregate by ad for the selected placement
+        const filteredData = placementAdsData.data.filter(row => 
+            row.publisher_platform === platform && row.platform_position === position
+        );
+        
+        // Create temporary filtered ads data
+        const placementAds = filteredData.map(ad => {
+            const spend = parseFloat(ad.spend || 0);
+            const impressions = parseInt(ad.impressions || 0);
+            const clicks = parseInt(ad.clicks || 0);
+            const ctr = ad.ctr ? parseFloat(ad.ctr) : 0;
+            const reach = parseInt(ad.reach || 0);
+            const frequency = ad.frequency ? parseFloat(ad.frequency) : 0;
+            const results = getResults(ad.actions);
+            const costPerResult = results > 0 ? spend / results : Infinity;
+            
+            // Find thumbnail from original data
+            const originalAd = adsRawData.find(a => a.ad_id === ad.ad_id);
+            
+            return {
+                ad_id: ad.ad_id,
+                ad_name: ad.ad_name,
+                adset_name: ad.adset_name || '-',
+                campaign_name: ad.campaign_name,
+                spend,
+                impressions,
+                clicks,
+                ctr,
+                reach,
+                frequency,
+                results,
+                cost_per_result: costPerResult,
+                cpr_trend: null,
+                avg_watch_time: null,
+                thumbnail: originalAd?.thumbnail,
+                videoId: originalAd?.videoId
+            };
+        });
+        
+        // Render filtered table
+        renderFilteredAdsTable(placementAds);
+    } catch (e) {
+        console.error('Error fetching placement ads:', e);
+        tbody.innerHTML = `<tr><td colspan="14" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+// Render filtered ads table (for placement filter)
+function renderFilteredAdsTable(ads) {
+    const tbody = document.getElementById('adsBody');
+    
+    if (ads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="14" class="loading">No ads for this placement</td></tr>';
+        return;
+    }
+    
+    // Sort by results desc
+    ads.sort((a, b) => b.results - a.results);
+    
+    tbody.innerHTML = ads.map(ad => {
+        let thumbnailHtml;
+        if (ad.thumbnail && ad.videoId) {
+            thumbnailHtml = `
+                <a href="https://www.facebook.com/watch/?v=${ad.videoId}" target="_blank" class="ad-thumbnail-link" title="Watch video">
+                    <img src="${ad.thumbnail}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
+                </a>
+            `;
+        } else if (ad.thumbnail) {
+            thumbnailHtml = `<img src="${ad.thumbnail}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
+        } else {
+            thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
+        }
+
+        const costPerResultDisplay = ad.cost_per_result !== Infinity ? '$' + ad.cost_per_result.toFixed(2) : '-';
+        
+        let frequencyHtml = ad.frequency > 0 ? ad.frequency.toFixed(1) : '-';
+        if (ad.frequency >= 7) {
+            frequencyHtml = `<span class="freq-critical">${ad.frequency.toFixed(1)}</span>`;
+        } else if (ad.frequency >= 4) {
+            frequencyHtml = `<span class="freq-warning">${ad.frequency.toFixed(1)}</span>`;
+        } else if (ad.frequency > 0) {
+            frequencyHtml = `<span class="freq-ok">${ad.frequency.toFixed(1)}</span>`;
+        }
+
+        return `
+            <tr>
+                <td>${thumbnailHtml}</td>
+                <td>${ad.ad_name}</td>
+                <td>${ad.adset_name}</td>
+                <td>${ad.campaign_name}</td>
+                <td>$${ad.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td>${ad.impressions.toLocaleString()}</td>
+                <td>${ad.clicks.toLocaleString()}</td>
+                <td>${ad.ctr.toFixed(2)}%</td>
+                <td>${ad.results}</td>
+                <td>${costPerResultDisplay}</td>
+                <td>${frequencyHtml}</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
         `;
     }).join('');
 }
