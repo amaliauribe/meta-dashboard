@@ -1483,3 +1483,18 @@ table.resizable-table td {
         max-width: 100%;
     }
 }
+
+/* Frequency color coding */
+.freq-ok {
+    color: #4ade80;
+}
+
+.freq-warning {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.freq-critical {
+    color: #ef4444;
+    font-weight: 700;
+}

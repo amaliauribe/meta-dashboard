@@ -1575,6 +1575,18 @@ function renderAdsTable() {
         // Format watch time
         const watchTimeDisplay = ad.avg_watch_time !== null ? `${ad.avg_watch_time}s` : '-';
 
+        // Format frequency with color coding
+        let frequencyHtml;
+        if (ad.frequency >= 7) {
+            frequencyHtml = `<span class="freq-critical">${ad.frequency.toFixed(1)}</span>`;
+        } else if (ad.frequency >= 4) {
+            frequencyHtml = `<span class="freq-warning">${ad.frequency.toFixed(1)}</span>`;
+        } else if (ad.frequency > 0) {
+            frequencyHtml = `<span class="freq-ok">${ad.frequency.toFixed(1)}</span>`;
+        } else {
+            frequencyHtml = '-';
+        }
+
         return `
             <tr>
                 <td>${thumbnailHtml}</td>
@@ -1587,6 +1599,7 @@ function renderAdsTable() {
                 <td>${ad.ctr.toFixed(2)}%</td>
                 <td>${ad.results}</td>
                 <td>${costPerResultDisplay}</td>
+                <td>${frequencyHtml}</td>
                 <td>${watchTimeDisplay}</td>
                 <td>${trendHtml}</td>
             </tr>
