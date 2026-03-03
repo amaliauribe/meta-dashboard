@@ -1862,7 +1862,7 @@ function renderPlatformCards() {
             results,
             costPerResult
         };
-    }).filter(p => p.spend > 0); // Only show platforms with spend
+    }).filter(p => p.spend >= 1); // Only show platforms with at least $1 spend
     
     if (platforms.length === 0) {
         section.classList.add('hidden');
@@ -1989,7 +1989,7 @@ function renderPlacementCards() {
             results,
             costPerResult
         };
-    }).filter(p => p.spend > 0);
+    }).filter(p => p.spend >= 1); // Only show placements with at least $1 spend
     
     if (placements.length === 0) {
         section.classList.add('hidden');
