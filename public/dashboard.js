@@ -1804,14 +1804,16 @@ function renderPlatformComparison(platformData) {
         return;
     }
     
-    // Find best performer by cost per result (lower is better)
-    const platformsWithResults = platforms.filter(p => p.costPerResult !== null);
-    let bestPlatform = null;
-    if (platformsWithResults.length > 0) {
-        bestPlatform = platformsWithResults.reduce((best, p) => 
-            p.costPerResult < best.costPerResult ? p : best
-        ).platform;
-    }
+    // Sort by cost per result (best first), platforms without results go last
+    platforms.sort((a, b) => {
+        if (a.costPerResult === null && b.costPerResult === null) return b.spend - a.spend;
+        if (a.costPerResult === null) return 1;
+        if (b.costPerResult === null) return -1;
+        return a.costPerResult - b.costPerResult;
+    });
+    
+    // Best performer is now first
+    const bestPlatform = platforms[0]?.costPerResult !== null ? platforms[0].platform : null;
     
     container.innerHTML = platforms.map(p => {
         const config = platformConfig[p.platform] || { icon: '📱', name: p.platform, class: '' };
