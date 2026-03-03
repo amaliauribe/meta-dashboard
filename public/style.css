@@ -1074,3 +1074,101 @@ table.resizable-table td {
 .filter-btn#applyCustomDate:hover {
     background: #166fe5;
 }
+
+/* Winner Analysis Section */
+.winner-analysis-section {
+    background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.winner-analysis-section h2 {
+    color: #ffd700;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+}
+
+.winner-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.winner-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 16px;
+    border: 2px solid transparent;
+}
+
+.winner-card.gold {
+    border-color: #ffd700;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.02) 100%);
+}
+
+.winner-card.silver {
+    border-color: #c0c0c0;
+    background: linear-gradient(135deg, rgba(192, 192, 192, 0.1) 0%, rgba(192, 192, 192, 0.02) 100%);
+}
+
+.winner-card.bronze {
+    border-color: #cd7f32;
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.1) 0%, rgba(205, 127, 50, 0.02) 100%);
+}
+
+.winner-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+.winner-card.gold .winner-badge { color: #ffd700; }
+.winner-card.silver .winner-badge { color: #c0c0c0; }
+.winner-card.bronze .winner-badge { color: #cd7f32; }
+
+.winner-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 12px;
+    line-height: 1.3;
+}
+
+.winner-stats {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.6;
+}
+
+.winner-stats .stat-highlight {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.winner-insights {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+}
+
+.winner-insights h3 {
+    color: #60a5fa;
+    font-size: 1rem;
+    margin-bottom: 12px;
+}
+
+.winner-insights ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.winner-insights li {
+    margin-bottom: 6px;
+}
