@@ -1621,8 +1621,20 @@ function analyzeWinner() {
         return;
     }
     
+    // Apply current filters to get filtered data
+    let filteredData = adsRawData;
+    if (filterCampaign) {
+        filteredData = filteredData.filter(ad => ad.campaign_name === filterCampaign);
+    }
+    if (filterAdset) {
+        filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
+    }
+    if (filterAd) {
+        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    }
+    
     // Find ads with results, sorted by most results
-    const adsWithResults = adsRawData.filter(ad => ad.results > 0).sort((a, b) => b.results - a.results);
+    const adsWithResults = filteredData.filter(ad => ad.results > 0).sort((a, b) => b.results - a.results);
     
     if (adsWithResults.length === 0) {
         section.classList.add('hidden');
@@ -1631,13 +1643,13 @@ function analyzeWinner() {
     
     section.classList.remove('hidden');
     
-    // Calculate averages for comparison
-    const avgCtr = adsRawData.reduce((sum, ad) => sum + ad.ctr, 0) / adsRawData.length;
-    const adsWithWatch = adsRawData.filter(ad => ad.avg_watch_time !== null && ad.avg_watch_time > 0);
+    // Calculate averages for comparison (using filtered data)
+    const avgCtr = filteredData.length > 0 ? filteredData.reduce((sum, ad) => sum + ad.ctr, 0) / filteredData.length : 0;
+    const adsWithWatch = filteredData.filter(ad => ad.avg_watch_time !== null && ad.avg_watch_time > 0);
     const avgWatch = adsWithWatch.length > 0 
         ? adsWithWatch.reduce((sum, ad) => sum + ad.avg_watch_time, 0) / adsWithWatch.length 
         : 0;
-    const adsWithCpr = adsRawData.filter(ad => ad.results > 0 && ad.cost_per_result !== Infinity);
+    const adsWithCpr = filteredData.filter(ad => ad.results > 0 && ad.cost_per_result !== Infinity);
     const avgCpr = adsWithCpr.length > 0
         ? adsWithCpr.reduce((sum, ad) => sum + ad.cost_per_result, 0) / adsWithCpr.length
         : 0;
@@ -1749,8 +1761,20 @@ function analyzeFatigue() {
         return;
     }
     
+    // Apply current filters
+    let filteredData = adsRawData;
+    if (filterCampaign) {
+        filteredData = filteredData.filter(ad => ad.campaign_name === filterCampaign);
+    }
+    if (filterAdset) {
+        filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
+    }
+    if (filterAd) {
+        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    }
+    
     // Find ads with frequency >= 4
-    const fatiguedAds = adsRawData
+    const fatiguedAds = filteredData
         .filter(ad => ad.frequency >= 4)
         .sort((a, b) => b.frequency - a.frequency);
     
