@@ -809,12 +809,14 @@ function initializeDashboard() {
         updateAdsetDropdown();
         updateAdDropdown();
         renderAdsTable();
+        refreshPlatformPlacementData();
     });
     
     document.getElementById('filterAdset').addEventListener('change', (e) => {
         filterAdset = e.target.value;
         updateAdDropdown();
         renderAdsTable();
+        refreshPlatformPlacementData();
     });
     
     document.getElementById('filterAd').addEventListener('change', (e) => {
@@ -832,6 +834,7 @@ function initializeDashboard() {
         updateAdsetDropdown();
         updateAdDropdown();
         renderAdsTable();
+        refreshPlatformPlacementData();
     });
     
     // Load summary by default
@@ -1300,7 +1303,7 @@ async function loadAdsData() {
     try {
         // Get ad-level insights for current period
         const insightsData = await apiCall(
-            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,reach,frequency,actions,video_avg_time_watched_actions&${getDateRange(range)}&limit=100`
+            `${ACCOUNT_ID}/insights?level=ad&fields=ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,reach,frequency,actions,video_avg_time_watched_actions&${getDateRange(range)}&limit=100`
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
@@ -1433,7 +1436,9 @@ async function loadAdsData() {
             return {
                 ad_id: ad.ad_id,
                 ad_name: ad.ad_name,
+                adset_id: ad.adset_id,
                 adset_name: ad.adset_name || '-',
+                campaign_id: ad.campaign_id,
                 campaign_name: ad.campaign_name,
                 spend,
                 impressions,
@@ -1761,6 +1766,37 @@ function generateWinnerInsight(ad, avgCtr, avgWatch, avgCpr) {
     
     // Limit to 3 insights max
     return insights.slice(0, 3).join('<br>');
+}
+
+// Refresh platform and placement data based on current filters
+async function refreshPlatformPlacementData() {
+    const range = dateRanges[currentRange];
+    
+    // Build filter parameter based on current campaign/adset selection
+    let filterParam = '';
+    if (filterCampaign) {
+        // Find campaign_id from selected campaign name
+        const campaignAd = adsRawData.find(ad => ad.campaign_name === filterCampaign);
+        if (campaignAd?.campaign_id) {
+            filterParam = `&filtering=[{"field":"campaign.id","operator":"IN","value":["${campaignAd.campaign_id}"]}]`;
+        }
+    }
+    
+    try {
+        // Get platform breakdown
+        const platformData = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,ctr,reach,actions&breakdowns=publisher_platform&${getDateRange(range)}${filterParam}&limit=10`
+        );
+        renderPlatformComparison(platformData.data || []);
+        
+        // Get placement breakdown
+        const placementData = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,ctr,reach,actions&breakdowns=publisher_platform,platform_position&${getDateRange(range)}${filterParam}&limit=50`
+        );
+        renderPlacementBreakdown(placementData.data || []);
+    } catch (e) {
+        console.error('Error refreshing platform/placement data:', e);
+    }
 }
 
 // Render platform comparison (Facebook vs Instagram)
