@@ -37,6 +37,8 @@ let bingKeywordsRawData = [];
 let bingKeywordsSortColumn = 'clicks';
 let bingKeywordsSortDirection = 'desc';
 let bingKeywordsSearchText = '';
+let bingKeywordsCampaignFilter = '';
+let bingKeywordsAdGroupFilter = '';
 
 // Bing Geographic state
 let bingGeoDataLoaded = false;
@@ -80,6 +82,8 @@ let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
 let keywordsSortDirection = 'desc';
 let keywordsSearchText = '';
+let googleKeywordsCampaignFilter = '';
+let googleKeywordsAdGroupFilter = '';
 
 // QS History search
 let qsHistorySearchText = '';
@@ -561,6 +565,32 @@ function initializeDashboard() {
         renderKeywordsTable();
     });
     
+    // Google Keywords campaign filter
+    document.getElementById('googleKeywordsCampaignFilter').addEventListener('change', (e) => {
+        googleKeywordsCampaignFilter = e.target.value;
+        googleKeywordsAdGroupFilter = ''; // Reset ad group when campaign changes
+        populateGoogleKeywordsAdGroupDropdown();
+        renderKeywordsTable();
+    });
+    
+    // Google Keywords ad group filter
+    document.getElementById('googleKeywordsAdGroupFilter').addEventListener('change', (e) => {
+        googleKeywordsAdGroupFilter = e.target.value;
+        renderKeywordsTable();
+    });
+    
+    // Google Keywords clear filters
+    document.getElementById('googleKeywordsClearFilters').addEventListener('click', () => {
+        googleKeywordsCampaignFilter = '';
+        googleKeywordsAdGroupFilter = '';
+        keywordsSearchText = '';
+        document.getElementById('googleKeywordsCampaignFilter').value = '';
+        document.getElementById('googleKeywordsAdGroupFilter').value = '';
+        document.getElementById('keywordsSearch').value = '';
+        populateGoogleKeywordsAdGroupDropdown();
+        renderKeywordsTable();
+    });
+    
     // QS History search
     document.getElementById('qsHistorySearch').addEventListener('input', (e) => {
         qsHistorySearchText = e.target.value.toLowerCase();
@@ -638,6 +668,32 @@ function initializeDashboard() {
     // Bing Keywords search
     document.getElementById('bingKeywordsSearch').addEventListener('input', (e) => {
         bingKeywordsSearchText = e.target.value.toLowerCase();
+        renderBingKeywordsTable();
+    });
+    
+    // Bing Keywords campaign filter
+    document.getElementById('bingKeywordsCampaignFilter').addEventListener('change', (e) => {
+        bingKeywordsCampaignFilter = e.target.value;
+        bingKeywordsAdGroupFilter = ''; // Reset ad group when campaign changes
+        populateBingKeywordsAdGroupDropdown();
+        renderBingKeywordsTable();
+    });
+    
+    // Bing Keywords ad group filter
+    document.getElementById('bingKeywordsAdGroupFilter').addEventListener('change', (e) => {
+        bingKeywordsAdGroupFilter = e.target.value;
+        renderBingKeywordsTable();
+    });
+    
+    // Bing Keywords clear filters
+    document.getElementById('bingKeywordsClearFilters').addEventListener('click', () => {
+        bingKeywordsCampaignFilter = '';
+        bingKeywordsAdGroupFilter = '';
+        bingKeywordsSearchText = '';
+        document.getElementById('bingKeywordsCampaignFilter').value = '';
+        document.getElementById('bingKeywordsAdGroupFilter').value = '';
+        document.getElementById('bingKeywordsSearch').value = '';
+        populateBingKeywordsAdGroupDropdown();
         renderBingKeywordsTable();
     });
     
@@ -2731,6 +2787,11 @@ async function loadGoogleKeywordsData() {
         // Update date range display
         document.getElementById('keywordsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
 
+        // Reset filters and populate dropdowns
+        googleKeywordsCampaignFilter = '';
+        googleKeywordsAdGroupFilter = '';
+        populateGoogleKeywordsFilterDropdowns();
+
         // Render table with current sort
         renderKeywordsTable();
         
@@ -2746,10 +2807,22 @@ async function loadGoogleKeywordsData() {
 function renderKeywordsTable() {
     if (keywordsRawData.length === 0) return;
     
-    // Filter by search text
+    // Apply filters
     let filtered = keywordsRawData;
+    
+    // Campaign filter
+    if (googleKeywordsCampaignFilter) {
+        filtered = filtered.filter(kw => kw.campaign === googleKeywordsCampaignFilter);
+    }
+    
+    // Ad group filter
+    if (googleKeywordsAdGroupFilter) {
+        filtered = filtered.filter(kw => kw.adGroup === googleKeywordsAdGroupFilter);
+    }
+    
+    // Search filter
     if (keywordsSearchText) {
-        filtered = keywordsRawData.filter(kw => 
+        filtered = filtered.filter(kw => 
             kw.keyword.toLowerCase().includes(keywordsSearchText)
         );
     }
@@ -2763,8 +2836,8 @@ function renderKeywordsTable() {
         if (aVal === null || aVal === undefined) aVal = keywordsSortDirection === 'desc' ? -Infinity : Infinity;
         if (bVal === null || bVal === undefined) bVal = keywordsSortDirection === 'desc' ? -Infinity : Infinity;
         
-        // String comparison for keyword and matchType
-        if (keywordsSortColumn === 'keyword' || keywordsSortColumn === 'matchType') {
+        // String comparison for keyword, matchType, campaign, adGroup
+        if (keywordsSortColumn === 'keyword' || keywordsSortColumn === 'matchType' || keywordsSortColumn === 'campaign' || keywordsSortColumn === 'adGroup') {
             aVal = (aVal || '').toLowerCase();
             bVal = (bVal || '').toLowerCase();
             if (keywordsSortDirection === 'asc') {
@@ -2792,6 +2865,8 @@ function renderKeywordsTable() {
         return `
             <tr>
                 <td>${kw.keyword}</td>
+                <td>${kw.campaign || '-'}</td>
+                <td>${kw.adGroup || '-'}</td>
                 <td>${kw.matchType || '-'}</td>
                 <td class="${qsClass}">${qualityScore}</td>
                 <td>${(kw.impressions || 0).toLocaleString()}</td>
@@ -2806,7 +2881,35 @@ function renderKeywordsTable() {
     }).join('');
     
     if (sorted.length === 0) {
-        document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="12" class="loading">No keywords match the search</td></tr>';
+        document.getElementById('keywordsFullBody').innerHTML = '<tr><td colspan="12" class="loading">No keywords match the filters</td></tr>';
+    }
+}
+
+// Populate Google Keywords filter dropdowns
+function populateGoogleKeywordsFilterDropdowns() {
+    const campaigns = [...new Set(keywordsRawData.map(kw => kw.campaign))].filter(c => c && c !== 'Unknown').sort();
+    const campaignSelect = document.getElementById('googleKeywordsCampaignFilter');
+    campaignSelect.innerHTML = '<option value="">All Campaigns</option>' + 
+        campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+    
+    populateGoogleKeywordsAdGroupDropdown();
+}
+
+function populateGoogleKeywordsAdGroupDropdown() {
+    let filteredData = keywordsRawData;
+    if (googleKeywordsCampaignFilter) {
+        filteredData = filteredData.filter(kw => kw.campaign === googleKeywordsCampaignFilter);
+    }
+    
+    const adGroups = [...new Set(filteredData.map(kw => kw.adGroup))].filter(a => a && a !== 'Unknown').sort();
+    const adGroupSelect = document.getElementById('googleKeywordsAdGroupFilter');
+    adGroupSelect.innerHTML = '<option value="">All Ad Groups</option>' + 
+        adGroups.map(a => `<option value="${a}">${a}</option>`).join('');
+    
+    // Reset filter if current selection not in list
+    if (googleKeywordsAdGroupFilter && !adGroups.includes(googleKeywordsAdGroupFilter)) {
+        googleKeywordsAdGroupFilter = '';
+        adGroupSelect.value = '';
     }
 }
 
@@ -3401,6 +3504,12 @@ async function loadBingKeywordsData() {
         
         bingKeywordsRawData = data.keywords || [];
         document.getElementById('bingKeywordsDateRange').textContent = `Data from ${dateRange.since} to ${dateRange.until}`;
+        
+        // Reset filters and populate dropdowns
+        bingKeywordsCampaignFilter = '';
+        bingKeywordsAdGroupFilter = '';
+        populateBingKeywordsFilterDropdowns();
+        
         renderBingKeywordsTable();
         bingKeywordsDataLoaded = true;
         updateLastUpdated();
@@ -3414,6 +3523,18 @@ function renderBingKeywordsTable() {
     if (bingKeywordsRawData.length === 0) return;
     
     let filtered = bingKeywordsRawData;
+    
+    // Apply campaign filter
+    if (bingKeywordsCampaignFilter) {
+        filtered = filtered.filter(kw => kw.campaign === bingKeywordsCampaignFilter);
+    }
+    
+    // Apply ad group filter
+    if (bingKeywordsAdGroupFilter) {
+        filtered = filtered.filter(kw => kw.adGroup === bingKeywordsAdGroupFilter);
+    }
+    
+    // Apply search filter
     if (bingKeywordsSearchText) {
         filtered = filtered.filter(kw => kw.keyword.toLowerCase().includes(bingKeywordsSearchText));
     }
@@ -3447,7 +3568,35 @@ function renderBingKeywordsTable() {
     }).join('');
     
     if (sorted.length === 0) {
-        document.getElementById('bingKeywordsBody').innerHTML = '<tr><td colspan="11" class="loading">No keywords match the search</td></tr>';
+        document.getElementById('bingKeywordsBody').innerHTML = '<tr><td colspan="11" class="loading">No keywords match the filters</td></tr>';
+    }
+}
+
+// Populate Bing Keywords filter dropdowns
+function populateBingKeywordsFilterDropdowns() {
+    const campaigns = [...new Set(bingKeywordsRawData.map(kw => kw.campaign))].filter(c => c).sort();
+    const campaignSelect = document.getElementById('bingKeywordsCampaignFilter');
+    campaignSelect.innerHTML = '<option value="">All Campaigns</option>' + 
+        campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+    
+    populateBingKeywordsAdGroupDropdown();
+}
+
+function populateBingKeywordsAdGroupDropdown() {
+    let filteredData = bingKeywordsRawData;
+    if (bingKeywordsCampaignFilter) {
+        filteredData = filteredData.filter(kw => kw.campaign === bingKeywordsCampaignFilter);
+    }
+    
+    const adGroups = [...new Set(filteredData.map(kw => kw.adGroup))].filter(a => a).sort();
+    const adGroupSelect = document.getElementById('bingKeywordsAdGroupFilter');
+    adGroupSelect.innerHTML = '<option value="">All Ad Groups</option>' + 
+        adGroups.map(a => `<option value="${a}">${a}</option>`).join('');
+    
+    // Reset filter if current selection not in list
+    if (bingKeywordsAdGroupFilter && !adGroups.includes(bingKeywordsAdGroupFilter)) {
+        bingKeywordsAdGroupFilter = '';
+        adGroupSelect.value = '';
     }
 }
 

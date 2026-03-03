@@ -1303,6 +1303,8 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
         
         const query = `
             SELECT 
+                campaign.name,
+                ad_group.name,
                 ad_group_criterion.keyword.text,
                 ad_group_criterion.keyword.match_type,
                 ad_group_criterion.quality_info.quality_score,
@@ -1330,6 +1332,8 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
         };
         
         const keywords = results.map(row => {
+            const campaign = row.campaign || {};
+            const adGroup = row.ad_group || {};
             const criterion = row.ad_group_criterion || {};
             const keyword = criterion.keyword || {};
             const qualityInfo = criterion.quality_info || {};
@@ -1337,6 +1341,8 @@ app.post('/api/google/keyword-performance-full', async (req, res) => {
             
             return {
                 keyword: keyword.text || 'Unknown',
+                campaign: campaign.name || 'Unknown',
+                adGroup: adGroup.name || 'Unknown',
                 matchType: matchTypes[keyword.match_type] || keyword.match_type || '-',
                 qualityScore: qualityInfo.quality_score || null,
                 impressions: parseInt(metrics.impressions) || 0,

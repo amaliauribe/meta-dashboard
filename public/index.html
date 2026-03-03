@@ -624,9 +624,16 @@
         <div id="bingKeywordsView" class="view-content hidden">
             <h1>🔷 Bing Keywords Performance</h1>
             
-            <!-- Filter -->
-            <div class="filter-row" style="margin-bottom: 15px;">
+            <!-- Filters -->
+            <div class="filter-row" style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <select id="bingKeywordsCampaignFilter" class="filter-dropdown">
+                    <option value="">All Campaigns</option>
+                </select>
+                <select id="bingKeywordsAdGroupFilter" class="filter-dropdown">
+                    <option value="">All Ad Groups</option>
+                </select>
                 <input type="text" id="bingKeywordsSearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+                <button id="bingKeywordsClearFilters" class="clear-filters-btn">Clear Filters</button>
             </div>
             
             <!-- Keywords Table -->
@@ -1046,14 +1053,23 @@
                     <span id="keywordsDateRange">Loading date range...</span> 
                     <span class="qs-legend">| Quality Score: <span class="qs-good">●</span> 7-10 Good <span class="qs-ok">●</span> 5-6 OK <span class="qs-low">●</span> 1-4 Needs work</span>
                 </p>
-                <div class="filter-row" style="margin-bottom: 15px;">
+                <div class="filter-row" style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <select id="googleKeywordsCampaignFilter" class="filter-dropdown">
+                        <option value="">All Campaigns</option>
+                    </select>
+                    <select id="googleKeywordsAdGroupFilter" class="filter-dropdown">
+                        <option value="">All Ad Groups</option>
+                    </select>
                     <input type="text" id="keywordsSearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+                    <button id="googleKeywordsClearFilters" class="clear-filters-btn">Clear Filters</button>
                 </div>
                 <div class="table-wrapper">
                     <table id="keywordsFullTable">
                         <thead>
                             <tr>
                                 <th class="sortable" data-sort="keyword">Keyword</th>
+                                <th class="sortable" data-sort="campaign">Campaign</th>
+                                <th class="sortable" data-sort="adGroup">Ad Group</th>
                                 <th class="sortable" data-sort="matchType">Match Type</th>
                                 <th class="sortable has-tooltip" data-sort="qualityScore">Quality Score
                                     <span class="tooltip">🟢 Green (7-10) — Good quality<br>🟡 Yellow (5-6) — Okay, needs improvement<br>🔴 Red (1-4) — Poor, needs attention</span>
