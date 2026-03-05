@@ -48,6 +48,13 @@ let bingGeoSortColumn = 'clicks';
 let bingGeoSortDirection = 'desc';
 let bingGeoSearchText = '';
 
+// Meta Geographic state
+let metaGeoDataLoaded = false;
+let metaGeoRawData = [];
+let metaGeoSortColumn = 'clicks';
+let metaGeoSortDirection = 'desc';
+let metaGeoSearchText = '';
+
 // Bing Search Terms state
 let bingSearchTermsDataLoaded = false;
 let bingSearchTermsRawData = [];
@@ -262,6 +269,7 @@ function initializeDashboard() {
             btn.classList.add('active');
             currentRange = btn.dataset.range;
             adsDataLoaded = false; // Reset ads data when date changes
+            metaGeoDataLoaded = false; // Reset meta geo data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
             bingKeywordsDataLoaded = false;
             bingQsHistoryDataLoaded = false;
@@ -330,6 +338,7 @@ function initializeDashboard() {
         
         // Reset all data flags
         adsDataLoaded = false;
+        metaGeoDataLoaded = false;
         bingDataLoaded = false;
         bingKeywordsDataLoaded = false;
         bingQsHistoryDataLoaded = false;
@@ -398,6 +407,7 @@ function initializeDashboard() {
             document.getElementById('heatmapView').classList.toggle('hidden', currentView !== 'heatmap');
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
+            document.getElementById('metaGeoView').classList.toggle('hidden', currentView !== 'metaGeo');
             document.getElementById('bingView').classList.toggle('hidden', currentView !== 'bing');
             document.getElementById('bingKeywordsView').classList.toggle('hidden', currentView !== 'bingKeywords');
             document.getElementById('bingQsHistoryView').classList.toggle('hidden', currentView !== 'bingQsHistory');
@@ -423,6 +433,9 @@ function initializeDashboard() {
             }
             if (currentView === 'ads' && !adsDataLoaded) {
                 loadAdsData();
+            }
+            if (currentView === 'metaGeo' && !metaGeoDataLoaded) {
+                loadMetaGeoData();
             }
             if (currentView === 'bing' && !bingDataLoaded) {
                 loadBingData();
@@ -479,6 +492,7 @@ function initializeDashboard() {
 
     document.getElementById('refreshBtn').addEventListener('click', () => {
         adsDataLoaded = false;
+        metaGeoDataLoaded = false;
         bingDataLoaded = false;
         bingKeywordsDataLoaded = false;
         bingQsHistoryDataLoaded = false;
@@ -498,6 +512,8 @@ function initializeDashboard() {
             loadData();
         } else if (currentView === 'ads') {
             loadAdsData();
+        } else if (currentView === 'metaGeo') {
+            loadMetaGeoData();
         } else if (currentView === 'bing') {
             loadBingData();
         } else if (currentView === 'bingKeywords') {
@@ -733,6 +749,28 @@ function initializeDashboard() {
     document.getElementById('bingQsHistorySearch').addEventListener('input', (e) => {
         bingQsHistorySearchText = e.target.value.toLowerCase();
         renderBingQsHistoryTable();
+    });
+    
+    // Meta Geographic search
+    document.getElementById('metaGeoSearch').addEventListener('input', (e) => {
+        metaGeoSearchText = e.target.value.toLowerCase();
+        renderMetaGeoTable();
+    });
+    
+    // Meta Geographic table sorting
+    document.querySelectorAll('#metaGeoTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortKey = th.dataset.sort;
+            if (metaGeoSortColumn === sortKey) {
+                metaGeoSortDirection = metaGeoSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                metaGeoSortColumn = sortKey;
+                metaGeoSortDirection = 'desc';
+            }
+            document.querySelectorAll('#metaGeoTable th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+            th.classList.add(metaGeoSortDirection);
+            renderMetaGeoTable();
+        });
     });
     
     // Bing Geographic search
@@ -4481,6 +4519,108 @@ function populateBingKeywordsAdGroupDropdown() {
     if (bingKeywordsAdGroupFilter && !adGroups.includes(bingKeywordsAdGroupFilter)) {
         bingKeywordsAdGroupFilter = '';
         adGroupSelect.value = '';
+    }
+}
+
+// ==================== Meta Geographic ====================
+
+async function loadMetaGeoData() {
+    document.getElementById('metaGeoBody').innerHTML = '<tr><td colspan="9" class="loading">Loading geographic data...</td></tr>';
+    
+    try {
+        const range = dateRanges[currentRange];
+        
+        // Get geographic breakdown from Meta API
+        const data = await apiCall(
+            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&breakdowns=region&${getDateRange(range)}&limit=500`
+        );
+        
+        if (!data || !data.data) {
+            throw new Error('No data returned from Meta API');
+        }
+        
+        // Process the data
+        metaGeoRawData = data.data.map(row => {
+            const spend = parseFloat(row.spend) || 0;
+            const impressions = parseInt(row.impressions) || 0;
+            const clicks = parseInt(row.clicks) || 0;
+            const results = getResults(row.actions) || 0;
+            const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
+            const cpc = clicks > 0 ? spend / clicks : 0;
+            const costPerConv = results > 0 ? spend / results : 0;
+            
+            return {
+                region: row.region || 'Unknown',
+                country: row.country || 'US',
+                impressions,
+                clicks,
+                ctr,
+                spend,
+                cpc,
+                conversions: results,
+                costPerConv
+            };
+        });
+        
+        // Update KPIs
+        const totalSpend = metaGeoRawData.reduce((sum, r) => sum + r.spend, 0);
+        const totalClicks = metaGeoRawData.reduce((sum, r) => sum + r.clicks, 0);
+        const totalConversions = metaGeoRawData.reduce((sum, r) => sum + r.conversions, 0);
+        
+        document.getElementById('metaGeoTotalRegions').textContent = metaGeoRawData.length;
+        document.getElementById('metaGeoTotalSpend').textContent = '$' + totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('metaGeoTotalClicks').textContent = totalClicks.toLocaleString();
+        document.getElementById('metaGeoTotalConversions').textContent = totalConversions.toLocaleString();
+        
+        document.getElementById('metaGeoDateRange').textContent = `Showing ${metaGeoRawData.length} regions`;
+        renderMetaGeoTable();
+        metaGeoDataLoaded = true;
+        updateLastUpdated();
+    } catch (e) {
+        console.error('Meta geographic error:', e);
+        document.getElementById('metaGeoBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderMetaGeoTable() {
+    if (metaGeoRawData.length === 0) return;
+    
+    let filtered = metaGeoRawData;
+    if (metaGeoSearchText) {
+        const search = metaGeoSearchText.toLowerCase();
+        filtered = filtered.filter(loc => 
+            loc.region.toLowerCase().includes(search) || 
+            (loc.country || '').toLowerCase().includes(search)
+        );
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+        let aVal = a[metaGeoSortColumn];
+        let bVal = b[metaGeoSortColumn];
+        if (aVal === null || aVal === undefined) aVal = metaGeoSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = metaGeoSortDirection === 'desc' ? -Infinity : Infinity;
+        if (metaGeoSortColumn === 'region' || metaGeoSortColumn === 'country') {
+            return metaGeoSortDirection === 'asc' ? (aVal || '').localeCompare(bVal || '') : (bVal || '').localeCompare(aVal || '');
+        }
+        return metaGeoSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    document.getElementById('metaGeoBody').innerHTML = sorted.map(loc => {
+        return `<tr>
+            <td>${loc.region}</td>
+            <td>${loc.country || '-'}</td>
+            <td>${(loc.impressions || 0).toLocaleString()}</td>
+            <td>${(loc.clicks || 0).toLocaleString()}</td>
+            <td>${loc.ctr?.toFixed(2) || '0.00'}%</td>
+            <td>$${(loc.spend || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td>$${(loc.cpc || 0).toFixed(2)}</td>
+            <td>${loc.conversions || 0}</td>
+            <td>${loc.conversions > 0 ? '$' + loc.costPerConv.toFixed(2) : '-'}</td>
+        </tr>`;
+    }).join('');
+    
+    if (sorted.length === 0) {
+        document.getElementById('metaGeoBody').innerHTML = '<tr><td colspan="9" class="loading">No regions match the search</td></tr>';
     }
 }
 

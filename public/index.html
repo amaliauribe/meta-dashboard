@@ -51,6 +51,7 @@
                     <div class="nav-section-items" id="metaItems">
                         <button class="nav-item" data-view="campaigns">Campaigns</button>
                         <button class="nav-item" data-view="ads">Ads</button>
+                        <button class="nav-item" data-view="metaGeo">Geographic</button>
                     </div>
                 </div>
                 <div class="nav-section">
@@ -659,6 +660,62 @@
                 </div>
             </section>
         </div><!-- End Ads View -->
+
+        <!-- Meta Geographic View -->
+        <div id="metaGeoView" class="view-content hidden">
+            <h1>📘 Meta Geographic Performance</h1>
+            
+            <!-- Filter -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <input type="text" id="metaGeoSearch" placeholder="🔍 Search regions..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+            </div>
+            
+            <!-- KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Regions</div>
+                    <div class="kpi-value" id="metaGeoTotalRegions">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Spend</div>
+                    <div class="kpi-value" id="metaGeoTotalSpend">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Clicks</div>
+                    <div class="kpi-value" id="metaGeoTotalClicks">0</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total Conversions</div>
+                    <div class="kpi-value" id="metaGeoTotalConversions">0</div>
+                </div>
+            </section>
+            
+            <!-- Geographic Table -->
+            <section class="table-section">
+                <h2>📍 Region Performance</h2>
+                <p class="table-subtitle" id="metaGeoDateRange">Loading...</p>
+                <div class="table-wrapper">
+                    <table id="metaGeoTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="region">Region</th>
+                                <th class="sortable" data-sort="country">Country</th>
+                                <th class="sortable" data-sort="impressions">Impressions</th>
+                                <th class="sortable desc" data-sort="clicks">Clicks</th>
+                                <th class="sortable" data-sort="ctr">CTR</th>
+                                <th class="sortable" data-sort="spend">Spend</th>
+                                <th class="sortable" data-sort="cpc">Avg CPC</th>
+                                <th class="sortable" data-sort="conversions">Results</th>
+                                <th class="sortable" data-sort="costPerConv">Cost/Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metaGeoBody">
+                            <tr><td colspan="9" class="loading">Loading geographic data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div><!-- End Meta Geographic View -->
 
         <!-- Bing Ads View -->
         <div id="bingView" class="view-content hidden">
