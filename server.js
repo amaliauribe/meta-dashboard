@@ -2542,18 +2542,42 @@ app.get("/api/ours-privacy/lfs-by-platform", (req, res) => {
         oursData = oursData.filter(d => new Date(d.timestamp) <= end);
     }
     
-    // Filter by platform using utm_source
+    // Get all visitor IDs that had platform-specific events
+    const allData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Build set of visitor IDs by platform based on their events
+    const metaVisitors = new Set();
+    const googleVisitors = new Set();
+    const bingVisitors = new Set();
+    const tiktokVisitors = new Set();
+    
+    allData.forEach(d => {
+        const event = d.body?.event?.event || "";
+        const visitorId = d.body?.visitor?.visitor_id;
+        if (!visitorId) return;
+        
+        if (event.startsWith("mutm_")) metaVisitors.add(visitorId);
+        if (event.startsWith("g1utm_")) googleVisitors.add(visitorId);
+        if (event.startsWith("butm_")) bingVisitors.add(visitorId);
+        if (event.startsWith("tutm_")) tiktokVisitors.add(visitorId);
+    });
+    
+    // Filter l_f_s by platform - check if visitor had platform events
     const filtered = oursData.filter(d => {
+        const visitorId = d.body?.visitor?.visitor_id;
         const source = (d.body.visitor?.utm_source || "").toLowerCase();
         
         if (platform === "meta") {
-            return source === "facebook" || source === "fb" || source === "meta";
+            return metaVisitors.has(visitorId) || source === "facebook" || source === "fb";
         } else if (platform === "google") {
-            return source === "google";
+            return googleVisitors.has(visitorId) || source === "google";
         } else if (platform === "bing") {
-            return source === "bing";
+            return bingVisitors.has(visitorId) || source === "bing";
         } else if (platform === "tiktok") {
-            return source === "tiktok" || source === "tt";
+            return tiktokVisitors.has(visitorId) || source === "tiktok";
         }
         return sourcesToMatch.some(s => source.includes(s));
     });
