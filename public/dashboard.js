@@ -5593,7 +5593,7 @@ async function loadOursPrivacyData() {
         
         if (sourceData.lastUpdated) {
             const lastTime = new Date(sourceData.lastUpdated);
-            document.getElementById("oursLastEvent").textContent = lastTime.toLocaleTimeString();
+            document.getElementById("oursLastEvent").textContent = lastTime.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true });
         } else {
             document.getElementById("oursLastEvent").textContent = "-";
         }
@@ -5645,7 +5645,7 @@ async function loadOursPrivacyData() {
             recentBody.innerHTML = "<tr><td colspan=\"4\">No recent events</td></tr>";
         } else {
             recentBody.innerHTML = rawData.data.map(d => {
-                const time = new Date(d.timestamp).toLocaleString();
+                const time = new Date(d.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                 const event = d.body?.event?.event || "-";
                 const source = d.body?.visitor?.utm_source || "-";
                 const campaign = d.body?.visitor?.utm_campaign || "-";
