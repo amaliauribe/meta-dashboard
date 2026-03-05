@@ -942,10 +942,27 @@ async function updateMetaFunnel(impressions, clicks, conversions) {
     
     // Fetch l_f_s data for Meta sources
     try {
+        // Build date range from current selection
         const range = dateRanges[currentRange];
-        const dateRange = getBingDateRange(range);
-        const params = new URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+        let startDate, endDate;
         
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = new Date();
+            const end = new Date(today);
+            const start = new Date(today);
+            
+            if (range.days) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            
+            startDate = start.toISOString().split('T')[0];
+            endDate = end.toISOString().split('T')[0];
+        }
+        
+        const params = new URLSearchParams({ startDate, endDate });
         const response = await fetch('/api/ours-privacy/lfs-by-platform?platform=meta&' + params);
         const data = await response.json();
         
@@ -961,6 +978,7 @@ async function updateMetaFunnel(impressions, clicks, conversions) {
         console.error('Error fetching l_f_s for funnel:', e);
         document.getElementById('funnelLfs').textContent = '-';
         document.getElementById('funnelLfsRate').textContent = '';
+        updateFunnelBars(impressions, clicks, conversions, 0);
     }
 }
 
@@ -968,16 +986,12 @@ function updateFunnelBars(impressions, clicks, conversions, lfs) {
     const steps = document.querySelectorAll('.funnel-step');
     if (steps.length < 4) return;
     
-    // Calculate percentages relative to impressions
-    const maxVal = Math.max(impressions, 1);
-    const clicksPct = Math.max((clicks / maxVal) * 100, 5);
-    const convPct = Math.max((conversions / maxVal) * 100, 3);
-    const lfsPct = Math.max((lfs / maxVal) * 100, 2);
-    
+    // Fixed visual scaling for funnel appearance (not proportional to data)
+    // Impressions = 100%, then decreasing widths for visual funnel effect
     steps[0].style.setProperty('--step-width', '100%');
-    steps[1].style.setProperty('--step-width', Math.min(clicksPct * 2, 80) + '%');
-    steps[2].style.setProperty('--step-width', Math.min(convPct * 10, 60) + '%');
-    steps[3].style.setProperty('--step-width', Math.min(lfsPct * 20, 40) + '%');
+    steps[1].style.setProperty('--step-width', clicks > 0 ? '70%' : '10%');
+    steps[2].style.setProperty('--step-width', conversions > 0 ? '45%' : '10%');
+    steps[3].style.setProperty('--step-width', lfs > 0 ? '25%' : '10%');
 }
 
 async function loadChartData() {
