@@ -2729,6 +2729,7 @@ async function loadFunnelsData() {
         document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
         
         // Load Medwork funnel for Funnels view
+        console.log('Calling loadFunnelsMedworkData with params:', params.toString());
         await loadFunnelsMedworkData(params);
         
         // Render comparison chart
@@ -2747,16 +2748,22 @@ async function loadFunnelsData() {
 async function loadFunnelsMedworkData(params) {
     const container = document.getElementById('funnelsMedworkContainer');
     const totalsContainer = document.getElementById('funnelsTotalFunnel');
-    if (!container) return;
+    if (!container) {
+        console.error('Medwork container not found');
+        return;
+    }
     
     container.innerHTML = '<div class="loading">Loading Medwork funnel data...</div>';
     
     try {
-        const response = await fetch(`/api/looker/leads-funnel?${params}`);
+        const url = `/api/looker/leads-funnel?${params}`;
+        console.log('Fetching Medwork funnel:', url);
+        const response = await fetch(url);
         const result = await response.json();
+        console.log('Medwork funnel result:', result);
         
         if (!result.success) {
-            container.innerHTML = '<div class="loading">Error loading funnel data</div>';
+            container.innerHTML = '<div class="loading">Error loading funnel data: ' + (result.error || 'Unknown error') + '</div>';
             return;
         }
         
