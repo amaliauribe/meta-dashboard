@@ -2434,8 +2434,8 @@ async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
             fetch(`/api/ours-privacy/lfs-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
             apiCall(`${ACCOUNT_ID}/insights?fields=impressions,clicks,actions&date_preset=${range.preset || 'last_7d'}`).catch(() => null),
-            bingApiCall('summary', { startDate, endDate }).catch(() => null),
-            googleApiCall('summary', { startDate, endDate }).catch(() => null)
+            bingApiCall('account-performance', { startDate, endDate }).catch(() => null),
+            googleApiCall('account-performance', { startDate, endDate }).catch(() => null)
         ]);
         
         // Meta funnel
