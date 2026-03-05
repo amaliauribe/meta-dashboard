@@ -4632,8 +4632,8 @@ function renderHeatmap(zipcodes) {
             const intensity = (z[heatmapMetric] || 0) / maxValue;
             heatData.push([coords.lat, coords.lng, intensity]);
             
-            // Add marker for top zipcodes
-            if ((z[heatmapMetric] || 0) >= (heatmapMetric === 'conversions' ? 1 : heatmapMetric === 'impressions' ? 100 : heatmapMetric === 'clicks' ? 10 : 1)) {
+            // Add marker for ALL zipcodes with data
+            if ((z[heatmapMetric] || 0) > 0) {
                 const marker = L.circleMarker([coords.lat, coords.lng], {
                     radius: Math.min(5 + ((z[heatmapMetric] || 0) / maxValue) * 15, 20),
                     fillColor: getHeatColor((z[heatmapMetric] || 0) / maxValue),
