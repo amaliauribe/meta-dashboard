@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VeinVanish™ - Reveal Flawless Legs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --french-mauve: #574dd6;
+            --grape: #6140b2;
+            --magnolia: #f4f1f9;
+            --white: #ffffff;
+            --dark: #1a1a2e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--french-mauve) 0%, var(--grape) 100%);
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .screen {
+            display: none;
+            min-height: 100vh;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Logo */
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .logo h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            line-height: 1.1;
+        }
+
+        .logo h1 .vein {
+            font-weight: 300;
+            font-style: italic;
+        }
+
+        .logo .tm {
+            font-size: 0.8rem;
+            vertical-align: super;
+            font-style: normal;
+        }
+
+        .tagline {
+            color: rgba(255,255,255,0.95);
+            font-size: 1.1rem;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--white);
+            border-radius: 24px;
+            padding: 35px 25px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .card h2 {
+            color: var(--grape);
+            font-size: 1.4rem;
+            margin-bottom: 12px;
+        }
+
+        .card p {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+
+        .card-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--magnolia);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            border: none;
+            border-radius: 50px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--french-mauve) 0%, var(--grape) 100%);
+            color: white;
+            box-shadow: 0 8px 25px rgba(97,64,178,0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(97,64,178,0.5);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--grape);
+            border: 2px solid var(--grape);
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 16px;
+            padding: 40px 20px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: var(--french-mauve);
+            background: var(--magnolia);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--grape);
+            background: var(--magnolia);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .upload-area p {
+            margin-bottom: 0;
+            color: #888;
+        }
+
+        .upload-area input {
+            display: none;
+        }
+
+        /* Results Screen */
+        #results {
+            padding: 20px;
+            background: #111;
+        }
+
+        .results-header {
+            text-align: center;
+            padding: 15px 0;
+        }
+
+        .results-header h3 {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .comparison-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            border-radius: 16px;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .comparison-image {
+            width: 100%;
+            display: block;
+        }
+
+        .after-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .after-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            max-width: none;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slider-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 4px;
+            height: 100%;
+            background: white;
+            transform: translateX(-50%);
+            cursor: ew-resize;
+            z-index: 10;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: ew-resize;
+            z-index: 11;
+        }
+
+        .comparison-labels {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 10px;
+        }
+
+        .comparison-labels span {
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 20px;
+        }
+
+        .results-actions {
+            padding: 25px 20px;
+            text-align: center;
+        }
+
+        .results-actions .btn {
+            margin: 8px;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Lead Form */
+        .form-group {
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--french-mauve);
+        }
+
+        .skip-link {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            display: inline-block;
+        }
+
+        /* Success Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 24px;
+            padding: 40px 30px;
+            max-width: 350px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .modal-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--french-mauve) 0%, var(--grape) 100%);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+        }
+
+        .modal h3 {
+            color: var(--grape);
+            margin-bottom: 10px;
+        }
+
+        .modal p {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        /* Hidden canvas */
+        #processCanvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Landing Screen -->
+    <div id="landing" class="screen active">
+        <div class="logo">
+            <h1><span class="vein">Vein</span>vanish<span class="tm">™</span></h1>
+        </div>
+        <p class="tagline">Reveal flawless legs.<br>Feel unstoppable.</p>
+        
+        <div class="card">
+            <div class="card-icon">📸</div>
+            <h2>See Your Results</h2>
+            <p>Upload a photo of your legs and see what they could look like after VeinVanish treatment!</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📤</div>
+                <p>Tap to upload a photo</p>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+            
+            <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">
+                Upload Photo
+            </button>
+        </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="results" class="screen">
+        <div class="results-header">
+            <h3>✨ Your VeinVanish Preview</h3>
+        </div>
+        
+        <div class="comparison-container" id="comparisonContainer">
+            <img id="beforeImage" class="comparison-image" src="" alt="Before">
+            <div class="after-container" id="afterContainer">
+                <img id="afterImage" class="after-image" src="" alt="After">
+            </div>
+            <div class="slider-line" id="sliderLine">
+                <div class="slider-handle">↔</div>
+            </div>
+        </div>
+        
+        <div class="comparison-labels">
+            <span>Before</span>
+            <span>After ✨</span>
+        </div>
+        
+        <div class="results-actions">
+            <button class="btn btn-primary" onclick="showScreen('leadCapture')">
+                I Love It! Book Now
+            </button>
+            <br>
+            <button class="btn btn-secondary" onclick="showScreen('landing')">
+                Try Another Photo
+            </button>
+        </div>
+    </div>
+
+    <!-- Lead Capture Screen -->
+    <div id="leadCapture" class="screen">
+        <div class="logo">
+            <h1><span class="vein">Vein</span>vanish<span class="tm">™</span></h1>
+        </div>
+        
+        <div class="card">
+            <div class="card-icon">✨</div>
+            <h2>Love What You See?</h2>
+            <p>Book your free consultation and let's make those results real!</p>
+            
+            <form id="leadForm" onsubmit="handleFormSubmit(event)">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" placeholder="Enter your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="(555) 123-4567" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Book Free Consultation
+                </button>
+            </form>
+        </div>
+        <a href="#" class="skip-link" onclick="showScreen('landing'); return false;">Maybe later</a>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>AI is removing veins... ✨<br><small>(takes 10-15 seconds)</small></p>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-icon">🎉</div>
+            <h3>You're All Set!</h3>
+            <p>A VeinVanish specialist will contact you shortly to schedule your free consultation.</p>
+            <button class="btn btn-primary" onclick="closeModal()">Done</button>
+        </div>
+    </div>
+
+    <!-- Hidden Canvas for Processing -->
+    <canvas id="processCanvas"></canvas>
+
+    <script>
+        // Screen navigation
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // Upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+
+        uploadArea.addEventListener('click', () => imageInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleImage(e.dataTransfer.files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleImage(e.target.files[0]);
+            }
+        });
+
+        async function handleImage(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingOverlay').classList.add('active');
+
+            // Store original as "before"
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                document.getElementById('beforeImage').src = e.target.result;
+                
+                // Send to AI API
+                try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    
+                    const response = await fetch('./api/process-image', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.imageUrl) {
+                        // Load the AI-processed image
+                        document.getElementById('afterImage').src = result.imageUrl;
+                        
+                        // Hide loading, show results
+                        document.getElementById('loadingOverlay').classList.remove('active');
+                        showScreen('results');
+                        initSlider();
+                    } else {
+                        throw new Error(result.error || 'Processing failed');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                    alert('Failed to process image: ' + error.message);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Comparison slider
+        function initSlider() {
+            const container = document.getElementById('comparisonContainer');
+            const afterContainer = document.getElementById('afterContainer');
+            const sliderLine = document.getElementById('sliderLine');
+            let isDragging = false;
+
+            function updateSlider(x) {
+                const rect = container.getBoundingClientRect();
+                let pos = (x - rect.left) / rect.width;
+                pos = Math.max(0, Math.min(1, pos));
+                
+                afterContainer.style.width = (pos * 100) + '%';
+                sliderLine.style.left = (pos * 100) + '%';
+            }
+
+            container.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                updateSlider(e.clientX);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) updateSlider(e.clientX);
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            container.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                updateSlider(e.touches[0].clientX);
+            });
+
+            container.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    updateSlider(e.touches[0].clientX);
+                }
+            });
+
+            container.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+        }
+
+        // Form handling
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('Lead captured:', formData);
+            localStorage.setItem('veinvanish_lead', JSON.stringify(formData));
+            
+            document.getElementById('successModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('successModal').classList.remove('active');
+            showScreen('landing');
+            document.getElementById('leadForm').reset();
+        }
+    </script>
+</body>
+</html>

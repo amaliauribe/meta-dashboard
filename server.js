@@ -1,11 +1,97 @@
 require("dotenv").config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const fetch = require('node-fetch');
 const { GoogleAdsApi } = require('google-ads-api');
 
 const app = express();
 app.use(express.json());
+
+// ==================== Persistent Webhook Storage ====================
+const WEBHOOK_FILE = "/var/www/ranchi/dashboard/data/webhooks.json";
+
+// Ensure data directory exists
+const dataDir = path.dirname(WEBHOOK_FILE);
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// Load existing data on startup
+function loadWebhookData() {
+    try {
+        if (fs.existsSync(WEBHOOK_FILE)) {
+            const data = fs.readFileSync(WEBHOOK_FILE, "utf8");
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error("Error loading webhook data:", e.message);
+    }
+    return [];
+}
+
+// Save data to file
+function saveWebhookData(data) {
+    try {
+        fs.writeFileSync(WEBHOOK_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error("Error saving webhook data:", e.message);
+    }
+}
+
+// Initialize global webhook data from file
+global.webhookData = loadWebhookData();
+console.log("[WEBHOOK] Loaded", global.webhookData.length, "historical events from storage");
+
+// Override webhook handler to persist data
+app.post("/webhook", express.json(), (req, res) => {
+    const timestamp = new Date().toISOString();
+    const source = req.headers["x-source"] || req.body.source || "unknown";
+    
+    const entry = {
+        timestamp,
+        source,
+        headers: req.headers,
+        body: req.body
+    };
+    
+    global.webhookData.push(entry);
+    
+    // Keep max 10000 entries
+    if (global.webhookData.length > 10000) {
+        global.webhookData = global.webhookData.slice(-10000);
+    }
+    
+    // Save to file (async to not block response)
+    setImmediate(() => saveWebhookData(global.webhookData));
+    
+    res.json({ success: true, message: "Data received", timestamp });
+});
+
+// Also handle POST to root
+app.post("/", express.json(), (req, res) => {
+    const timestamp = new Date().toISOString();
+    const source = req.headers["x-source"] || req.body.source || "unknown";
+    
+    const entry = {
+        timestamp,
+        source,
+        headers: req.headers,
+        body: req.body
+    };
+    
+    global.webhookData.push(entry);
+    
+    if (global.webhookData.length > 10000) {
+        global.webhookData = global.webhookData.slice(-10000);
+    }
+    
+    setImmediate(() => saveWebhookData(global.webhookData));
+    
+    res.json({ success: true, message: "Data received", timestamp });
+});
+
+
 app.use(express.static('public'));
 
 // Google Ads API Configuration
@@ -1722,7 +1808,6 @@ app.post('/api/google/geographic-performance', async (req, res) => {
 // ==================== QS History API ====================
 
 // Simple file-based storage for QS history
-const fs = require('fs');
 const QS_HISTORY_FILE = '/tmp/qs-history.json';
 
 function loadQsHistory() {
@@ -2183,6 +2268,288 @@ app.post('/api/summary/aggregated', async (req, res) => {
     res.json(results);
 });
 
+
+// API endpoint for webhook data (must be before catch-all)
+app.get("/api/webhooks", (req, res) => {
+    res.json({ count: global.webhookData?.length || 0, data: (global.webhookData || []).slice(-20) });
+});
+
+// ==================== Ours Privacy API ====================
+
+// Get aggregated event counts
+app.get("/api/ours-privacy/events", (req, res) => {
+    const data = global.webhookData || [];
+    
+    // Filter only ours-privacy data (has user-agent with ours-privacy)
+    const oursData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Aggregate by event type
+    const eventCounts = {};
+    const sourceCounts = {};
+    
+    oursData.forEach(d => {
+        if (d.body && d.body.event && d.body.event.event) {
+            const event = d.body.event.event;
+            eventCounts[event] = (eventCounts[event] || 0) + 1;
+        }
+        if (d.body && d.body.visitor && d.body.visitor.utm_source) {
+            const source = d.body.visitor.utm_source;
+            sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        }
+    });
+    
+    // Convert to arrays sorted by count
+    const events = Object.entries(eventCounts)
+        .map(([event, count]) => ({ event, count }))
+        .sort((a, b) => b.count - a.count);
+    
+    const sources = Object.entries(sourceCounts)
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count);
+    
+    res.json({
+        totalEvents: oursData.length,
+        events,
+        sources,
+        lastUpdated: oursData.length > 0 ? oursData[oursData.length - 1].timestamp : null
+    });
+});
+
+// Get raw webhook data (last N entries)
+app.get("/api/ours-privacy/raw", (req, res) => {
+    const limit = parseInt(req.query.limit) || 50;
+    const data = global.webhookData || [];
+    
+    const oursData = data
+        .filter(d => d.headers && d.headers["user-agent"] && d.headers["user-agent"].includes("ours-privacy"))
+        .slice(-limit)
+        .reverse();
+    
+    res.json({ count: oursData.length, data: oursData });
+});
+
+
+// Get aggregated event counts with pivot by source
+app.get("/api/ours-privacy/pivot", (req, res) => {
+    const data = global.webhookData || [];
+    
+    const oursData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    const sourceData = {};
+    const allEngagements = new Set();
+    
+    oursData.forEach(d => {
+        if (!d.body || !d.body.event || !d.body.visitor) return;
+        
+        const event = d.body.event.event || "";
+        const source = d.body.visitor.utm_source || "Unknown";
+        
+        const match = event.match(/e(\d+)s$/);
+        const engagement = match ? "e" + match[1] + "s" : "other";
+        
+        allEngagements.add(engagement);
+        
+        if (!sourceData[source]) {
+            sourceData[source] = { total: 0, engagements: {} };
+        }
+        sourceData[source].total++;
+        sourceData[source].engagements[engagement] = (sourceData[source].engagements[engagement] || 0) + 1;
+    });
+    
+    const engagementOrder = ["e1s", "e5s", "e15s", "e30s", "e45s", "e60s", "other"];
+    const sortedEngagements = [...allEngagements].sort((a, b) => {
+        return engagementOrder.indexOf(a) - engagementOrder.indexOf(b);
+    });
+    
+    const sources = Object.entries(sourceData)
+        .map(([source, data]) => ({
+            source,
+            total: data.total,
+            engagements: data.engagements
+        }))
+        .sort((a, b) => b.total - a.total);
+    
+    res.json({
+        totalEvents: oursData.length,
+        engagementTypes: sortedEngagements,
+        sources,
+        lastUpdated: oursData.length > 0 ? oursData[oursData.length - 1].timestamp : null
+    });
+});
+
+
+// Get events grouped by source prefix (all visitor events under primary source)
+app.get("/api/ours-privacy/by-source", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let oursData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Apply date filtering
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Known source prefixes
+    const sourcePrefixes = ["mutm", "tutm", "butm", "g1utm", "outm"];
+    
+    // Group by visitor first
+    const visitorData = {};
+    oursData.forEach(d => {
+        if (!d.body || !d.body.event || !d.body.visitor) return;
+        
+        const vid = d.body.visitor.visitor_id || "unknown";
+        const fullEvent = d.body.event.event || "";
+        
+        // Check if event starts with a known source prefix
+        let prefix = "unknown";
+        let eventType = fullEvent;
+        
+        for (const p of sourcePrefixes) {
+            if (fullEvent.startsWith(p + "_")) {
+                prefix = p;
+                eventType = fullEvent.substring(p.length + 1);
+                break;
+            }
+        }
+        
+        // If no known prefix, keep full event name as eventType
+        if (prefix === "unknown") {
+            eventType = fullEvent;
+        }
+        
+        if (!visitorData[vid]) {
+            visitorData[vid] = { prefixes: new Set(), events: [] };
+        }
+        visitorData[vid].prefixes.add(prefix);
+        visitorData[vid].events.push({ prefix, eventType, fullEvent });
+    });
+    
+    // Priority order for sources
+    const sourcePriority = ["mutm", "tutm", "butm", "g1utm", "outm", "unknown"];
+    
+    // Determine primary source per visitor and count ALL events under that source
+    const sourceGroups = {};
+    
+    Object.values(visitorData).forEach(visitor => {
+        // Find primary source (highest priority)
+        let primarySource = "unknown";
+        for (const src of sourcePriority) {
+            if (visitor.prefixes.has(src)) {
+                primarySource = src;
+                break;
+            }
+        }
+        
+        if (!sourceGroups[primarySource]) {
+            sourceGroups[primarySource] = { total: 0, events: {}, visitors: new Set() };
+        }
+        
+        // Count ALL events under primary source
+        visitor.events.forEach(ev => {
+            sourceGroups[primarySource].total++;
+            sourceGroups[primarySource].events[ev.eventType] = (sourceGroups[primarySource].events[ev.eventType] || 0) + 1;
+        });
+        sourceGroups[primarySource].visitors.add(visitor);
+    });
+    
+    // Convert to output format
+    const sources = Object.entries(sourceGroups)
+        .map(([prefix, data]) => {
+            const sortedEvents = Object.entries(data.events)
+                .map(([event, count]) => ({ event, count }))
+                .sort((a, b) => b.count - a.count);
+            return { 
+                prefix, 
+                total: data.total, 
+                uniqueVisitors: data.visitors.size,
+                events: sortedEvents 
+            };
+        })
+        .sort((a, b) => b.total - a.total);
+    
+    res.json({
+        totalEvents: oursData.length,
+        uniqueVisitors: Object.keys(visitorData).length,
+        sources,
+        dateRange: { startDate, endDate },
+        lastUpdated: oursData.length > 0 ? oursData[oursData.length - 1].timestamp : null
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Get l_f_s events grouped by source
+app.get("/api/ours-privacy/lfs", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let oursData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy") &&
+        d.body && d.body.event && d.body.event.event === "l_f_s"
+    );
+    
+    // Apply date filtering
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Group by utm_source
+    const sourceGroups = {};
+    oursData.forEach(d => {
+        const source = d.body.visitor?.utm_source || "Unknown";
+        sourceGroups[source] = (sourceGroups[source] || 0) + 1;
+    });
+    
+    const sources = Object.entries(sourceGroups)
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count);
+    
+    res.json({
+        total: oursData.length,
+        sources,
+        lastUpdated: oursData.length > 0 ? oursData[oursData.length - 1].timestamp : null
+    });
+});
+
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -2366,4 +2733,5 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
     
     res.json({ zipcodes: results });
 });
+
 

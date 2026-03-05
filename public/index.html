@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meta Ads Dashboard | Meta Business VTC</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1772716068">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -82,6 +82,10 @@
                     </div>
                 </div>
             </nav>
+            
+                <div class="nav-section">
+                    <button class="nav-item nav-item-main" data-view="oursPrivacy">🔒 Ours Privacy</button>
+                </div>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
@@ -225,6 +229,15 @@
                 <p class="section-subtitle">Geographic performance by zipcode (Google + Bing combined)</p>
                 
                 <div class="heatmap-controls">
+                    <div style="margin-bottom: 15px;">
+                        <label for="heatmapMetric" style="margin-right: 8px; font-weight: 500;">View by:</label>
+                        <select id="heatmapMetric" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd;">
+                            <option value="conversions">Conversions</option>
+                            <option value="impressions">Impressions</option>
+                            <option value="clicks">Clicks</option>
+                            <option value="cost">Cost</option>
+                        </select>
+                    </div>
                     <div class="heatmap-stats">
                         <div class="stat-box">
                             <span class="stat-label">Total Zipcodes</span>
@@ -240,7 +253,7 @@
                         </div>
                     </div>
                     <div class="heatmap-legend">
-                        <span class="legend-label">Conversions:</span>
+                        <span class="legend-label" id="heatmapLegendLabel">Conversions:</span>
                         <span>Low</span>
                         <div class="legend-gradient"></div>
                         <span>High</span>
@@ -250,7 +263,7 @@
                 <div id="heatmapContainer" style="height: 600px; width: 100%; border-radius: 8px; overflow: hidden;"></div>
                 
                 <div class="table-section" style="margin-top: 20px;">
-                    <h3>📍 Top Converting Zipcodes</h3>
+                    <h3 id="heatmapTableTitle">📍 Top Zipcodes</h3>
                     <div class="table-filters" style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
                         <div>
                             <label for="heatmapSourceFilter" style="margin-right: 8px; font-weight: 500;">Source:</label>
@@ -1380,6 +1393,81 @@
                 </div>
             </section>
         </div><!-- End Google Ads Creative View -->
+                                                <!-- Ours Privacy View -->
+        <div id="oursPrivacyView" class="view-content hidden">
+            <h1>🔒 Ours Privacy Events</h1>
+            
+            <!-- KPI Cards -->
+            <section class="kpi-cards">
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total Events</div>
+                    <div class="kpi-value" id="oursTotalEvents">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Unique Visitors</div>
+                    <div class="kpi-value" id="oursUniqueVisitors">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">l_f_s Events</div>
+                    <div class="kpi-value" id="oursLfsTotal">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Last Event</div>
+                    <div class="kpi-value" id="oursLastEvent" style="font-size: 0.9em;">-</div>
+                </div>
+            </section>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <!-- l_f_s Card -->
+                <section class="table-section" style="flex: 0 0 250px;">
+                    <h2>📋 l_f_s</h2>
+                    <div class="ours-scroll-card" style="max-height: 300px;">
+                        <table class="ours-table">
+                            <tbody id="oursLfsBody">
+                                <tr><td colspan="2" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- By UTM Source Card -->
+                <section class="table-section" style="flex: 1; min-width: 300px; max-width: 400px;">
+                    <h2>BY UTM SOURCE</h2>
+                    <div class="ours-scroll-card">
+                        <table id="oursSourceTable" class="ours-table">
+                            <tbody id="oursSourceBody">
+                                <tr><td colspan="2" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Recent Events Card -->
+                <section class="table-section" style="flex: 2; min-width: 400px;">
+                    <h2>🕐 Recent Events</h2>
+                    <div class="ours-scroll-card">
+                        <table id="oursRecentTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Event</th>
+                                    <th>Source</th>
+                                    <th>Campaign</th>
+                                </tr>
+                            </thead>
+                            <tbody id="oursRecentBody">
+                                <tr><td colspan="4" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div><!-- End Ours Privacy View -->
+
+
+
+
+
 
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
@@ -1387,6 +1475,6 @@
             </footer>
         </main><!-- End Main Content -->
     </div>
-    <script src="dashboard.js?v=1772483843"></script>
+    <script src="dashboard.js?v=1772716620"></script>
 </body>
 </html>

@@ -296,6 +296,8 @@ function initializeDashboard() {
                 loadGoogleSearchTermsData();
             } else if (currentView === 'bingAds') {
                 loadBingAdsData();
+            } else if (currentView === 'oursPrivacy') {
+                loadOursPrivacyData();
             } else if (currentView === 'googleAdsCreative') {
                 loadGoogleAdsData();
             }
@@ -368,7 +370,9 @@ function initializeDashboard() {
             loadGoogleGeoData();
         } else if (currentView === 'googleSearchTerms') {
             loadGoogleSearchTermsData();
-        } else if (currentView === 'googleAdsCreative') {
+        } else if (currentView === 'oursPrivacy') {
+                loadOursPrivacyData();
+            } else if (currentView === 'googleAdsCreative') {
             loadGoogleAdsData();
         } else if (currentView === 'heatmap') {
             loadHeatmapData();
@@ -406,6 +410,7 @@ function initializeDashboard() {
             document.getElementById('googleGeoView').classList.toggle('hidden', currentView !== 'googleGeo');
             document.getElementById('googleSearchTermsView').classList.toggle('hidden', currentView !== 'googleSearchTerms');
             document.getElementById('googleAdsCreativeView').classList.toggle('hidden', currentView !== 'googleAdsCreative');
+            document.getElementById('oursPrivacyView').classList.toggle('hidden', currentView !== 'oursPrivacy');
             
             // Load data for the selected view
             if (currentView === 'heatmap' && !heatmapDataLoaded) {
@@ -446,6 +451,9 @@ function initializeDashboard() {
             }
             if (currentView === 'googleSearchTerms' && !searchTermsDataLoaded) {
                 loadGoogleSearchTermsData();
+            }
+            if (currentView === 'oursPrivacy') {
+                loadOursPrivacyData();
             }
             if (currentView === 'bingAds' && !bingAdsDataLoaded) {
                 loadBingAdsData();
@@ -510,7 +518,9 @@ function initializeDashboard() {
             loadGoogleSearchTermsData();
         } else if (currentView === 'bingAds') {
             loadBingAdsData();
-        } else if (currentView === 'googleAdsCreative') {
+        } else if (currentView === 'oursPrivacy') {
+                loadOursPrivacyData();
+            } else if (currentView === 'googleAdsCreative') {
             loadGoogleAdsData();
         }
     });
@@ -4401,6 +4411,7 @@ let heatmapSortDirection = 'desc';
 let heatmapSourceFilter = 'all';
 let heatmapStateFilter = 'all';
 let heatmapSearchText = '';
+let heatmapMetric = 'conversions';
 
 // US Zipcode coordinates cache (loaded dynamically)
 const zipcodeCoords = {};
@@ -4409,7 +4420,8 @@ async function loadZipcodeCoordinates(zipcodes) {
     const uncached = zipcodes.filter(z => !zipcodeCoords[z]);
     if (uncached.length === 0) return;
     
-    for (const zip of uncached.slice(0, 100)) {
+    // Load all uncached zipcodes (up to 500 per batch)
+    for (const zip of uncached.slice(0, 500)) {
         try {
             const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
             if (response.ok) {
@@ -4471,6 +4483,11 @@ async function loadHeatmapData() {
 }
 
 function setupHeatmapFilters() {
+    document.getElementById('heatmapMetric').addEventListener('change', (e) => {
+        heatmapMetric = e.target.value;
+        updateHeatmapDisplay();
+    });
+
     document.getElementById('heatmapSourceFilter').addEventListener('change', (e) => {
         heatmapSourceFilter = e.target.value;
         updateHeatmapDisplay();
@@ -4556,19 +4573,36 @@ function getFilteredHeatmapData() {
     return filtered;
 }
 
-function updateHeatmapDisplay() {
+async function updateHeatmapDisplay() {
     const filtered = getFilteredHeatmapData();
     
+    // Load coordinates for filtered zipcodes that don't have them yet
+    const needCoords = filtered.filter(z => !zipcodeCoords[z.zipcode]).map(z => z.zipcode);
+    if (needCoords.length > 0) {
+        await loadZipcodeCoordinates(needCoords);
+    }
+    
     // Update stats for filtered data
-    document.getElementById('heatmapZipcodeCount').textContent = filtered.length.toLocaleString();
-    document.getElementById('heatmapTotalConversions').textContent = 
-        filtered.reduce((sum, z) => sum + z.conversions, 0).toFixed(1);
-    document.getElementById('heatmapTotalSpend').textContent = 
-        '$' + filtered.reduce((sum, z) => sum + z.cost, 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById("heatmapZipcodeCount").textContent = filtered.length.toLocaleString();
+    
+    // Update metric total based on selected metric
+    const metricTotal = filtered.reduce((sum, z) => sum + (z[heatmapMetric] || 0), 0);
+    document.getElementById("heatmapTotalConversions").textContent = 
+        heatmapMetric === "cost" ? "$" + metricTotal.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 
+        (heatmapMetric === "conversions" ? metricTotal.toFixed(1) : metricTotal.toLocaleString());
+    
+    // Update legend label
+    const metricName = heatmapMetric.charAt(0).toUpperCase() + heatmapMetric.slice(1);
+    const legendLabel = document.getElementById("heatmapLegendLabel");
+    if (legendLabel) legendLabel.textContent = metricName + ":";
+    
+    document.getElementById("heatmapTotalSpend").textContent = 
+        "$" + filtered.reduce((sum, z) => sum + z.cost, 0).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
     renderHeatmap(filtered);
     renderZipcodeTable(filtered);
 }
+
 
 function renderHeatmap(zipcodes) {
     // Initialize map if not exists
@@ -4589,20 +4623,20 @@ function renderHeatmap(zipcodes) {
     
     // Prepare heatmap data
     const heatData = [];
-    const maxConversions = Math.max(...zipcodes.map(z => z.conversions), 1);
+    const maxValue = Math.max(...zipcodes.map(z => z[heatmapMetric] || 0), 1);
     
     zipcodes.forEach(z => {
         const coords = zipcodeCoords[z.zipcode];
         if (coords) {
             // Add to heatmap with intensity based on conversions
-            const intensity = z.conversions / maxConversions;
+            const intensity = (z[heatmapMetric] || 0) / maxValue;
             heatData.push([coords.lat, coords.lng, intensity]);
             
             // Add marker for top zipcodes
-            if (z.conversions >= 1) {
+            if ((z[heatmapMetric] || 0) >= (heatmapMetric === 'conversions' ? 1 : heatmapMetric === 'impressions' ? 100 : heatmapMetric === 'clicks' ? 10 : 1)) {
                 const marker = L.circleMarker([coords.lat, coords.lng], {
-                    radius: Math.min(5 + (z.conversions / maxConversions) * 15, 20),
-                    fillColor: getHeatColor(z.conversions / maxConversions),
+                    radius: Math.min(5 + ((z[heatmapMetric] || 0) / maxValue) * 15, 20),
+                    fillColor: getHeatColor((z[heatmapMetric] || 0) / maxValue),
                     color: '#fff',
                     weight: 1,
                     opacity: 1,
@@ -4860,4 +4894,152 @@ function renderGoogleAdsTable(ads) {
 function truncate(str, maxLen) {
     if (!str) return '-';
     return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}
+
+
+
+
+
+
+// ==================== Ours Privacy (By Source) ====================
+
+async function loadOursPrivacyData() {
+    try {
+        // Get current date range
+        const startDateEl = document.getElementById("startDate");
+        const endDateEl = document.getElementById("endDate");
+        let startDate = startDateEl ? startDateEl.value : "";
+        let endDate = endDateEl ? endDateEl.value : "";
+        
+        if (!startDate || !endDate) {
+            const today = new Date();
+            const end = new Date(today);
+            let start = new Date(today);
+            
+            if (typeof currentRange !== "undefined") {
+                if (currentRange === "today") {
+                } else if (currentRange === "yesterday") {
+                    start.setDate(start.getDate() - 1);
+                    end.setDate(end.getDate() - 1);
+                } else if (currentRange === "7d") {
+                    start.setDate(start.getDate() - 6);
+                } else if (currentRange === "14d") {
+                    start.setDate(start.getDate() - 13);
+                } else if (currentRange === "30d") {
+                    start.setDate(start.getDate() - 29);
+                }
+            }
+            
+            startDate = start.toISOString().split("T")[0];
+            endDate = end.toISOString().split("T")[0];
+        }
+        
+        const params = new URLSearchParams({ startDate, endDate });
+        
+        const [sourceRes, lfsRes, rawRes] = await Promise.all([
+            fetch("/api/ours-privacy/by-source?" + params),
+            fetch("/api/ours-privacy/lfs?" + params),
+            fetch("/api/ours-privacy/raw?limit=15")
+        ]);
+        
+        const sourceData = await sourceRes.json();
+        const lfsData = await lfsRes.json();
+        const rawData = await rawRes.json();
+        
+        // Update KPIs
+        document.getElementById("oursTotalEvents").textContent = sourceData.totalEvents.toLocaleString();
+        document.getElementById("oursUniqueVisitors").textContent = sourceData.uniqueVisitors || 0;
+        document.getElementById("oursLfsTotal").textContent = lfsData.total || 0;
+        
+        if (sourceData.lastUpdated) {
+            const lastTime = new Date(sourceData.lastUpdated);
+            document.getElementById("oursLastEvent").textContent = lastTime.toLocaleTimeString();
+        } else {
+            document.getElementById("oursLastEvent").textContent = "-";
+        }
+        
+        // Build l_f_s card
+        const lfsBody = document.getElementById("oursLfsBody");
+        if (lfsData.sources.length === 0) {
+            lfsBody.innerHTML = "<tr><td colspan=\"2\" style=\"padding:15px;color:#888;\">No l_f_s events</td></tr>";
+        } else {
+            let lfsHtml = "";
+            lfsData.sources.forEach(src => {
+                lfsHtml += "<tr class=\"ours-event-row\">";
+                lfsHtml += "<td class=\"ours-event-name\">" + src.source + "</td>";
+                lfsHtml += "<td class=\"ours-event-count\">" + src.count + "</td>";
+                lfsHtml += "</tr>";
+            });
+            // Add total row
+            lfsHtml += "<tr class=\"ours-source-row\">";
+            lfsHtml += "<td>Total</td>";
+            lfsHtml += "<td class=\"ours-source-total\">" + lfsData.total + "</td>";
+            lfsHtml += "</tr>";
+            lfsBody.innerHTML = lfsHtml;
+        }
+        
+        // Build source table
+        const tbody = document.getElementById("oursSourceBody");
+        if (sourceData.sources.length === 0) {
+            tbody.innerHTML = "<tr><td colspan=\"2\" style=\"color:#888;padding:20px;\">No events</td></tr>";
+        } else {
+            let html = "";
+            sourceData.sources.forEach(src => {
+                html += "<tr class=\"ours-source-row\">";
+                html += "<td class=\"ours-source-name\">" + src.prefix + "</td>";
+                html += "<td class=\"ours-source-total\">" + src.total + "</td>";
+                html += "</tr>";
+                src.events.forEach(ev => {
+                    html += "<tr class=\"ours-event-row\">";
+                    html += "<td class=\"ours-event-name\">" + ev.event + "</td>";
+                    html += "<td class=\"ours-event-count\">" + ev.count + "</td>";
+                    html += "</tr>";
+                });
+            });
+            tbody.innerHTML = html;
+        }
+        
+        // Recent events table
+        const recentBody = document.getElementById("oursRecentBody");
+        if (rawData.data.length === 0) {
+            recentBody.innerHTML = "<tr><td colspan=\"4\">No recent events</td></tr>";
+        } else {
+            recentBody.innerHTML = rawData.data.map(d => {
+                const time = new Date(d.timestamp).toLocaleString();
+                const event = d.body?.event?.event || "-";
+                const source = d.body?.visitor?.utm_source || "-";
+                const campaign = d.body?.visitor?.utm_campaign || "-";
+                const shortCampaign = campaign.length > 30 ? campaign.substring(0, 30) + "..." : campaign;
+                return "<tr><td>" + time + "</td><td><code>" + event + "</code></td><td>" + source + "</td><td title=\"" + campaign + "\">" + shortCampaign + "</td></tr>";
+            }).join("");
+        }
+        
+    } catch (err) {
+        console.error("Ours Privacy load error:", err);
+    }
+}
+
+
+// Hook into view switching
+const originalSwitchView = typeof switchView === "function" ? switchView : null;
+if (originalSwitchView) {
+    const newSwitchView = function(view) {
+        originalSwitchView(view);
+        if (view === "oursPrivacy") {
+            loadOursPrivacyData();
+        }
+    };
+    // Replace switchView reference
+    document.querySelectorAll("[data-view]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const view = btn.dataset.view;
+            if (view === "oursPrivacy") {
+                document.querySelectorAll(".view-content").forEach(v => v.classList.add("hidden"));
+                document.getElementById("oursPrivacyView")?.classList.remove("hidden");
+                document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+                btn.classList.add("active");
+                loadOursPrivacyData();
+            }
+        });
+    });
 }
