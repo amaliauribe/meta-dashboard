@@ -4420,8 +4420,8 @@ async function loadZipcodeCoordinates(zipcodes) {
     const uncached = zipcodes.filter(z => !zipcodeCoords[z]);
     if (uncached.length === 0) return;
     
-    // Load all uncached zipcodes (up to 500 per batch)
-    for (const zip of uncached.slice(0, 500)) {
+    // Load all uncached zipcodes
+    for (const zip of uncached) {
         try {
             const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
             if (response.ok) {
@@ -4465,8 +4465,8 @@ async function loadHeatmapData() {
         stateSelect.innerHTML = '<option value="all">All States</option>' + 
             states.map(s => `<option value="${s}">${s}</option>`).join('');
         
-        // Load coordinates for top zipcodes
-        await loadZipcodeCoordinates(heatmapRawData.slice(0, 200).map(z => z.zipcode));
+        // Load coordinates for ALL zipcodes
+        await loadZipcodeCoordinates(heatmapRawData.map(z => z.zipcode));
         
         // Setup filter event listeners
         setupHeatmapFilters();
