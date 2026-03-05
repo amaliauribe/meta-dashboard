@@ -3016,7 +3016,7 @@ async function loadBingDailyData() {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
@@ -3439,7 +3439,7 @@ async function loadGoogleDailyData() {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
