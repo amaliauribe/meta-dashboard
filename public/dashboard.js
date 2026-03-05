@@ -954,12 +954,17 @@ async function updateMetaFunnel(impressions, clicks, conversions) {
             const end = new Date(today);
             const start = new Date(today);
             
-            if (range.days) {
+            // Handle presets
+            if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
                 start.setDate(start.getDate() - range.days + 1);
             }
+            // 'today' preset or days=1 uses today's date (no change needed)
             
-            startDate = start.toISOString().split('T')[0];
-            endDate = end.toISOString().split('T')[0];
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
         }
         
         const params = new URLSearchParams({ startDate, endDate });
