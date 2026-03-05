@@ -4585,19 +4585,20 @@ async function updateHeatmapDisplay() {
     // Update stats for filtered data
     document.getElementById("heatmapZipcodeCount").textContent = filtered.length.toLocaleString();
     
-    // Update metric total based on selected metric
-    const metricTotal = filtered.reduce((sum, z) => sum + (z[heatmapMetric] || 0), 0);
+    // Update all metric totals
+    document.getElementById("heatmapTotalImpressions").textContent = 
+        filtered.reduce((sum, z) => sum + (z.impressions || 0), 0).toLocaleString();
+    document.getElementById("heatmapTotalClicks").textContent = 
+        filtered.reduce((sum, z) => sum + (z.clicks || 0), 0).toLocaleString();
     document.getElementById("heatmapTotalConversions").textContent = 
-        heatmapMetric === "cost" ? "$" + metricTotal.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 
-        (heatmapMetric === "conversions" ? metricTotal.toFixed(1) : metricTotal.toLocaleString());
+        filtered.reduce((sum, z) => sum + (z.conversions || 0), 0).toFixed(1);
+    document.getElementById("heatmapTotalSpend").textContent = 
+        "$" + filtered.reduce((sum, z) => sum + (z.cost || 0), 0).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
     // Update legend label
     const metricName = heatmapMetric.charAt(0).toUpperCase() + heatmapMetric.slice(1);
     const legendLabel = document.getElementById("heatmapLegendLabel");
     if (legendLabel) legendLabel.textContent = metricName + ":";
-    
-    document.getElementById("heatmapTotalSpend").textContent = 
-        "$" + filtered.reduce((sum, z) => sum + z.cost, 0).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
     renderHeatmap(filtered);
     renderZipcodeTable(filtered);
