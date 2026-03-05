@@ -2594,6 +2594,70 @@ app.get("/api/ours-privacy/lfs-by-platform", (req, res) => {
     });
 });
 
+// Get l_f_s daily breakdown with platform counts
+app.get("/api/ours-privacy/lfs-daily-breakdown", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    const allData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Build visitor platform mapping
+    const visitorPlatform = {};
+    allData.forEach(d => {
+        const event = d.body?.event?.event || "";
+        const visitorId = d.body?.visitor?.visitor_id;
+        if (!visitorId) return;
+        
+        if (event.startsWith("mutm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "meta";
+        if (event.startsWith("g1utm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "google";
+        if (event.startsWith("butm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "bing";
+        if (event.startsWith("tutm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "tiktok";
+    });
+    
+    // Filter l_f_s events
+    let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
+    
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        lfsData = lfsData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        lfsData = lfsData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Group by date with platform breakdown
+    const byDate = {};
+    lfsData.forEach(d => {
+        const date = d.timestamp.split("T")[0];
+        const visitorId = d.body?.visitor?.visitor_id;
+        const source = (d.body?.visitor?.utm_source || "").toLowerCase();
+        
+        // Determine platform
+        let platform = visitorPlatform[visitorId] || "other";
+        if (platform === "other") {
+            if (source === "facebook" || source === "fb") platform = "meta";
+            else if (source === "google") platform = "google";
+            else if (source === "bing") platform = "bing";
+            else if (source === "tiktok") platform = "tiktok";
+        }
+        
+        if (!byDate[date]) {
+            byDate[date] = { total: 0, meta: 0, google: 0, bing: 0, tiktok: 0, other: 0 };
+        }
+        byDate[date].total++;
+        byDate[date][platform]++;
+    });
+    
+    res.json({ byDate });
+});
+
 // Get l_f_s events by platform grouped by date
 app.get("/api/ours-privacy/lfs-by-date", (req, res) => {
     const data = global.webhookData || [];

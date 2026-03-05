@@ -5193,15 +5193,46 @@ async function loadOursPrivacyData() {
         
         const params = new URLSearchParams({ startDate, endDate });
         
-        const [sourceRes, lfsRes, rawRes] = await Promise.all([
+        const [sourceRes, lfsRes, rawRes, dailyRes] = await Promise.all([
             fetch("/api/ours-privacy/by-source?" + params),
             fetch("/api/ours-privacy/lfs?" + params),
-            fetch("/api/ours-privacy/raw?limit=15")
+            fetch("/api/ours-privacy/raw?limit=15"),
+            fetch("/api/ours-privacy/lfs-daily-breakdown?" + params)
         ]);
         
         const sourceData = await sourceRes.json();
         const lfsData = await lfsRes.json();
         const rawData = await rawRes.json();
+        const dailyData = await dailyRes.json();
+        
+        // Build daily breakdown table
+        const dailyBody = document.getElementById("oursDailyBody");
+        const dates = Object.keys(dailyData.byDate || {}).sort().reverse();
+        
+        if (dates.length === 0) {
+            dailyBody.innerHTML = "<tr><td colspan=\"8\" class=\"loading\">No data for this period</td></tr>";
+        } else {
+            dailyBody.innerHTML = dates.map(date => {
+                const d = dailyData.byDate[date];
+                const dateParts = date.split('-');
+                const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
+                const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                return `
+                    <tr>
+                        <td>${dateFormatted}</td>
+                        <td>${dayOfWeek}</td>
+                        <td><strong>${d.total}</strong></td>
+                        <td>${d.meta || 0}</td>
+                        <td>${d.google || 0}</td>
+                        <td>${d.bing || 0}</td>
+                        <td>${d.tiktok || 0}</td>
+                        <td>${d.other || 0}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
         
         // Update KPIs
         document.getElementById("oursTotalEvents").textContent = sourceData.totalEvents.toLocaleString();
