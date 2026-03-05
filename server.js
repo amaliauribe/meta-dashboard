@@ -160,6 +160,54 @@ function isTikTokConfigured() {
            TIKTOK_CONFIG.accessToken;
 }
 
+// Looker API Configuration
+const LOOKER_CONFIG = {
+    baseUrl: process.env.LOOKER_BASE_URL || 'https://vipmedicalgroup.cloud.looker.com',
+    clientId: process.env.LOOKER_CLIENT_ID || 'zSZYbwPQyFbTBzJ6VYXk',
+    clientSecret: process.env.LOOKER_CLIENT_SECRET || 'nZ8KCdDcqqrcMtPgXMm5GrJy'
+};
+
+// Looker token cache
+let lookerAccessToken = null;
+let lookerTokenExpiry = null;
+
+async function getLookerToken() {
+    if (lookerAccessToken && lookerTokenExpiry && Date.now() < lookerTokenExpiry) {
+        return lookerAccessToken;
+    }
+    
+    const response = await fetch(`${LOOKER_CONFIG.baseUrl}/api/4.0/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `client_id=${LOOKER_CONFIG.clientId}&client_secret=${LOOKER_CONFIG.clientSecret}`
+    });
+    
+    const data = await response.json();
+    lookerAccessToken = data.access_token;
+    lookerTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+    return lookerAccessToken;
+}
+
+async function lookerQuery(view, fields, filters = {}, sorts = [], limit = 500) {
+    const token = await getLookerToken();
+    const response = await fetch(`${LOOKER_CONFIG.baseUrl}/api/4.0/queries/run/json`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: 'snow_prd_analytics_db',
+            view,
+            fields,
+            filters,
+            sorts,
+            limit: String(limit)
+        })
+    });
+    return response.json();
+}
+
 // Microsoft Advertising API Configuration (from environment variables)
 const MSADS_CONFIG = {
     clientId: process.env.MSADS_CLIENT_ID,
@@ -2754,6 +2802,108 @@ app.get("/api/ours-privacy/lfs", (req, res) => {
         sources,
         lastUpdated: oursData.length > 0 ? oursData[oursData.length - 1].timestamp : null
     });
+});
+
+// ==================== Looker API Endpoints ====================
+
+// Get leads funnel data by tracking type
+app.get('/api/looker/leads-funnel', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        
+        // Build date filter
+        let dateFilter = {};
+        if (startDate && endDate) {
+            dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = `${startDate} to ${endDate}`;
+        }
+        
+        // Get total leads by tracking type
+        const totalLeads = await lookerQuery(
+            'fct_leads_funnel_marketing_phi_exclude',
+            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
+            dateFilter,
+            ['fct_leads_funnel_marketing_phi_exclude.count desc']
+        );
+        
+        // Get is_booked by tracking type
+        const isBooked = await lookerQuery(
+            'fct_leads_funnel_marketing_phi_exclude',
+            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
+            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.is_booked': '1' },
+            ['fct_leads_funnel_marketing_phi_exclude.count desc']
+        );
+        
+        // Get sent_to_verification by tracking type
+        const sentToVerification = await lookerQuery(
+            'fct_leads_funnel_marketing_phi_exclude',
+            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
+            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.sent_to_verification': '1' },
+            ['fct_leads_funnel_marketing_phi_exclude.count desc']
+        );
+        
+        // Get is_booked_covered by tracking type
+        const isBookedCovered = await lookerQuery(
+            'fct_leads_funnel_marketing_phi_exclude',
+            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
+            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.is_booked_covered': '1' },
+            ['fct_leads_funnel_marketing_phi_exclude.count desc']
+        );
+        
+        // Get initial_fulfilled by tracking type
+        const initialFulfilled = await lookerQuery(
+            'fct_leads_funnel_marketing_phi_exclude',
+            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
+            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.initial_fulfilled': '1' },
+            ['fct_leads_funnel_marketing_phi_exclude.count desc']
+        );
+        
+        // Helper to convert array to map
+        const toMap = (arr) => {
+            const map = {};
+            arr.forEach(item => {
+                const type = item['fct_leads_funnel_marketing_phi_exclude.tracking_type'] || 'unknown';
+                map[type] = item['fct_leads_funnel_marketing_phi_exclude.count'] || 0;
+            });
+            return map;
+        };
+        
+        // Build response
+        const trackingTypes = ['mutm', 'outm', 'tutm', 'g1utm', 'butm', 'gbputm'];
+        const funnelData = {};
+        
+        const totalMap = toMap(totalLeads);
+        const bookedMap = toMap(isBooked);
+        const verificationMap = toMap(sentToVerification);
+        const coveredMap = toMap(isBookedCovered);
+        const fulfilledMap = toMap(initialFulfilled);
+        
+        trackingTypes.forEach(type => {
+            if (totalMap[type]) {
+                funnelData[type] = {
+                    l_f_s: totalMap[type] || 0,
+                    is_booked: bookedMap[type] || 0,
+                    sent_to_verification: verificationMap[type] || 0,
+                    is_booked_covered: coveredMap[type] || 0,
+                    initial_fulfilled: fulfilledMap[type] || 0
+                };
+            }
+        });
+        
+        res.json({
+            success: true,
+            data: funnelData,
+            totals: {
+                l_f_s: Object.values(totalMap).reduce((a, b) => a + b, 0),
+                is_booked: Object.values(bookedMap).reduce((a, b) => a + b, 0),
+                sent_to_verification: Object.values(verificationMap).reduce((a, b) => a + b, 0),
+                is_booked_covered: Object.values(coveredMap).reduce((a, b) => a + b, 0),
+                initial_fulfilled: Object.values(fulfilledMap).reduce((a, b) => a + b, 0)
+            }
+        });
+    } catch (error) {
+        console.error('Looker leads funnel error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 

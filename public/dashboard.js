@@ -2531,6 +2531,109 @@ async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
     }
 }
 
+// Load Medwork Leads Funnel from Looker
+async function loadMedworkFunnel() {
+    const container = document.getElementById('medworkFunnelContainer');
+    const totalsContainer = document.getElementById('medworkTotalFunnel');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">Loading Medwork funnel data...</div>';
+    
+    try {
+        // Get date range
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.preset === 'today' || range.preset === 'yesterday') {
+            const today = getESTDate();
+            const d = new Date(today);
+            if (range.preset === 'yesterday') d.setDate(d.getDate() - 1);
+            startDate = endDate = formatDateEST(d);
+        } else if (range.days) {
+            const today = getESTDate();
+            const start = new Date(today);
+            start.setDate(today.getDate() - range.days + 1);
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(today);
+        }
+        
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        
+        const response = await fetch(`/api/looker/leads-funnel?${params}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            container.innerHTML = '<div class="loading">Error loading funnel data</div>';
+            return;
+        }
+        
+        const data = result.data;
+        const totals = result.totals;
+        
+        // Tracking type labels
+        const typeLabels = {
+            'mutm': { name: 'Meta', color: '#4267B2', emoji: '📘' },
+            'outm': { name: 'Organic', color: '#34A853', emoji: '🌿' },
+            'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
+            'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
+            'butm': { name: 'Bing', color: '#00A4EF', emoji: '🔷' },
+            'gbputm': { name: 'GBP', color: '#F4B400', emoji: '📍' }
+        };
+        
+        // Build funnel cards for each tracking type
+        let html = '';
+        Object.keys(data).forEach(type => {
+            const info = typeLabels[type] || { name: type, color: '#666', emoji: '📊' };
+            const d = data[type];
+            html += `
+                <div class="funnel-card" style="flex: 1; min-width: 200px; max-width: 250px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
+                    <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.emoji} ${info.name}</h3>
+                    <div class="mini-funnel">
+                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row" style="background: #d4edda;"><span>Fulfilled</span><span>${d.initial_fulfilled.toLocaleString()}</span></div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html || '<div class="loading">No funnel data available</div>';
+        
+        // Build total funnel visualization
+        const stages = [
+            { label: 'l_f_s', value: totals.l_f_s, color: '#6366f1' },
+            { label: 'Is Booked', value: totals.is_booked, color: '#8b5cf6' },
+            { label: 'Sent to Verif.', value: totals.sent_to_verification, color: '#a855f7' },
+            { label: 'Booked Covered', value: totals.is_booked_covered, color: '#d946ef' },
+            { label: 'Fulfilled', value: totals.initial_fulfilled, color: '#22c55e' }
+        ];
+        
+        const maxValue = Math.max(...stages.map(s => s.value), 1);
+        
+        totalsContainer.innerHTML = stages.map(stage => {
+            const height = Math.max((stage.value / maxValue) * 150, 20);
+            const rate = totals.l_f_s > 0 ? ((stage.value / totals.l_f_s) * 100).toFixed(1) : 0;
+            return `
+                <div style="flex: 1; text-align: center;">
+                    <div style="height: ${height}px; background: ${stage.color}; border-radius: 8px 8px 0 0; min-width: 60px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                        ${stage.value}
+                    </div>
+                    <div style="font-size: 11px; margin-top: 5px; color: #666;">${stage.label}</div>
+                    <div style="font-size: 10px; color: #999;">${rate}%</div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (e) {
+        console.error('Error loading Medwork funnel:', e);
+        container.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+    }
+}
+
 async function loadSummaryData() {
     document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading summary data...</td></tr>';
     document.getElementById('summaryWeeklyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
@@ -2681,6 +2784,9 @@ async function loadSummaryData() {
         
         // Load summary funnels
         loadSummaryFunnels(totalMeta, totalGoogle, totalBing);
+        
+        // Load Medwork leads funnel
+        loadMedworkFunnel();
         
         // Weekly breakdown
         const weeklyPeriods = [
