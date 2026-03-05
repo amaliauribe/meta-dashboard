@@ -2507,6 +2507,59 @@ app.get("/api/ours-privacy/by-source", (req, res) => {
 
 
 
+// Get l_f_s events by platform (meta, google, bing, tiktok)
+app.get("/api/ours-privacy/lfs-by-platform", (req, res) => {
+    const data = global.webhookData || [];
+    const platform = (req.query.platform || "").toLowerCase();
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    // Define source patterns for each platform
+    const platformSources = {
+        meta: ["facebook", "fb", "instagram", "meta"],
+        google: ["google", "gclid"],
+        bing: ["bing", "msclkid"],
+        tiktok: ["tiktok", "tt"]
+    };
+    
+    const sourcesToMatch = platformSources[platform] || [];
+    
+    let oursData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy") &&
+        d.body && d.body.event && d.body.event.event === "l_f_s"
+    );
+    
+    // Apply date filtering
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Filter by platform sources
+    const filtered = oursData.filter(d => {
+        const source = (d.body.visitor?.utm_source || "").toLowerCase();
+        return sourcesToMatch.some(s => source.includes(s));
+    });
+    
+    res.json({
+        platform,
+        total: filtered.length,
+        sources: sourcesToMatch,
+        events: filtered.slice(0, 50).map(d => ({
+            timestamp: d.timestamp,
+            source: d.body.visitor?.utm_source,
+            campaign: d.body.visitor?.utm_campaign
+        }))
+    });
+});
+
 // Get l_f_s events grouped by source
 app.get("/api/ours-privacy/lfs", (req, res) => {
     const data = global.webhookData || [];

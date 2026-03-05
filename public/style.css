@@ -1884,3 +1884,67 @@ table.resizable-table td {
 .ours-scroll-card table {
     margin: 0;
 }
+
+/* Journey Funnel */
+.funnel-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    max-width: 800px;
+}
+
+.funnel-step {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.funnel-bar {
+    height: 45px;
+    width: var(--step-width, 100%);
+    border-radius: 8px;
+    transition: width 0.5s ease;
+    min-width: 60px;
+}
+
+.funnel-bar.impressions {
+    background: linear-gradient(90deg, #4267B2, #5b7bd5);
+}
+
+.funnel-bar.clicks {
+    background: linear-gradient(90deg, #1877F2, #42a5f5);
+}
+
+.funnel-bar.conversions {
+    background: linear-gradient(90deg, #42B72A, #66bb6a);
+}
+
+.funnel-bar.lfs {
+    background: linear-gradient(90deg, #F7931A, #ffb74d);
+}
+
+.funnel-label {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.funnel-name {
+    font-size: 0.85em;
+    color: #666;
+    font-weight: 500;
+}
+
+.funnel-value {
+    font-size: 1.4em;
+    font-weight: 700;
+    color: #333;
+}
+
+.funnel-rate {
+    font-size: 0.8em;
+    color: #888;
+}

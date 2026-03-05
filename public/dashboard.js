@@ -919,10 +919,65 @@ async function loadKPIs() {
             document.getElementById('cpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             document.getElementById('ctr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
             document.getElementById('impressions').textContent = impressions.toLocaleString();
+            
+            // Update funnel with Meta data
+            updateMetaFunnel(impressions, clicks, results);
         }
     } catch (e) { 
         console.error('KPI error:', e); 
     }
+}
+
+async function updateMetaFunnel(impressions, clicks, conversions) {
+    // Update Meta metrics in funnel
+    document.getElementById('funnelImpressions').textContent = impressions.toLocaleString();
+    document.getElementById('funnelClicks').textContent = clicks.toLocaleString();
+    document.getElementById('funnelConversions').textContent = conversions.toLocaleString();
+    
+    // Calculate rates
+    const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : 0;
+    const convRate = clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : 0;
+    document.getElementById('funnelCtr').textContent = ctr + '% CTR';
+    document.getElementById('funnelConvRate').textContent = convRate + '% conv rate';
+    
+    // Fetch l_f_s data for Meta sources
+    try {
+        const range = dateRanges[currentRange];
+        const dateRange = getBingDateRange(range);
+        const params = new URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+        
+        const response = await fetch('/api/ours-privacy/lfs-by-platform?platform=meta&' + params);
+        const data = await response.json();
+        
+        const lfsCount = data.total || 0;
+        document.getElementById('funnelLfs').textContent = lfsCount.toLocaleString();
+        
+        const lfsRate = conversions > 0 ? ((lfsCount / conversions) * 100).toFixed(1) : 0;
+        document.getElementById('funnelLfsRate').textContent = lfsRate + '% of conv';
+        
+        // Update funnel bar widths based on actual ratios
+        updateFunnelBars(impressions, clicks, conversions, lfsCount);
+    } catch (e) {
+        console.error('Error fetching l_f_s for funnel:', e);
+        document.getElementById('funnelLfs').textContent = '-';
+        document.getElementById('funnelLfsRate').textContent = '';
+    }
+}
+
+function updateFunnelBars(impressions, clicks, conversions, lfs) {
+    const steps = document.querySelectorAll('.funnel-step');
+    if (steps.length < 4) return;
+    
+    // Calculate percentages relative to impressions
+    const maxVal = Math.max(impressions, 1);
+    const clicksPct = Math.max((clicks / maxVal) * 100, 5);
+    const convPct = Math.max((conversions / maxVal) * 100, 3);
+    const lfsPct = Math.max((lfs / maxVal) * 100, 2);
+    
+    steps[0].style.setProperty('--step-width', '100%');
+    steps[1].style.setProperty('--step-width', Math.min(clicksPct * 2, 80) + '%');
+    steps[2].style.setProperty('--step-width', Math.min(convPct * 10, 60) + '%');
+    steps[3].style.setProperty('--step-width', Math.min(lfsPct * 20, 40) + '%');
 }
 
 async function loadChartData() {
