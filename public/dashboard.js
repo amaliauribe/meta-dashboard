@@ -288,6 +288,8 @@ function initializeDashboard() {
             heatmapDataLoaded = false; // Reset heatmap data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
+            } else if (currentView === 'funnels') {
+                loadFunnelsData();
             } else if (currentView === 'campaigns') {
                 loadData();
             } else if (currentView === 'ads') {
@@ -359,6 +361,8 @@ function initializeDashboard() {
         // Load data for current view
         if (currentView === 'summary') {
             loadSummaryData();
+        } else if (currentView === 'funnels') {
+            loadFunnelsData();
         } else if (currentView === 'campaigns') {
             loadData();
         } else if (currentView === 'ads') {
@@ -382,8 +386,8 @@ function initializeDashboard() {
         } else if (currentView === 'googleSearchTerms') {
             loadGoogleSearchTermsData();
         } else if (currentView === 'oursPrivacy') {
-                loadOursPrivacyData();
-            } else if (currentView === 'googleAdsCreative') {
+            loadOursPrivacyData();
+        } else if (currentView === 'googleAdsCreative') {
             loadGoogleAdsData();
         } else if (currentView === 'heatmap') {
             loadHeatmapData();
@@ -406,6 +410,7 @@ function initializeDashboard() {
             
             // Show/hide views
             document.getElementById('summaryView').classList.toggle('hidden', currentView !== 'summary');
+            document.getElementById('funnelsView').classList.toggle('hidden', currentView !== 'funnels');
             document.getElementById('heatmapView').classList.toggle('hidden', currentView !== 'heatmap');
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
@@ -432,6 +437,9 @@ function initializeDashboard() {
             }
             if (currentView === 'summary' && !summaryDataLoaded) {
                 loadSummaryData();
+            }
+            if (currentView === 'funnels') {
+                loadFunnelsData();
             }
             if (currentView === 'ads' && !adsDataLoaded) {
                 loadAdsData();
@@ -510,6 +518,8 @@ function initializeDashboard() {
         summaryDataLoaded = false;
         if (currentView === 'summary') {
             loadSummaryData();
+        } else if (currentView === 'funnels') {
+            loadFunnelsData();
         } else if (currentView === 'campaigns') {
             loadData();
         } else if (currentView === 'ads') {
@@ -2632,6 +2642,231 @@ async function loadMedworkFunnel() {
         console.error('Error loading Medwork funnel:', e);
         container.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
     }
+}
+
+// Funnels comparison chart instance
+let funnelsComparisonChart = null;
+
+// Load Funnels View Data
+async function loadFunnelsData() {
+    try {
+        // Get date range
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else if (range.preset === 'today' || range.preset === 'yesterday') {
+            const today = getESTDate();
+            const d = new Date(today);
+            if (range.preset === 'yesterday') d.setDate(d.getDate() - 1);
+            startDate = endDate = formatDateEST(d);
+        } else if (range.days) {
+            const today = getESTDate();
+            const start = new Date(today);
+            start.setDate(today.getDate() - range.days + 1);
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(today);
+        }
+        
+        const params = new URLSearchParams({ startDate, endDate });
+        
+        // Load all platform data in parallel
+        const [metaData, googleData, bingData, metaLfs, googleLfs, bingLfs] = await Promise.all([
+            apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${startDate}","until":"${endDate}"}`),
+            fetch(`/api/google/insights?${params}`).then(r => r.json()).catch(() => ({})),
+            fetch(`/api/bing/campaigns?${params}`).then(r => r.json()).catch(() => ({ data: [] })),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=google&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&${params}`).then(r => r.json()).catch(() => ({ total: 0 }))
+        ]);
+        
+        // Process Meta data
+        const meta = metaData.data?.[0] || {};
+        const metaSpend = parseFloat(meta.spend || 0);
+        const metaImpressions = parseInt(meta.impressions || 0);
+        const metaClicks = parseInt(meta.clicks || 0);
+        const metaResults = getResults(meta.actions);
+        const metaLfsCount = metaLfs.total || 0;
+        
+        document.getElementById('funnelMetaCost').textContent = '$' + metaSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('funnelMetaImpressions').textContent = metaImpressions.toLocaleString();
+        document.getElementById('funnelMetaClicks').textContent = metaClicks.toLocaleString();
+        document.getElementById('funnelMetaResults').textContent = metaResults.toLocaleString();
+        document.getElementById('funnelMetaLfs').textContent = metaLfsCount.toLocaleString();
+        document.getElementById('funnelMetaCostLfs').textContent = metaLfsCount > 0 ? '$' + (metaSpend / metaLfsCount).toFixed(2) : '-';
+        
+        // Process Google data
+        const googleSpend = parseFloat(googleData.spend || 0);
+        const googleImpressions = parseInt(googleData.impressions || 0);
+        const googleClicks = parseInt(googleData.clicks || 0);
+        const googleResults = parseFloat(googleData.conversions || 0);
+        const googleLfsCount = googleLfs.total || 0;
+        
+        document.getElementById('funnelGoogleCost').textContent = '$' + googleSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('funnelGoogleImpressions').textContent = googleImpressions.toLocaleString();
+        document.getElementById('funnelGoogleClicks').textContent = googleClicks.toLocaleString();
+        document.getElementById('funnelGoogleResults').textContent = Math.round(googleResults).toLocaleString();
+        document.getElementById('funnelGoogleLfs').textContent = googleLfsCount.toLocaleString();
+        document.getElementById('funnelGoogleCostLfs').textContent = googleLfsCount > 0 ? '$' + (googleSpend / googleLfsCount).toFixed(2) : '-';
+        
+        // Process Bing data
+        let bingSpend = 0, bingImpressions = 0, bingClicks = 0, bingResults = 0;
+        if (bingData.data && Array.isArray(bingData.data)) {
+            bingData.data.forEach(c => {
+                bingSpend += parseFloat(c.spend || 0);
+                bingImpressions += parseInt(c.impressions || 0);
+                bingClicks += parseInt(c.clicks || 0);
+                bingResults += parseFloat(c.conversions || 0);
+            });
+        }
+        const bingLfsCount = bingLfs.total || 0;
+        
+        document.getElementById('funnelBingCost').textContent = '$' + bingSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('funnelBingImpressions').textContent = bingImpressions.toLocaleString();
+        document.getElementById('funnelBingClicks').textContent = bingClicks.toLocaleString();
+        document.getElementById('funnelBingResults').textContent = Math.round(bingResults).toLocaleString();
+        document.getElementById('funnelBingLfs').textContent = bingLfsCount.toLocaleString();
+        document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
+        
+        // Load Medwork funnel for Funnels view
+        await loadFunnelsMedworkData(params);
+        
+        // Render comparison chart
+        renderFunnelsComparisonChart({
+            meta: { spend: metaSpend, results: metaResults, lfs: metaLfsCount },
+            google: { spend: googleSpend, results: googleResults, lfs: googleLfsCount },
+            bing: { spend: bingSpend, results: bingResults, lfs: bingLfsCount }
+        });
+        
+    } catch (e) {
+        console.error('Error loading funnels data:', e);
+    }
+}
+
+// Load Medwork funnel for Funnels view
+async function loadFunnelsMedworkData(params) {
+    const container = document.getElementById('funnelsMedworkContainer');
+    const totalsContainer = document.getElementById('funnelsTotalFunnel');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">Loading Medwork funnel data...</div>';
+    
+    try {
+        const response = await fetch(`/api/looker/leads-funnel?${params}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            container.innerHTML = '<div class="loading">Error loading funnel data</div>';
+            return;
+        }
+        
+        const data = result.data;
+        const totals = result.totals;
+        
+        // Tracking type labels
+        const typeLabels = {
+            'mutm': { name: 'Meta', color: '#4267B2', emoji: '📘' },
+            'outm': { name: 'Organic', color: '#34A853', emoji: '🌿' },
+            'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
+            'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
+            'butm': { name: 'Bing', color: '#00A4EF', emoji: '🔷' },
+            'gbputm': { name: 'GBP', color: '#F4B400', emoji: '📍' }
+        };
+        
+        // Build funnel cards for each tracking type
+        let html = '';
+        Object.keys(data).forEach(type => {
+            const info = typeLabels[type] || { name: type, color: '#666', emoji: '📊' };
+            const d = data[type];
+            html += `
+                <div class="funnel-card" style="flex: 1; min-width: 200px; max-width: 250px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
+                    <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.emoji} ${info.name}</h3>
+                    <div class="mini-funnel">
+                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row" style="background: #d4edda;"><span>Fulfilled</span><span>${d.initial_fulfilled.toLocaleString()}</span></div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html || '<div class="loading">No funnel data available</div>';
+        
+        // Build total funnel visualization
+        const stages = [
+            { label: 'l_f_s', value: totals.l_f_s, color: '#6366f1' },
+            { label: 'Is Booked', value: totals.is_booked, color: '#8b5cf6' },
+            { label: 'Sent to Verif.', value: totals.sent_to_verification, color: '#a855f7' },
+            { label: 'Booked Covered', value: totals.is_booked_covered, color: '#d946ef' },
+            { label: 'Fulfilled', value: totals.initial_fulfilled, color: '#22c55e' }
+        ];
+        
+        const maxValue = Math.max(...stages.map(s => s.value), 1);
+        
+        totalsContainer.innerHTML = stages.map(stage => {
+            const height = Math.max((stage.value / maxValue) * 150, 20);
+            const rate = totals.l_f_s > 0 ? ((stage.value / totals.l_f_s) * 100).toFixed(1) : 0;
+            return `
+                <div style="flex: 1; text-align: center;">
+                    <div style="height: ${height}px; background: ${stage.color}; border-radius: 8px 8px 0 0; min-width: 60px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                        ${stage.value}
+                    </div>
+                    <div style="font-size: 11px; margin-top: 5px; color: #666;">${stage.label}</div>
+                    <div style="font-size: 10px; color: #999;">${rate}%</div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (e) {
+        console.error('Error loading Medwork funnel for Funnels view:', e);
+        container.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+    }
+}
+
+// Render Funnels Comparison Chart
+function renderFunnelsComparisonChart(data) {
+    const ctx = document.getElementById('funnelsComparisonChart');
+    if (!ctx) return;
+    
+    if (funnelsComparisonChart) funnelsComparisonChart.destroy();
+    
+    funnelsComparisonChart = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Meta', 'Google', 'Bing'],
+            datasets: [
+                {
+                    label: 'Results',
+                    data: [data.meta.results, data.google.results, data.bing.results],
+                    backgroundColor: ['rgba(66, 103, 178, 0.7)', 'rgba(234, 67, 53, 0.7)', 'rgba(0, 164, 239, 0.7)'],
+                    borderColor: ['#4267B2', '#EA4335', '#00A4EF'],
+                    borderWidth: 1
+                },
+                {
+                    label: 'l_f_s',
+                    data: [data.meta.lfs, data.google.lfs, data.bing.lfs],
+                    backgroundColor: ['rgba(66, 103, 178, 0.4)', 'rgba(234, 67, 53, 0.4)', 'rgba(0, 164, 239, 0.4)'],
+                    borderColor: ['#4267B2', '#EA4335', '#00A4EF'],
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                title: { display: true, text: 'Results vs l_f_s by Platform' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
 }
 
 async function loadSummaryData() {

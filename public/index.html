@@ -41,6 +41,7 @@
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <button class="nav-item nav-item-main active" data-view="summary">📊 Summary</button>
+                    <button class="nav-item nav-item-main" data-view="funnels">🚀 Funnels</button>
                     <button class="nav-item nav-item-main" data-view="heatmap">🗺️ Heatmap</button>
                 </div>
                 <div class="nav-section">
@@ -292,6 +293,84 @@
             </section>
 
         </div><!-- End Summary View -->
+
+        <!-- Funnels View -->
+        <div id="funnelsView" class="view-content hidden">
+            <div class="summary-header">
+                <h2>🚀 Marketing Funnels</h2>
+                <p class="summary-subtitle">Full journey from ad impression to conversion, by platform</p>
+            </div>
+
+            <!-- Platform Ad Funnels -->
+            <section class="table-section">
+                <h2>📊 Ad Platform Funnels</h2>
+                <p class="section-subtitle">Cost → Impressions → Clicks → Results → l_f_s</p>
+                <div id="funnelsPlatformContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                    
+                    <!-- Meta Funnel -->
+                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #4267B2;">
+                        <h3 style="margin: 0 0 15px 0; color: #4267B2;">📘 Meta</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelMetaCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelMetaImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelMetaClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="funnelMetaResults">0</span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelMetaLfs">0</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelMetaCostLfs">-</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Google Funnel -->
+                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #EA4335;">
+                        <h3 style="margin: 0 0 15px 0; color: #EA4335;">🔴 Google</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelGoogleCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelGoogleImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelGoogleClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="funnelGoogleResults">0</span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelGoogleLfs">0</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelGoogleCostLfs">-</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bing Funnel -->
+                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #00A4EF;">
+                        <h3 style="margin: 0 0 15px 0; color: #00A4EF;">🔷 Bing</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelBingCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelBingImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelBingClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="funnelBingResults">0</span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelBingLfs">0</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelBingCostLfs">-</span></div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+
+            <!-- Medwork Leads Funnel -->
+            <section class="table-section">
+                <h2>📊 Medwork Leads Funnel</h2>
+                <p class="section-subtitle">Full funnel from l_f_s to fulfilled, by tracking source (from Looker)</p>
+                <div id="funnelsMedworkContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                    <div class="loading" id="funnelsMedworkLoading">Loading Medwork funnel data...</div>
+                </div>
+                <div id="funnelsMedworkTotals" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px;">📈 Total Funnel</h3>
+                    <div class="funnel-bars" id="funnelsTotalFunnel" style="display: flex; gap: 10px; align-items: flex-end; height: 200px; padding: 20px; background: #f8f9fa; border-radius: 12px;"></div>
+                </div>
+            </section>
+
+            <!-- Funnel Comparison Chart -->
+            <section class="chart-section">
+                <h2>📈 Platform Comparison</h2>
+                <div class="chart-container">
+                    <canvas id="funnelsComparisonChart"></canvas>
+                </div>
+            </section>
+
+        </div><!-- End Funnels View -->
 
         <!-- Heatmap View -->
         <div id="heatmapView" class="view-content hidden">
