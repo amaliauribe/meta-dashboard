@@ -2787,8 +2787,8 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
             'gbputm': { name: 'GBP', color: '#F4B400', icon: '📍' }
         };
         
-        // Helper to format cost
-        const formatCost = (spend, count) => count > 0 ? '$' + (spend / count).toFixed(2) : '-';
+        // Helper to format cost with commas (e.g., $12,222.00)
+        const formatCost = (spend, count) => count > 0 ? '$' + (spend / count).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
         
         // Build funnel cards for each tracking type
         let html = '';
@@ -2831,7 +2831,7 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
         totalsContainer.innerHTML = stages.map(stage => {
             const height = Math.max((stage.value / maxValue) * 150, 20);
             const rate = totals.l_f_s > 0 ? ((stage.value / totals.l_f_s) * 100).toFixed(1) : 0;
-            const costPerStage = stage.value > 0 ? '$' + (totalSpend / stage.value).toFixed(2) : '-';
+            const costPerStage = stage.value > 0 ? '$' + (totalSpend / stage.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
             return `
                 <div style="flex: 1; text-align: center;">
                     <div style="height: ${height}px; background: ${stage.color}; border-radius: 8px 8px 0 0; min-width: 60px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
