@@ -4648,8 +4648,9 @@ function renderHeatmap(zipcodes) {
                     <div class="popup-zipcode">${z.zipcode}</div>
                     <div class="popup-stats">
                         ${coords.city ? `<strong>${coords.city}, ${coords.state}</strong><br>` : ''}
-                        <strong>Conversions:</strong> ${z.conversions.toFixed(1)}<br>
+                        <strong>Impressions:</strong> ${(z.impressions || 0).toLocaleString()}<br>
                         <strong>Clicks:</strong> ${z.clicks.toLocaleString()}<br>
+                        <strong>Conversions:</strong> ${z.conversions.toFixed(1)}<br>
                         <strong>Cost:</strong> $${z.cost.toFixed(2)}<br>
                         <strong>Cost/Conv:</strong> ${z.conversions > 0 ? '$' + (z.cost / z.conversions).toFixed(2) : '-'}<br>
                         <strong>Source:</strong> ${z.sources.join(', ')}
