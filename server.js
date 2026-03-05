@@ -2542,20 +2542,18 @@ app.get("/api/ours-privacy/lfs-by-platform", (req, res) => {
         oursData = oursData.filter(d => new Date(d.timestamp) <= end);
     }
     
-    // Filter by platform - check tracking_type in referrer URL
+    // Filter by platform using utm_source
     const filtered = oursData.filter(d => {
-        const referrer = (d.body.visitor?.referrer || "").toLowerCase();
         const source = (d.body.visitor?.utm_source || "").toLowerCase();
         
         if (platform === "meta") {
-            // Meta ads have tracking_type=mutm in URL
-            return referrer.includes("tracking_type=mutm") || referrer.includes("&mutm");
+            return source === "facebook" || source === "fb" || source === "meta";
         } else if (platform === "google") {
-            return referrer.includes("tracking_type=g1utm") || referrer.includes("gclid=");
+            return source === "google";
         } else if (platform === "bing") {
-            return referrer.includes("tracking_type=butm") || referrer.includes("msclkid=");
+            return source === "bing";
         } else if (platform === "tiktok") {
-            return referrer.includes("tracking_type=tutm") || source.includes("tiktok");
+            return source === "tiktok" || source === "tt";
         }
         return sourcesToMatch.some(s => source.includes(s));
     });
