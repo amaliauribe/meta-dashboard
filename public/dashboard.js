@@ -2678,8 +2678,8 @@ async function loadFunnelsData() {
         // Load all platform data in parallel
         const [metaData, googleData, bingData, metaLfs, googleLfs, bingLfs] = await Promise.all([
             apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${startDate}","until":"${endDate}"}`),
-            fetch(`/api/google/insights?${params}`).then(r => r.json()).catch(() => ({})),
-            fetch(`/api/bing/campaigns?${params}`).then(r => r.json()).catch(() => ({ data: [] })),
+            googleApiCall('account-performance', { startDate, endDate }).catch(() => ({})),
+            bingApiCall('account-performance', { startDate, endDate }).catch(() => ({})),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=google&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&${params}`).then(r => r.json()).catch(() => ({ total: 0 }))
@@ -2714,16 +2714,11 @@ async function loadFunnelsData() {
         document.getElementById('funnelGoogleLfs').textContent = googleLfsCount.toLocaleString();
         document.getElementById('funnelGoogleCostLfs').textContent = googleLfsCount > 0 ? '$' + (googleSpend / googleLfsCount).toFixed(2) : '-';
         
-        // Process Bing data
-        let bingSpend = 0, bingImpressions = 0, bingClicks = 0, bingResults = 0;
-        if (bingData.data && Array.isArray(bingData.data)) {
-            bingData.data.forEach(c => {
-                bingSpend += parseFloat(c.spend || 0);
-                bingImpressions += parseInt(c.impressions || 0);
-                bingClicks += parseInt(c.clicks || 0);
-                bingResults += parseFloat(c.conversions || 0);
-            });
-        }
+        // Process Bing data (bingApiCall returns data directly, not nested)
+        const bingSpend = parseFloat(bingData.spend || 0);
+        const bingImpressions = parseInt(bingData.impressions || 0);
+        const bingClicks = parseInt(bingData.clicks || 0);
+        const bingResults = parseFloat(bingData.conversions || 0);
         const bingLfsCount = bingLfs.total || 0;
         
         document.getElementById('funnelBingCost').textContent = '$' + bingSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
