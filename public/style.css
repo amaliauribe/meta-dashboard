@@ -1948,3 +1948,34 @@ table.resizable-table td {
     font-size: 0.8em;
     color: #888;
 }
+
+/* Mini Funnel Cards for Summary */
+.mini-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mini-funnel-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.mini-funnel-row span:last-child {
+    font-weight: 600;
+}
+
+.mini-funnel-row.highlight {
+    background: linear-gradient(90deg, #F7931A, #ffb74d);
+    color: white;
+}
+
+.mini-funnel-row.cost {
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-weight: 500;
+}

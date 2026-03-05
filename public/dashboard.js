@@ -2405,6 +2405,80 @@ function getBingDateRange(range) {
 
 // ==================== Summary Functions ====================
 
+async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
+    try {
+        // Get date range
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = new Date();
+            const end = new Date(today);
+            const start = new Date(today);
+            if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
+        }
+        
+        // Fetch l_f_s data for all platforms
+        const [metaLfs, googleLfs, bingLfs, metaData, bingData, googleData] = await Promise.all([
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
+            apiCall(`${ACCOUNT_ID}/insights?fields=impressions,clicks,actions&date_preset=${range.preset || 'last_7d'}`).catch(() => null),
+            bingApiCall('summary', { startDate, endDate }).catch(() => null),
+            googleApiCall('summary', { startDate, endDate }).catch(() => null)
+        ]);
+        
+        // Meta funnel
+        const metaImpressions = metaData?.data?.[0]?.impressions || 0;
+        const metaClicks = metaData?.data?.[0]?.clicks || 0;
+        const metaResults = getResults(metaData?.data?.[0]?.actions) || 0;
+        const metaLfsCount = metaLfs.total || 0;
+        
+        document.getElementById('summaryMetaImpressions').textContent = parseInt(metaImpressions).toLocaleString();
+        document.getElementById('summaryMetaClicks').textContent = parseInt(metaClicks).toLocaleString();
+        document.getElementById('summaryMetaResults').textContent = metaResults.toLocaleString();
+        document.getElementById('summaryMetaLfs').textContent = metaLfsCount.toLocaleString();
+        document.getElementById('summaryMetaCostLfs').textContent = metaLfsCount > 0 ? '$' + (metaSpend / metaLfsCount).toFixed(2) : '-';
+        
+        // Google funnel
+        const googleImpressions = googleData?.impressions || 0;
+        const googleClicks = googleData?.clicks || 0;
+        const googleResults = googleData?.conversions || 0;
+        const googleLfsCount = googleLfs.total || 0;
+        
+        document.getElementById('summaryGoogleImpressions').textContent = parseInt(googleImpressions).toLocaleString();
+        document.getElementById('summaryGoogleClicks').textContent = parseInt(googleClicks).toLocaleString();
+        document.getElementById('summaryGoogleResults').textContent = Math.round(googleResults).toLocaleString();
+        document.getElementById('summaryGoogleLfs').textContent = googleLfsCount.toLocaleString();
+        document.getElementById('summaryGoogleCostLfs').textContent = googleLfsCount > 0 ? '$' + (googleSpend / googleLfsCount).toFixed(2) : '-';
+        
+        // Bing funnel
+        const bingImpressions = bingData?.impressions || 0;
+        const bingClicks = bingData?.clicks || 0;
+        const bingResults = bingData?.conversions || 0;
+        const bingLfsCount = bingLfs.total || 0;
+        
+        document.getElementById('summaryBingImpressions').textContent = parseInt(bingImpressions).toLocaleString();
+        document.getElementById('summaryBingClicks').textContent = parseInt(bingClicks).toLocaleString();
+        document.getElementById('summaryBingResults').textContent = Math.round(bingResults).toLocaleString();
+        document.getElementById('summaryBingLfs').textContent = bingLfsCount.toLocaleString();
+        document.getElementById('summaryBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
+        
+    } catch (e) {
+        console.error('Error loading summary funnels:', e);
+    }
+}
+
 async function loadSummaryData() {
     document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading summary data...</td></tr>';
     document.getElementById('summaryWeeklyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
@@ -2552,6 +2626,9 @@ async function loadSummaryData() {
         document.getElementById('summaryGoogleConversions').textContent = totalGoogleConv.toFixed(1);
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
+        
+        // Load summary funnels
+        loadSummaryFunnels(totalMeta, totalGoogle, totalBing);
         
         // Weekly breakdown
         const weeklyPeriods = [
