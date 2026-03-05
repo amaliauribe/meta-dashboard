@@ -1338,14 +1338,37 @@ async function loadDailyData() {
     const range = dateRanges[currentRange];
 
     try {
-        const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}&time_increment=1`
-        );
+        // Build date range for l_f_s API
+        let startDate, endDate;
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = new Date();
+            const end = new Date(today);
+            const start = new Date(today);
+            if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
+        }
+        
+        // Fetch Meta data and l_f_s data in parallel
+        const [data, lfsResponse] = await Promise.all([
+            apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}&time_increment=1`),
+            fetch(`/api/ours-privacy/lfs-by-date?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json())
+        ]);
+        
+        const lfsByDate = lfsResponse.byDate || {};
 
         const tbody = document.getElementById('dailyBody');
         
         if (!data.data || data.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -1357,10 +1380,12 @@ async function loadDailyData() {
             const impressions = parseInt(day.impressions || 0);
             const clicks = parseInt(day.clicks || 0);
             const results = getResults(day.actions);
+            const lfs = lfsByDate[day.date_start] || 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
             
             // Parse date - create from parts to avoid timezone issues
             const dateParts = day.date_start.split('-');
@@ -1379,12 +1404,14 @@ async function loadDailyData() {
                     <td>${cpc}</td>
                     <td>${results}</td>
                     <td>${costPerResult}</td>
+                    <td>${lfs}</td>
+                    <td>${costPerLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Daily error:', e);
-        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="12" class="loading">Error loading daily data</td></tr>';
+        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="11" class="loading">Error loading daily data</td></tr>';
     }
 }
 
