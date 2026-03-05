@@ -690,6 +690,22 @@
                 </div>
             </section>
             
+            <!-- Heatmap Section -->
+            <section class="table-section">
+                <h2>🗺️ State Performance Heatmap</h2>
+                <div class="heatmap-controls" style="margin-bottom: 10px;">
+                    <label>Color by: </label>
+                    <select id="metaGeoHeatmapMetric" style="padding: 5px; border-radius: 4px;">
+                        <option value="spend">Spend</option>
+                        <option value="clicks">Clicks</option>
+                        <option value="conversions">Conversions</option>
+                        <option value="impressions">Impressions</option>
+                    </select>
+                </div>
+                <div id="metaGeoHeatmap" style="height: 400px; border-radius: 8px; border: 1px solid #ddd;"></div>
+                <p style="color: #888; font-size: 12px; margin-top: 8px;">⚠️ Meta API provides state/region data only. Zipcode-level data is available in Google/Bing Geographic tabs.</p>
+            </section>
+
             <!-- Geographic Table -->
             <section class="table-section">
                 <h2>📍 Region Performance</h2>
