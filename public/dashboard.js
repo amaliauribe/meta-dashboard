@@ -410,6 +410,8 @@ function initializeDashboard() {
             document.getElementById('googleGeoView').classList.toggle('hidden', currentView !== 'googleGeo');
             document.getElementById('googleSearchTermsView').classList.toggle('hidden', currentView !== 'googleSearchTerms');
             document.getElementById('googleAdsCreativeView').classList.toggle('hidden', currentView !== 'googleAdsCreative');
+            document.getElementById('tiktokView').classList.toggle('hidden', currentView !== 'tiktok');
+            document.getElementById('tiktokAdsView').classList.toggle('hidden', currentView !== 'tiktokAds');
             document.getElementById('oursPrivacyView').classList.toggle('hidden', currentView !== 'oursPrivacy');
             
             // Load data for the selected view

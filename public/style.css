@@ -1985,3 +1985,55 @@ table.resizable-table td {
     color: #1565c0;
     font-weight: 600;
 }
+
+/* TikTok Coming Soon Styles */
+.coming-soon-banner {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid #00f2ea;
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0, 242, 234, 0.2);
+}
+
+.coming-soon-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.coming-soon-text {
+    font-size: 28px;
+    font-weight: 700;
+    color: #00f2ea;
+    display: block;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.coming-soon-subtitle {
+    color: #8892b0;
+    font-size: 14px;
+    margin: 0;
+}
+
+.coming-soon-cell {
+    text-align: center;
+    color: #8892b0;
+    font-style: italic;
+    padding: 40px !important;
+}
+
+#tiktokItems .nav-item:hover,
+#tiktokItems .nav-item.active {
+    border-left-color: #00f2ea;
+    background: rgba(0, 242, 234, 0.1);
+}
+
+#tiktokView .kpi-card,
+#tiktokAdsView .kpi-card {
+    border-top: 3px solid #00f2ea;
+    opacity: 0.7;
+}
