@@ -2728,9 +2728,16 @@ async function loadFunnelsData() {
         document.getElementById('funnelBingLfs').textContent = bingLfsCount.toLocaleString();
         document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
         
-        // Load Medwork funnel for Funnels view
-        console.log('Calling loadFunnelsMedworkData with startDate:', startDate, 'endDate:', endDate);
-        await loadFunnelsMedworkData(startDate, endDate);
+        // Load Medwork funnel for Funnels view with spend data for cost per stage
+        const spendByPlatform = {
+            mutm: metaSpend,      // Meta
+            g1utm: googleSpend,   // Google
+            butm: bingSpend,      // Bing
+            outm: 0,              // Organic (no spend)
+            tutm: 0,              // TikTok (not integrated yet)
+            gbputm: 0             // GBP (no spend)
+        };
+        await loadFunnelsMedworkData(startDate, endDate, spendByPlatform);
         
         // Render comparison chart
         renderFunnelsComparisonChart({
@@ -2745,7 +2752,7 @@ async function loadFunnelsData() {
 }
 
 // Load Medwork funnel for Funnels view
-async function loadFunnelsMedworkData(startDate, endDate) {
+async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) {
     const container = document.getElementById('funnelsMedworkContainer');
     const totalsContainer = document.getElementById('funnelsTotalFunnel');
     if (!container) {
@@ -2770,38 +2777,47 @@ async function loadFunnelsMedworkData(startDate, endDate) {
         const data = result.data;
         const totals = result.totals;
         
-        // Tracking type labels
+        // Tracking type labels with logos
         const typeLabels = {
-            'mutm': { name: 'Meta', color: '#4267B2', emoji: '📘' },
-            'outm': { name: 'Organic', color: '#34A853', emoji: '🌿' },
-            'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
-            'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
-            'butm': { name: 'Bing', color: '#00A4EF', emoji: '🔷' },
-            'gbputm': { name: 'GBP', color: '#F4B400', emoji: '📍' }
+            'mutm': { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">' },
+            'outm': { name: 'Organic', color: '#34A853', icon: '🌿' },
+            'tutm': { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
+            'g1utm': { name: 'Google', color: '#EA4335', icon: '🔴' },
+            'butm': { name: 'Bing', color: '#00A4EF', icon: '🔷' },
+            'gbputm': { name: 'GBP', color: '#F4B400', icon: '📍' }
         };
+        
+        // Helper to format cost
+        const formatCost = (spend, count) => count > 0 ? '$' + (spend / count).toFixed(2) : '-';
         
         // Build funnel cards for each tracking type
         let html = '';
         Object.keys(data).forEach(type => {
-            const info = typeLabels[type] || { name: type, color: '#666', emoji: '📊' };
+            const info = typeLabels[type] || { name: type, color: '#666', icon: '📊' };
             const d = data[type];
+            const spend = spendByPlatform[type] || 0;
+            
             html += `
-                <div class="funnel-card" style="flex: 1; min-width: 200px; max-width: 250px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
-                    <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.emoji} ${info.name}</h3>
+                <div class="funnel-card" style="flex: 1; min-width: 220px; max-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
+                    <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.icon} ${info.name}</h3>
                     <div class="mini-funnel">
-                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span></div>
-                        <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span></div>
-                        <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span></div>
-                        <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span></div>
-                        <div class="mini-funnel-row" style="background: #d4edda;"><span>Fulfilled</span><span>${d.initial_fulfilled.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.l_f_s)}</span></div>
+                        <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.is_booked)}</span></div>
+                        <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.sent_to_verification)}</span></div>
+                        <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.is_booked_covered)}</span></div>
+                        <div class="mini-funnel-row" style="background: #d4edda;"><span>Fulfilled</span><span>${d.initial_fulfilled.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.initial_fulfilled)}</span></div>
                     </div>
+                    ${spend > 0 ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">Total Spend: <strong>$${spend.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></div>` : ''}
                 </div>
             `;
         });
         
         container.innerHTML = html || '<div class="loading">No funnel data available</div>';
         
-        // Build total funnel visualization
+        // Calculate total spend for cost per stage in totals
+        const totalSpend = Object.values(spendByPlatform).reduce((a, b) => a + b, 0);
+        
+        // Build total funnel visualization with cost per stage
         const stages = [
             { label: 'l_f_s', value: totals.l_f_s, color: '#6366f1' },
             { label: 'Is Booked', value: totals.is_booked, color: '#8b5cf6' },
@@ -2815,6 +2831,7 @@ async function loadFunnelsMedworkData(startDate, endDate) {
         totalsContainer.innerHTML = stages.map(stage => {
             const height = Math.max((stage.value / maxValue) * 150, 20);
             const rate = totals.l_f_s > 0 ? ((stage.value / totals.l_f_s) * 100).toFixed(1) : 0;
+            const costPerStage = stage.value > 0 ? '$' + (totalSpend / stage.value).toFixed(2) : '-';
             return `
                 <div style="flex: 1; text-align: center;">
                     <div style="height: ${height}px; background: ${stage.color}; border-radius: 8px 8px 0 0; min-width: 60px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
@@ -2822,6 +2839,7 @@ async function loadFunnelsMedworkData(startDate, endDate) {
                     </div>
                     <div style="font-size: 11px; margin-top: 5px; color: #666;">${stage.label}</div>
                     <div style="font-size: 10px; color: #999;">${rate}%</div>
+                    <div style="font-size: 10px; color: #2196F3; font-weight: 500;">${costPerStage}</div>
                 </div>
             `;
         }).join('');

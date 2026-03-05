@@ -2037,3 +2037,34 @@ table.resizable-table td {
     border-top: 3px solid #00f2ea;
     opacity: 0.7;
 }
+
+/* Cost badge for Medwork funnel */
+.cost-badge {
+    font-size: 11px;
+    color: #2196F3;
+    font-weight: 500;
+    min-width: 50px;
+    text-align: right;
+}
+
+.mini-funnel-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.mini-funnel-row:last-child {
+    border-bottom: none;
+}
+
+.mini-funnel-row span:first-child {
+    flex: 1;
+}
+
+.mini-funnel-row span:nth-child(2) {
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+}
