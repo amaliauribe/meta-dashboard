@@ -3020,12 +3020,6 @@ async function loadSummaryData() {
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
         
-        // Load summary funnels
-        loadSummaryFunnels(totalMeta, totalGoogle, totalBing);
-        
-        // Load Medwork leads funnel
-        loadMedworkFunnel();
-        
         // Weekly breakdown
         const weeklyPeriods = [
             { name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] },
