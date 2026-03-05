@@ -3204,10 +3204,74 @@ async function loadGoogleKPIs() {
             document.getElementById('googleCpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             document.getElementById('googleCtr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
             document.getElementById('googleImpressions').textContent = impressions.toLocaleString();
+            
+            // Update Google funnel
+            updateGoogleFunnel(impressions, clicks, conversions);
         }
     } catch (e) { 
         console.error('Google KPI error:', e);
         throw e;
+    }
+}
+
+async function updateGoogleFunnel(impressions, clicks, conversions) {
+    // Update Google metrics in funnel
+    document.getElementById('googleFunnelImpressions').textContent = impressions.toLocaleString();
+    document.getElementById('googleFunnelClicks').textContent = clicks.toLocaleString();
+    document.getElementById('googleFunnelConversions').textContent = Math.round(conversions).toLocaleString();
+    
+    // Calculate rates
+    const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : 0;
+    const convRate = clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : 0;
+    document.getElementById('googleFunnelCtr').textContent = ctr + '% CTR';
+    document.getElementById('googleFunnelConvRate').textContent = convRate + '% conv rate';
+    
+    // Fetch l_f_s data for Google
+    try {
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = new Date();
+            const end = new Date(today);
+            const start = new Date(today);
+            if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
+        }
+        
+        const response = await fetch(`/api/ours-privacy/lfs-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`);
+        const data = await response.json();
+        
+        const lfsCount = data.total || 0;
+        document.getElementById('googleFunnelLfs').textContent = lfsCount.toLocaleString();
+        
+        const lfsRate = conversions > 0 ? ((lfsCount / conversions) * 100).toFixed(1) : 0;
+        document.getElementById('googleFunnelLfsRate').textContent = lfsRate + '% of conv';
+        
+        // Update funnel bar widths
+        const funnelSteps = document.querySelectorAll('#googleView .funnel-step');
+        if (funnelSteps.length >= 4) {
+            funnelSteps[0].style.setProperty('--step-width', '100%');
+            funnelSteps[1].style.setProperty('--step-width', clicks > 0 ? '70%' : '10%');
+            const maxLower = Math.max(conversions, lfsCount, 1);
+            const resultsWidth = conversions > 0 ? Math.max((conversions / maxLower) * 45, 15) : 10;
+            const lfsWidth = lfsCount > 0 ? Math.max((lfsCount / maxLower) * 45, 15) : 10;
+            funnelSteps[2].style.setProperty('--step-width', resultsWidth + '%');
+            funnelSteps[3].style.setProperty('--step-width', lfsWidth + '%');
+        }
+    } catch (e) {
+        console.error('Error fetching Google l_f_s:', e);
+        document.getElementById('googleFunnelLfs').textContent = '-';
+        document.getElementById('googleFunnelLfsRate').textContent = '';
     }
 }
 
@@ -3369,15 +3433,21 @@ async function loadGoogleDailyData() {
     const dateRange = getGoogleDateRange(range);
 
     try {
-        const data = await googleApiCall('daily-performance', {
-            startDate: dateRange.since,
-            endDate: dateRange.until
-        });
+        // Fetch Google data and l_f_s data in parallel
+        const [data, lfsResponse] = await Promise.all([
+            googleApiCall('daily-performance', {
+                startDate: dateRange.since,
+                endDate: dateRange.until
+            }),
+            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`).then(r => r.json())
+        ]);
+        
+        const lfsByDate = lfsResponse.byDate || {};
 
         const tbody = document.getElementById('googleDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -3389,10 +3459,12 @@ async function loadGoogleDailyData() {
             const impressions = parseInt(day.impressions || 0);
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
+            const lfs = lfsByDate[day.date] || 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+            const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
             
             // Parse date
             const dateParts = day.date.split('-');
@@ -3411,12 +3483,14 @@ async function loadGoogleDailyData() {
                     <td>${cpc}</td>
                     <td>${conversions}</td>
                     <td>${costPerConv}</td>
+                    <td>${lfs}</td>
+                    <td>${costPerLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Google Daily error:', e);
-        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="12" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 

@@ -1048,6 +1048,44 @@
                 </div>
             </section>
 
+            <!-- Google Journey Funnel -->
+            <section class="table-section">
+                <h2>🚀 Google Journey Funnel</h2>
+                <div class="funnel-container">
+                    <div class="funnel-step" style="--step-width: 100%;">
+                        <div class="funnel-bar impressions" style="background: linear-gradient(90deg, #EA4335, #DB4437);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Impressions</span>
+                            <span class="funnel-value" id="googleFunnelImpressions">0</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 70%;">
+                        <div class="funnel-bar clicks" style="background: linear-gradient(90deg, #FBBC05, #F9AB00);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Clicks</span>
+                            <span class="funnel-value" id="googleFunnelClicks">0</span>
+                            <span class="funnel-rate" id="googleFunnelCtr">0%</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 45%;">
+                        <div class="funnel-bar conversions" style="background: linear-gradient(90deg, #34A853, #2E8B4A);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Results</span>
+                            <span class="funnel-value" id="googleFunnelConversions">0</span>
+                            <span class="funnel-rate" id="googleFunnelConvRate">0%</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 25%;">
+                        <div class="funnel-bar lfs"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Lead Forms (l_f_s)</span>
+                            <span class="funnel-value" id="googleFunnelLfs">0</span>
+                            <span class="funnel-rate" id="googleFunnelLfsRate">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Google Daily Breakdown Table -->
             <section class="table-section">
                 <h2>📅 Daily Breakdown</h2>
@@ -1064,10 +1102,12 @@
                                 <th>CPC</th>
                                 <th>Conversions</th>
                                 <th>Cost/Conv.</th>
+                                <th>l_f_s</th>
+                                <th>Cost/l_f_s</th>
                             </tr>
                         </thead>
                         <tbody id="googleDailyBody">
-                            <tr><td colspan="12" class="loading">Select this tab to load Google Ads data...</td></tr>
+                            <tr><td colspan="11" class="loading">Select this tab to load Google Ads data...</td></tr>
                         </tbody>
                     </table>
                 </div>
