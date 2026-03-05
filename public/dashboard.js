@@ -991,12 +991,18 @@ function updateFunnelBars(impressions, clicks, conversions, lfs) {
     const steps = document.querySelectorAll('.funnel-step');
     if (steps.length < 4) return;
     
-    // Fixed visual scaling for funnel appearance (not proportional to data)
-    // Impressions = 100%, then decreasing widths for visual funnel effect
+    // Scale bars proportionally - impressions is 100%, others relative to clicks
+    // Use clicks as the reference for the lower funnel (Results & l_f_s)
     steps[0].style.setProperty('--step-width', '100%');
     steps[1].style.setProperty('--step-width', clicks > 0 ? '70%' : '10%');
-    steps[2].style.setProperty('--step-width', conversions > 0 ? '45%' : '10%');
-    steps[3].style.setProperty('--step-width', lfs > 0 ? '25%' : '10%');
+    
+    // Results and l_f_s scaled relative to each other
+    const maxLower = Math.max(conversions, lfs, 1);
+    const resultsWidth = conversions > 0 ? Math.max((conversions / maxLower) * 45, 15) : 10;
+    const lfsWidth = lfs > 0 ? Math.max((lfs / maxLower) * 45, 15) : 10;
+    
+    steps[2].style.setProperty('--step-width', resultsWidth + '%');
+    steps[3].style.setProperty('--step-width', lfsWidth + '%');
 }
 
 async function loadChartData() {
