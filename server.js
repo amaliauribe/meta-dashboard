@@ -58,8 +58,8 @@ app.post("/webhook", express.json(), (req, res) => {
     global.webhookData.push(entry);
     
     // Keep max 10000 entries
-    if (global.webhookData.length > 10000) {
-        global.webhookData = global.webhookData.slice(-10000);
+    if (global.webhookData.length > 50000) {
+        global.webhookData = global.webhookData.slice(-50000);
     }
     
     // Save to file (async to not block response)
@@ -82,8 +82,8 @@ app.post("/", express.json(), (req, res) => {
     
     global.webhookData.push(entry);
     
-    if (global.webhookData.length > 10000) {
-        global.webhookData = global.webhookData.slice(-10000);
+    if (global.webhookData.length > 50000) {
+        global.webhookData = global.webhookData.slice(-50000);
     }
     
     setImmediate(() => saveWebhookData(global.webhookData));
