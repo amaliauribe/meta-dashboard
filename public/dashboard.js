@@ -2774,10 +2774,74 @@ async function loadBingKPIs() {
             document.getElementById('bingCpc').textContent = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             document.getElementById('bingCtr').textContent = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
             document.getElementById('bingImpressions').textContent = impressions.toLocaleString();
+            
+            // Update Bing funnel
+            updateBingFunnel(impressions, clicks, conversions);
         }
     } catch (e) { 
         console.error('Bing KPI error:', e);
         throw e;
+    }
+}
+
+async function updateBingFunnel(impressions, clicks, conversions) {
+    // Update Bing metrics in funnel
+    document.getElementById('bingFunnelImpressions').textContent = impressions.toLocaleString();
+    document.getElementById('bingFunnelClicks').textContent = clicks.toLocaleString();
+    document.getElementById('bingFunnelConversions').textContent = Math.round(conversions).toLocaleString();
+    
+    // Calculate rates
+    const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : 0;
+    const convRate = clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : 0;
+    document.getElementById('bingFunnelCtr').textContent = ctr + '% CTR';
+    document.getElementById('bingFunnelConvRate').textContent = convRate + '% conv rate';
+    
+    // Fetch l_f_s data for Bing
+    try {
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = new Date();
+            const end = new Date(today);
+            const start = new Date(today);
+            if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
+        }
+        
+        const response = await fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`);
+        const data = await response.json();
+        
+        const lfsCount = data.total || 0;
+        document.getElementById('bingFunnelLfs').textContent = lfsCount.toLocaleString();
+        
+        const lfsRate = conversions > 0 ? ((lfsCount / conversions) * 100).toFixed(1) : 0;
+        document.getElementById('bingFunnelLfsRate').textContent = lfsRate + '% of conv';
+        
+        // Update funnel bar widths
+        const funnelSteps = document.querySelectorAll('#bingView .funnel-step');
+        if (funnelSteps.length >= 4) {
+            funnelSteps[0].style.setProperty('--step-width', '100%');
+            funnelSteps[1].style.setProperty('--step-width', clicks > 0 ? '70%' : '10%');
+            const maxLower = Math.max(conversions, lfsCount, 1);
+            const resultsWidth = conversions > 0 ? Math.max((conversions / maxLower) * 45, 15) : 10;
+            const lfsWidth = lfsCount > 0 ? Math.max((lfsCount / maxLower) * 45, 15) : 10;
+            funnelSteps[2].style.setProperty('--step-width', resultsWidth + '%');
+            funnelSteps[3].style.setProperty('--step-width', lfsWidth + '%');
+        }
+    } catch (e) {
+        console.error('Error fetching Bing l_f_s:', e);
+        document.getElementById('bingFunnelLfs').textContent = '-';
+        document.getElementById('bingFunnelLfsRate').textContent = '';
     }
 }
 
@@ -2946,15 +3010,21 @@ async function loadBingDailyData() {
     const dateRange = getBingDateRange(range);
 
     try {
-        const data = await bingApiCall('daily-performance', {
-            startDate: dateRange.since,
-            endDate: dateRange.until
-        });
+        // Fetch Bing data and l_f_s data in parallel
+        const [data, lfsResponse] = await Promise.all([
+            bingApiCall('daily-performance', {
+                startDate: dateRange.since,
+                endDate: dateRange.until
+            }),
+            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`).then(r => r.json())
+        ]);
+        
+        const lfsByDate = lfsResponse.byDate || {};
 
         const tbody = document.getElementById('bingDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -2976,10 +3046,12 @@ async function loadBingDailyData() {
             const impressions = parseInt(day.impressions || 0);
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
+            const lfs = lfsByDate[day.normalizedDate] || 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
+            const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
             
             // Parse date from normalized format
             const dateParts = day.normalizedDate.split('-');
@@ -2998,12 +3070,14 @@ async function loadBingDailyData() {
                     <td>${cpc}</td>
                     <td>${conversions}</td>
                     <td>${costPerConv}</td>
+                    <td>${lfs}</td>
+                    <td>${costPerLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="12" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 

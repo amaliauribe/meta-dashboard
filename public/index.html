@@ -634,6 +634,44 @@
                 </div>
             </section>
 
+            <!-- Bing Journey Funnel -->
+            <section class="table-section">
+                <h2>🚀 Bing Journey Funnel</h2>
+                <div class="funnel-container">
+                    <div class="funnel-step" style="--step-width: 100%;">
+                        <div class="funnel-bar impressions" style="background: linear-gradient(90deg, #00A4EF, #0078D4);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Impressions</span>
+                            <span class="funnel-value" id="bingFunnelImpressions">0</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 70%;">
+                        <div class="funnel-bar clicks" style="background: linear-gradient(90deg, #0078D4, #106EBE);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Clicks</span>
+                            <span class="funnel-value" id="bingFunnelClicks">0</span>
+                            <span class="funnel-rate" id="bingFunnelCtr">0%</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 45%;">
+                        <div class="funnel-bar conversions" style="background: linear-gradient(90deg, #7FBA00, #5E9E00);"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Results</span>
+                            <span class="funnel-value" id="bingFunnelConversions">0</span>
+                            <span class="funnel-rate" id="bingFunnelConvRate">0%</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" style="--step-width: 25%;">
+                        <div class="funnel-bar lfs"></div>
+                        <div class="funnel-label">
+                            <span class="funnel-name">Lead Forms (l_f_s)</span>
+                            <span class="funnel-value" id="bingFunnelLfs">0</span>
+                            <span class="funnel-rate" id="bingFunnelLfsRate">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Bing Daily Breakdown Table -->
             <section class="table-section">
                 <h2>📅 Daily Breakdown</h2>
@@ -650,10 +688,12 @@
                                 <th>CPC</th>
                                 <th>Conversions</th>
                                 <th>Cost/Conv.</th>
+                                <th>l_f_s</th>
+                                <th>Cost/l_f_s</th>
                             </tr>
                         </thead>
                         <tbody id="bingDailyBody">
-                            <tr><td colspan="12" class="loading">Select this tab to load Bing data...</td></tr>
+                            <tr><td colspan="11" class="loading">Select this tab to load Bing data...</td></tr>
                         </tbody>
                     </table>
                 </div>
