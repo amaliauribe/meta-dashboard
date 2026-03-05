@@ -2814,7 +2814,12 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
         // Build date filter
         let dateFilter = {};
         if (startDate && endDate) {
-            dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = `${startDate} to ${endDate}`;
+            // For single day, use just the date; for ranges, use "start to end"
+            if (startDate === endDate) {
+                dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = startDate;
+            } else {
+                dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = `${startDate} to ${endDate}`;
+            }
         }
         
         // Get total leads by tracking type
