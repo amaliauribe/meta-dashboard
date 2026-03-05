@@ -2729,8 +2729,8 @@ async function loadFunnelsData() {
         document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
         
         // Load Medwork funnel for Funnels view
-        console.log('Calling loadFunnelsMedworkData with params:', params.toString());
-        await loadFunnelsMedworkData(params);
+        console.log('Calling loadFunnelsMedworkData with startDate:', startDate, 'endDate:', endDate);
+        await loadFunnelsMedworkData(startDate, endDate);
         
         // Render comparison chart
         renderFunnelsComparisonChart({
@@ -2745,7 +2745,7 @@ async function loadFunnelsData() {
 }
 
 // Load Medwork funnel for Funnels view
-async function loadFunnelsMedworkData(params) {
+async function loadFunnelsMedworkData(startDate, endDate) {
     const container = document.getElementById('funnelsMedworkContainer');
     const totalsContainer = document.getElementById('funnelsTotalFunnel');
     if (!container) {
@@ -2756,7 +2756,7 @@ async function loadFunnelsMedworkData(params) {
     container.innerHTML = '<div class="loading">Loading Medwork funnel data...</div>';
     
     try {
-        const url = `/api/looker/leads-funnel?${params}`;
+        const url = `/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`;
         console.log('Fetching Medwork funnel:', url);
         const response = await fetch(url);
         const result = await response.json();
