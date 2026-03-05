@@ -2554,7 +2554,10 @@ async function loadMedworkFunnel() {
         const range = dateRanges[currentRange];
         let startDate, endDate;
         
-        if (range.preset === 'today' || range.preset === 'yesterday') {
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else if (range.preset === 'today' || range.preset === 'yesterday') {
             const today = getESTDate();
             const d = new Date(today);
             if (range.preset === 'yesterday') d.setDate(d.getDate() - 1);
