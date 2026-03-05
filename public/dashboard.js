@@ -2587,7 +2587,7 @@ async function loadMedworkFunnel() {
         
         // Tracking type labels
         const typeLabels = {
-            'mutm': { name: 'Meta', color: '#4267B2', emoji: '📘' },
+            'mutm': { name: 'Meta', color: '#4267B2', emoji: '<img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;">' },
             'outm': { name: 'Organic', color: '#34A853', emoji: '🌿' },
             'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
