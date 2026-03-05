@@ -2444,6 +2444,7 @@ async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
         const metaResults = getResults(metaData?.data?.[0]?.actions) || 0;
         const metaLfsCount = metaLfs.total || 0;
         
+        document.getElementById('summaryMetaCost').textContent = '$' + metaSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryMetaImpressions').textContent = parseInt(metaImpressions).toLocaleString();
         document.getElementById('summaryMetaClicks').textContent = parseInt(metaClicks).toLocaleString();
         document.getElementById('summaryMetaResults').textContent = metaResults.toLocaleString();
@@ -2456,6 +2457,7 @@ async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
         const googleResults = googleData?.conversions || 0;
         const googleLfsCount = googleLfs.total || 0;
         
+        document.getElementById('summaryGoogleCost').textContent = '$' + googleSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryGoogleImpressions').textContent = parseInt(googleImpressions).toLocaleString();
         document.getElementById('summaryGoogleClicks').textContent = parseInt(googleClicks).toLocaleString();
         document.getElementById('summaryGoogleResults').textContent = Math.round(googleResults).toLocaleString();
@@ -2468,6 +2470,7 @@ async function loadSummaryFunnels(metaSpend, googleSpend, bingSpend) {
         const bingResults = bingData?.conversions || 0;
         const bingLfsCount = bingLfs.total || 0;
         
+        document.getElementById('summaryBingCost').textContent = '$' + bingSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingImpressions').textContent = parseInt(bingImpressions).toLocaleString();
         document.getElementById('summaryBingClicks').textContent = parseInt(bingClicks).toLocaleString();
         document.getElementById('summaryBingResults').textContent = Math.round(bingResults).toLocaleString();

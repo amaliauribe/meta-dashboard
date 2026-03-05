@@ -1979,3 +1979,9 @@ table.resizable-table td {
     color: #2e7d32;
     font-weight: 500;
 }
+
+.mini-funnel-row.spend {
+    background: #e3f2fd;
+    color: #1565c0;
+    font-weight: 600;
+}
