@@ -1886,10 +1886,30 @@
                     </div>
                 </section>
 
-                <!-- Patient Journey Viewer -->
+                <!-- Overall Patient Journey Funnel -->
                 <section class="table-section">
-                    <h2>🛤️ Patient Journey</h2>
-                    <p class="section-subtitle">Visualize a visitor's touchpoints from first contact to conversion</p>
+                    <h2>🛤️ Overall Patient Journey</h2>
+                    <p class="section-subtitle">Full funnel from first engagement to fulfilled, by platform</p>
+                    
+                    <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
+                        <select id="journeyPlatformFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
+                            <option value="mutm">Meta</option>
+                            <option value="tutm">TikTok</option>
+                            <option value="outm">Organic</option>
+                            <option value="g1utm">Google</option>
+                            <option value="butm">Bing</option>
+                        </select>
+                    </div>
+                    
+                    <div id="overallJourneyFunnel" style="margin-top: 20px;">
+                        <div class="loading">Loading journey data...</div>
+                    </div>
+                </section>
+
+                <!-- Individual Patient Journey Viewer -->
+                <section class="table-section">
+                    <h2>🔍 Individual Journey Viewer</h2>
+                    <p class="section-subtitle">Visualize a specific visitor's touchpoints</p>
                     
                     <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
                         <select id="journeyVisitorSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; min-width: 300px; font-size: 14px;">

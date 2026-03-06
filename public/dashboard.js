@@ -6112,6 +6112,112 @@ async function loadOursPrivacyData() {
             console.error("Cross-attribution load error:", crossErr);
         }
         
+        // Load Overall Patient Journey Funnel
+        try {
+            const [sourceRes, funnelRes] = await Promise.all([
+                fetch("/api/ours-privacy/by-source?" + params),
+                fetch("/api/looker/leads-funnel?" + params)
+            ]);
+            
+            const sourceData = await sourceRes.json();
+            const funnelData = await funnelRes.json();
+            
+            const funnelContainer = document.getElementById("overallJourneyFunnel");
+            const platformSelect = document.getElementById("journeyPlatformFilter");
+            
+            const platformMap = {
+                'mutm': { name: 'Meta', color: '#4267B2', funnelKey: 'mutm' },
+                'tutm': { name: 'TikTok', color: '#00f2ea', funnelKey: 'tutm' },
+                'outm': { name: 'Organic', color: '#34A853', funnelKey: 'outm' },
+                'g1utm': { name: 'Google', color: '#EA4335', funnelKey: 'g1utm' },
+                'butm': { name: 'Bing', color: '#00A4EF', funnelKey: 'butm' }
+            };
+            
+            function renderOverallJourney(platform) {
+                const config = platformMap[platform];
+                const platformData = sourceData.sources?.find(s => s.prefix === platform);
+                const medworkData = funnelData.data?.[config.funnelKey] || {};
+                
+                if (!platformData) {
+                    funnelContainer.innerHTML = '<div style="color: #666;">No data for this platform</div>';
+                    return;
+                }
+                
+                // Build funnel stages
+                const stages = [];
+                
+                // Ours Privacy engagement stages
+                const eventOrder = ['e1s', 'e5s', 'e15s', 'e30s', 'e45s', 'e60s', 'l_f_s'];
+                eventOrder.forEach(evt => {
+                    const eventData = platformData.events?.find(e => e.event === evt);
+                    if (eventData) {
+                        const label = evt === 'l_f_s' ? '🎯 l_f_s (Lead)' : 
+                                     evt === 'e1s' ? '👁️ 1s view' :
+                                     evt === 'e5s' ? '⏱️ 5s engaged' :
+                                     evt === 'e15s' ? '⏱️ 15s engaged' :
+                                     evt === 'e30s' ? '⏱️ 30s engaged' :
+                                     evt === 'e45s' ? '⏱️ 45s engaged' :
+                                     '⏱️ 60s engaged';
+                        stages.push({ label, count: eventData.count, type: 'ours' });
+                    }
+                });
+                
+                // Medwork funnel stages
+                if (medworkData.l_f_s > 0) {
+                    stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork' });
+                    stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork' });
+                    stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork' });
+                    stages.push({ label: '🏆 Fulfilled', count: medworkData.initial_fulfilled || 0, type: 'medwork' });
+                }
+                
+                const maxCount = Math.max(...stages.map(s => s.count), 1);
+                
+                funnelContainer.innerHTML = `
+                    <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; border-top: 4px solid ${config.color};">
+                        <h3 style="margin: 0 0 20px 0; color: ${config.color};">${config.name} Patient Journey</h3>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            ${stages.map((stage, i) => {
+                                const width = Math.max((stage.count / maxCount) * 100, 5);
+                                const prevCount = i > 0 ? stages[i-1].count : stage.count;
+                                const dropoff = prevCount > 0 ? ((1 - stage.count / prevCount) * 100).toFixed(1) : 0;
+                                const bgColor = stage.type === 'medwork' ? '#e8f5e9' : '#e3f2fd';
+                                const barColor = stage.type === 'medwork' ? '#4CAF50' : config.color;
+                                
+                                return `
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <div style="width: 140px; font-size: 13px; text-align: right;">${stage.label}</div>
+                                        <div style="flex: 1; background: ${bgColor}; border-radius: 4px; height: 32px; position: relative;">
+                                            <div style="width: ${width}%; background: ${barColor}; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; min-width: 50px;">
+                                                ${stage.count.toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <div style="width: 60px; font-size: 11px; color: ${dropoff > 50 ? '#dc3545' : '#666'};">
+                                            ${i > 0 ? (dropoff > 0 ? `-${dropoff}%` : '0%') : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="margin-top: 15px; font-size: 11px; color: #666; display: flex; gap: 20px;">
+                            <span>🔵 Website engagement (Ours Privacy)</span>
+                            <span>🟢 Lead funnel (Medwork)</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Initial render
+            renderOverallJourney(platformSelect?.value || 'mutm');
+            
+            // Platform change handler
+            if (platformSelect) {
+                platformSelect.onchange = () => renderOverallJourney(platformSelect.value);
+            }
+            
+        } catch (journeyErr) {
+            console.error("Overall journey load error:", journeyErr);
+        }
+        
         // Load converted visitors for journey dropdown
         try {
             const visitorsRes = await fetch("/api/ours-privacy/converted-visitors?" + params);
