@@ -2779,7 +2779,7 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
         
         // Tracking type labels with logos
         const typeLabels = {
-            'mutm': { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">' },
+            'mutm': { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-icon.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">' },
             'outm': { name: 'Organic', color: '#34A853', icon: '🌿' },
             'tutm': { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', icon: '🔴' },
