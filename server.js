@@ -2821,9 +2821,11 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         google: new Set(),
         bing: new Set(),
         tiktok: new Set(),
-        organic: new Set()
+        organic: new Set(),
+        instagramOrganic: new Set()
     };
     
+    // First pass: collect visitors by event prefix
     allData.forEach(d => {
         const event = d.body?.event?.event || "";
         const visitorId = d.body?.visitor?.visitor_id;
@@ -2834,6 +2836,17 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         if (event.startsWith("butm_")) platformVisitors.bing.add(visitorId);
         if (event.startsWith("tutm_")) platformVisitors.tiktok.add(visitorId);
         if (event.startsWith("outm_")) platformVisitors.organic.add(visitorId);
+    });
+    
+    // Second pass: find Instagram Organic (utm_source=instagram but NOT from Meta ads)
+    allData.forEach(d => {
+        const visitorId = d.body?.visitor?.visitor_id;
+        const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
+        if (!visitorId) return;
+        
+        if (utmSource === "instagram" && !platformVisitors.meta.has(visitorId)) {
+            platformVisitors.instagramOrganic.add(visitorId);
+        }
     });
     
     // Get l_f_s events with date filtering
@@ -2851,18 +2864,20 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
     }
     
     // Analyze cross-attribution for each platform
-    const metaSources = ["facebook", "fb", "instagram", "meta"];
+    const metaSources = ["facebook", "fb", "meta"];  // instagram removed - it's now tracked separately
     const googleSources = ["google"];
     const bingSources = ["bing"];
     const tiktokSources = ["tiktok", "tt"];
     const organicSources = ["organic", "direct", "", "(none)", "(direct)"];
+    const instagramOrganicSources = ["instagram"];
     
     const analysis = {
         meta: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
         google: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
         bing: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
         tiktok: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
-        organic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
+        organic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        instagramOrganic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
     };
     
     // Count visitors who entered via each platform
@@ -2871,6 +2886,7 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
     analysis.bing.entered = platformVisitors.bing.size;
     analysis.tiktok.entered = platformVisitors.tiktok.size;
     analysis.organic.entered = platformVisitors.organic.size;
+    analysis.instagramOrganic.entered = platformVisitors.instagramOrganic.size;
     
     // Analyze conversions
     lfsData.forEach(d => {
@@ -2878,12 +2894,13 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
         
         // Check each platform
-        ["meta", "google", "bing", "tiktok", "organic"].forEach(platform => {
+        ["meta", "google", "bing", "tiktok", "organic", "instagramOrganic"].forEach(platform => {
             if (platformVisitors[platform].has(visitorId)) {
                 const platformSources = platform === "meta" ? metaSources :
                                        platform === "google" ? googleSources :
                                        platform === "bing" ? bingSources :
-                                       platform === "tiktok" ? tiktokSources : organicSources;
+                                       platform === "tiktok" ? tiktokSources :
+                                       platform === "instagramOrganic" ? instagramOrganicSources : organicSources;
                 
                 if (platformSources.some(s => utmSource.includes(s) || (s === "" && utmSource === ""))) {
                     analysis[platform].convertedSame++;
@@ -2902,12 +2919,17 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         metaBing: [...platformVisitors.meta].filter(v => platformVisitors.bing.has(v)).length,
         metaTiktok: [...platformVisitors.meta].filter(v => platformVisitors.tiktok.has(v)).length,
         metaOrganic: [...platformVisitors.meta].filter(v => platformVisitors.organic.has(v)).length,
+        metaInstagramOrganic: [...platformVisitors.meta].filter(v => platformVisitors.instagramOrganic.has(v)).length,
         googleBing: [...platformVisitors.google].filter(v => platformVisitors.bing.has(v)).length,
         googleTiktok: [...platformVisitors.google].filter(v => platformVisitors.tiktok.has(v)).length,
         googleOrganic: [...platformVisitors.google].filter(v => platformVisitors.organic.has(v)).length,
+        googleInstagramOrganic: [...platformVisitors.google].filter(v => platformVisitors.instagramOrganic.has(v)).length,
         bingTiktok: [...platformVisitors.bing].filter(v => platformVisitors.tiktok.has(v)).length,
         bingOrganic: [...platformVisitors.bing].filter(v => platformVisitors.organic.has(v)).length,
-        tiktokOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.organic.has(v)).length
+        bingInstagramOrganic: [...platformVisitors.bing].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        tiktokOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.organic.has(v)).length,
+        tiktokInstagramOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        organicInstagramOrganic: [...platformVisitors.organic].filter(v => platformVisitors.instagramOrganic.has(v)).length
     };
     
     res.json({
