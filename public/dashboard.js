@@ -1478,7 +1478,7 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="13" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="loading">Loading ads...</td></tr>';
 
     try {
         // Get ad-level insights for current period
@@ -1487,7 +1487,7 @@ async function loadAdsData() {
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="13" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">No ad data for this period</td></tr>';
             return;
         }
         
@@ -1552,18 +1552,19 @@ async function loadAdsData() {
         const adIds = insightsData.data.map(ad => ad.ad_id);
         const creativeData = {};
         
-        // Fetch creative IDs in batches of 50
+        // Fetch creative IDs and created_time in batches of 50
         for (let i = 0; i < adIds.length; i += 50) {
             const batchIds = adIds.slice(i, i + 50);
             const adsWithCreatives = await apiCall(
-                `?ids=${batchIds.join(',')}&fields=creative`
+                `?ids=${batchIds.join(',')}&fields=creative,created_time`
             );
             
-            // Collect creative IDs from this batch
+            // Collect creative IDs and created_time from this batch
             Object.values(adsWithCreatives).forEach(ad => {
-                if (ad.creative?.id) {
-                    creativeData[ad.id] = { creativeId: ad.creative.id };
-                }
+                creativeData[ad.id] = { 
+                    creativeId: ad.creative?.id,
+                    created_time: ad.created_time
+                };
             });
         }
 
@@ -1631,7 +1632,8 @@ async function loadAdsData() {
                 cpr_trend: cprTrend,
                 avg_watch_time: avgWatchTime,
                 thumbnail: creative.thumbnail,
-                videoId: creative.videoId
+                videoId: creative.videoId,
+                created_time: creative.created_time
             };
         });
         
@@ -1647,7 +1649,7 @@ async function loadAdsData() {
         updateLastUpdated();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="13" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -1784,12 +1786,20 @@ function renderAdsTable() {
             frequencyHtml = '-';
         }
 
+        // Format published date
+        let publishedDisplay = '-';
+        if (ad.created_time) {
+            const pubDate = new Date(ad.created_time);
+            publishedDisplay = pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
         return `
             <tr>
                 <td>${thumbnailHtml}</td>
                 <td>${ad.ad_name}</td>
                 <td>${ad.adset_name}</td>
                 <td>${ad.campaign_name}</td>
+                <td>${publishedDisplay}</td>
                 <td>$${ad.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                 <td>${ad.impressions.toLocaleString()}</td>
                 <td>${ad.clicks.toLocaleString()}</td>
