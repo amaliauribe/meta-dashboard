@@ -1886,6 +1886,23 @@
                     </div>
                 </section>
 
+                <!-- Patient Journey Viewer -->
+                <section class="table-section">
+                    <h2>🛤️ Patient Journey</h2>
+                    <p class="section-subtitle">Visualize a visitor's touchpoints from first contact to conversion</p>
+                    
+                    <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
+                        <select id="journeyVisitorSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; min-width: 300px; font-size: 14px;">
+                            <option value="">Select a converted visitor...</option>
+                        </select>
+                        <button id="loadJourneyBtn" style="padding: 8px 16px; background: #4267B2; color: white; border: none; border-radius: 6px; cursor: pointer;">View Journey</button>
+                    </div>
+                    
+                    <div id="journeyTimeline" style="margin-top: 20px;">
+                        <div style="color: #666; font-style: italic;">Select a visitor to see their journey</div>
+                    </div>
+                </section>
+
                 <!-- Cross-Attribution Analysis -->
                 <section class="table-section">
                     <h2>🔀 Cross-Attribution Analysis</h2>

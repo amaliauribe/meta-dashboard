@@ -6112,6 +6112,116 @@ async function loadOursPrivacyData() {
             console.error("Cross-attribution load error:", crossErr);
         }
         
+        // Load converted visitors for journey dropdown
+        try {
+            const visitorsRes = await fetch("/api/ours-privacy/converted-visitors?" + params);
+            const visitorsData = await visitorsRes.json();
+            
+            const select = document.getElementById("journeyVisitorSelect");
+            if (select && visitorsData.visitors) {
+                select.innerHTML = '<option value="">Select a converted visitor...</option>' +
+                    visitorsData.visitors.map(v => {
+                        const time = new Date(v.conversionTime).toLocaleString('en-US', { 
+                            timeZone: 'America/New_York', 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                        });
+                        const shortId = v.visitorId.substring(0, 8);
+                        return `<option value="${v.visitorId}">${shortId}... | ${v.utm_source || 'Unknown'} | ${v.totalEvents} events | ${time}</option>`;
+                    }).join('');
+            }
+            
+            // Journey button handler
+            const loadBtn = document.getElementById("loadJourneyBtn");
+            if (loadBtn) {
+                loadBtn.onclick = async () => {
+                    const visitorId = document.getElementById("journeyVisitorSelect").value;
+                    if (!visitorId) return;
+                    
+                    const timeline = document.getElementById("journeyTimeline");
+                    timeline.innerHTML = '<div class="loading">Loading journey...</div>';
+                    
+                    try {
+                        const journeyRes = await fetch(`/api/ours-privacy/visitor-journey/${visitorId}`);
+                        const journey = await journeyRes.json();
+                        
+                        const eventColors = {
+                            'mutm_': '#4267B2',
+                            'g1utm_': '#EA4335',
+                            'butm_': '#00A4EF',
+                            'tutm_': '#00f2ea',
+                            'outm_': '#34A853',
+                            'l_f_s': '#22c55e'
+                        };
+                        
+                        const getEventColor = (event) => {
+                            for (const [prefix, color] of Object.entries(eventColors)) {
+                                if (event.startsWith(prefix) || event === prefix) return color;
+                            }
+                            return '#666';
+                        };
+                        
+                        const getEventLabel = (event) => {
+                            if (event === 'l_f_s') return '🎯 CONVERTED';
+                            if (event.startsWith('mutm_')) return '📘 Meta: ' + event.replace('mutm_', '');
+                            if (event.startsWith('g1utm_')) return '🔴 Google: ' + event.replace('g1utm_', '');
+                            if (event.startsWith('butm_')) return '🔷 Bing: ' + event.replace('butm_', '');
+                            if (event.startsWith('tutm_')) return '🎵 TikTok: ' + event.replace('tutm_', '');
+                            if (event.startsWith('outm_')) return '🌿 Organic: ' + event.replace('outm_', '');
+                            return event;
+                        };
+                        
+                        timeline.innerHTML = `
+                            <div style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                                    <div>
+                                        <strong>Visitor ID:</strong> ${journey.visitorId.substring(0, 12)}...
+                                    </div>
+                                    <div>
+                                        <strong>Total Events:</strong> ${journey.totalEvents}
+                                    </div>
+                                    <div>
+                                        <strong>Converted:</strong> ${journey.converted ? '✅ Yes' : '❌ No'}
+                                        ${journey.conversionSource ? ` (via ${journey.conversionSource})` : ''}
+                                    </div>
+                                </div>
+                                <div style="position: relative; padding-left: 30px; border-left: 3px solid #ddd;">
+                                    ${journey.events.map((e, i) => {
+                                        const time = new Date(e.timestamp).toLocaleString('en-US', {
+                                            timeZone: 'America/New_York',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            second: '2-digit'
+                                        });
+                                        const color = getEventColor(e.event);
+                                        const isConversion = e.event === 'l_f_s';
+                                        return `
+                                            <div style="position: relative; margin-bottom: 15px; ${isConversion ? 'background: #d4edda; padding: 10px; border-radius: 8px; margin-left: -10px;' : ''}">
+                                                <div style="position: absolute; left: -38px; top: 5px; width: 16px; height: 16px; background: ${color}; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px ${color};"></div>
+                                                <div style="font-size: 11px; color: #666;">${time}</div>
+                                                <div style="font-weight: ${isConversion ? 'bold' : 'normal'}; color: ${color}; font-size: ${isConversion ? '16px' : '14px'};">
+                                                    ${getEventLabel(e.event)}
+                                                </div>
+                                                ${e.utm_source ? `<div style="font-size: 11px; color: #888;">Source: ${e.utm_source}</div>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } catch (journeyErr) {
+                        timeline.innerHTML = '<div style="color: red;">Error loading journey</div>';
+                    }
+                };
+            }
+        } catch (visitorsErr) {
+            console.error("Visitors load error:", visitorsErr);
+        }
+        
     } catch (err) {
         console.error("Ours Privacy load error:", err);
     }
