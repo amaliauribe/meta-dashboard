@@ -2768,9 +2768,35 @@ async function loadFunnelsData() {
             };
             
             function renderOverallJourney(platform) {
-                const config = platformMap[platform];
-                const platformData = sourceData.sources?.find(s => s.prefix === platform);
-                const medworkData = funnelData.data?.[config.funnelKey] || {};
+                let config, platformData, medworkData;
+                
+                if (platform === 'all') {
+                    // Combine all sources
+                    config = { name: 'All Sources', color: '#6366f1' };
+                    
+                    // Sum up all platform events
+                    const eventTotals = {};
+                    sourceData.sources?.forEach(src => {
+                        src.events?.forEach(evt => {
+                            eventTotals[evt.event] = (eventTotals[evt.event] || 0) + evt.count;
+                        });
+                    });
+                    platformData = { events: Object.entries(eventTotals).map(([event, count]) => ({ event, count })) };
+                    
+                    // Sum up all medwork data
+                    medworkData = { l_f_s: 0, is_booked: 0, sent_to_verification: 0, is_booked_covered: 0, initial_fulfilled: 0 };
+                    Object.values(funnelData.data || {}).forEach(d => {
+                        medworkData.l_f_s += d.l_f_s || 0;
+                        medworkData.is_booked += d.is_booked || 0;
+                        medworkData.sent_to_verification += d.sent_to_verification || 0;
+                        medworkData.is_booked_covered += d.is_booked_covered || 0;
+                        medworkData.initial_fulfilled += d.initial_fulfilled || 0;
+                    });
+                } else {
+                    config = platformMap[platform];
+                    platformData = sourceData.sources?.find(s => s.prefix === platform);
+                    medworkData = funnelData.data?.[config.funnelKey] || {};
+                }
                 
                 if (!platformData) {
                     funnelContainer.innerHTML = '<div style="color: #666;">No data for this platform</div>';
@@ -2836,7 +2862,7 @@ async function loadFunnelsData() {
                 `;
             }
             
-            renderOverallJourney(platformSelect?.value || 'mutm');
+            renderOverallJourney(platformSelect?.value || 'all');
             
             if (platformSelect) {
                 platformSelect.onchange = () => renderOverallJourney(platformSelect.value);
