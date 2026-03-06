@@ -683,9 +683,20 @@
                     <select id="filterAdset" class="filter-dropdown">
                         <option value="">All Ad Sets</option>
                     </select>
-                    <select id="filterAd" class="filter-dropdown" multiple size="4" style="min-width: 200px; height: auto;">
-                    </select>
-                    <span style="font-size: 11px; color: #666; margin-left: -5px;">(Ctrl/Cmd+click for multiple)</span>
+                    <div class="multi-select-container" style="position: relative; display: inline-block;">
+                        <button type="button" id="filterAdBtn" class="filter-dropdown" style="min-width: 180px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                            <span id="filterAdLabel">All Ads</span>
+                            <span style="margin-left: 10px;">▼</span>
+                        </button>
+                        <div id="filterAdDropdown" class="multi-select-dropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 300px; overflow-y: auto; z-index: 1000; min-width: 250px;">
+                            <div style="padding: 8px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: white;">
+                                <label style="display: flex; align-items: center; cursor: pointer; font-weight: bold;">
+                                    <input type="checkbox" id="filterAdSelectAll" style="margin-right: 8px;"> Select All
+                                </label>
+                            </div>
+                            <div id="filterAdOptions" style="padding: 8px;"></div>
+                        </div>
+                    </div>
                     <button id="clearFilters" class="clear-filters-btn">Clear Filters</button>
                 </div>
                 <div class="table-wrapper">

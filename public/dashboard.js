@@ -892,9 +892,26 @@ function initializeDashboard() {
         refreshPlatformPlacementData();
     });
     
-    document.getElementById('filterAd').addEventListener('change', (e) => {
-        filterAds = Array.from(e.target.selectedOptions).map(opt => opt.value);
-        renderAdsTable();
+    // Multi-select Ads dropdown
+    const filterAdBtn = document.getElementById('filterAdBtn');
+    const filterAdDropdown = document.getElementById('filterAdDropdown');
+    const filterAdSelectAll = document.getElementById('filterAdSelectAll');
+    
+    filterAdBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        filterAdDropdown.style.display = filterAdDropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!filterAdDropdown.contains(e.target) && e.target !== filterAdBtn) {
+            filterAdDropdown.style.display = 'none';
+        }
+    });
+    
+    filterAdSelectAll.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('#filterAdOptions input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = filterAdSelectAll.checked);
+        updateFilterAdsFromCheckboxes();
     });
     
     document.getElementById('clearFilters').addEventListener('click', () => {
@@ -903,7 +920,9 @@ function initializeDashboard() {
         filterAds = [];
         document.getElementById('filterCampaign').value = '';
         document.getElementById('filterAdset').value = '';
-        document.getElementById('filterAd').selectedIndex = -1;
+        document.getElementById('filterAdLabel').textContent = 'All Ads';
+        filterAdSelectAll.checked = false;
+        document.querySelectorAll('#filterAdOptions input[type="checkbox"]').forEach(cb => cb.checked = false);
         updateAdsetDropdown();
         updateAdDropdown();
         renderAdsTable();
@@ -1690,13 +1709,48 @@ function updateAdDropdown() {
     }
     
     const ads = [...new Set(filteredData.map(ad => ad.ad_name))].sort();
-    const adSelect = document.getElementById('filterAd');
-    adSelect.innerHTML = '<option value="">All Ads</option>' + 
-        ads.map(a => `<option value="${a}">${a}</option>`).join('');
+    const optionsContainer = document.getElementById('filterAdOptions');
+    
+    optionsContainer.innerHTML = ads.map(ad => {
+        const checked = filterAds.includes(ad) ? 'checked' : '';
+        const shortName = ad.length > 35 ? ad.substring(0, 35) + '...' : ad;
+        return `
+            <label style="display: flex; align-items: center; padding: 6px 4px; cursor: pointer; border-radius: 4px;" 
+                   onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='transparent'">
+                <input type="checkbox" value="${ad}" ${checked} style="margin-right: 8px;" onchange="updateFilterAdsFromCheckboxes()">
+                <span title="${ad}" style="font-size: 13px;">${shortName}</span>
+            </label>
+        `;
+    }).join('');
     
     // Reset ad filter if current selections are not in filtered list
     if (filterAds.length > 0) {
         filterAds = filterAds.filter(ad => ads.includes(ad));
+        updateFilterAdLabel();
+    }
+}
+
+function updateFilterAdsFromCheckboxes() {
+    const checkboxes = document.querySelectorAll('#filterAdOptions input[type="checkbox"]');
+    filterAds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    updateFilterAdLabel();
+    
+    // Update select all checkbox
+    const selectAll = document.getElementById('filterAdSelectAll');
+    selectAll.checked = filterAds.length === checkboxes.length && checkboxes.length > 0;
+    
+    renderAdsTable();
+}
+
+function updateFilterAdLabel() {
+    const label = document.getElementById('filterAdLabel');
+    if (filterAds.length === 0) {
+        label.textContent = 'All Ads';
+    } else if (filterAds.length === 1) {
+        const name = filterAds[0];
+        label.textContent = name.length > 20 ? name.substring(0, 20) + '...' : name;
+    } else {
+        label.textContent = `${filterAds.length} ads selected`;
     }
 }
 
