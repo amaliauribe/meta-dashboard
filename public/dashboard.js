@@ -6024,13 +6024,14 @@ async function loadOursPrivacyData() {
                 meta: { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-icon.png" style="width: 20px; height: 20px; vertical-align: middle;">' },
                 google: { name: 'Google', color: '#EA4335', icon: '🔴' },
                 bing: { name: 'Bing', color: '#00A4EF', icon: '🔷' },
-                tiktok: { name: 'TikTok', color: '#00f2ea', icon: '🎵' }
+                tiktok: { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
+                organic: { name: 'Organic', color: '#34A853', icon: '🌿' }
             };
             
             const crossContainer = document.getElementById("crossAttributionContainer");
             let crossHtml = '';
             
-            ['meta', 'google', 'bing', 'tiktok'].forEach(platform => {
+            ['meta', 'google', 'bing', 'tiktok', 'organic'].forEach(platform => {
                 const data = crossData.analysis[platform];
                 const config = platformConfig[platform];
                 const lossRate = data.convertedSame + data.convertedOther > 0 
@@ -6066,9 +6067,13 @@ async function loadOursPrivacyData() {
                 { key: 'metaGoogle', label: 'Meta + Google', colors: ['#4267B2', '#EA4335'] },
                 { key: 'metaBing', label: 'Meta + Bing', colors: ['#4267B2', '#00A4EF'] },
                 { key: 'metaTiktok', label: 'Meta + TikTok', colors: ['#4267B2', '#00f2ea'] },
+                { key: 'metaOrganic', label: 'Meta + Organic', colors: ['#4267B2', '#34A853'] },
                 { key: 'googleBing', label: 'Google + Bing', colors: ['#EA4335', '#00A4EF'] },
                 { key: 'googleTiktok', label: 'Google + TikTok', colors: ['#EA4335', '#00f2ea'] },
-                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'] }
+                { key: 'googleOrganic', label: 'Google + Organic', colors: ['#EA4335', '#34A853'] },
+                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'] },
+                { key: 'bingOrganic', label: 'Bing + Organic', colors: ['#00A4EF', '#34A853'] },
+                { key: 'tiktokOrganic', label: 'TikTok + Organic', colors: ['#00f2ea', '#34A853'] }
             ];
             
             overlapsContainer.innerHTML = overlapPairs.map(pair => `

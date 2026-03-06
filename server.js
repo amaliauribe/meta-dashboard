@@ -2820,7 +2820,8 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         meta: new Set(),
         google: new Set(),
         bing: new Set(),
-        tiktok: new Set()
+        tiktok: new Set(),
+        organic: new Set()
     };
     
     allData.forEach(d => {
@@ -2832,6 +2833,7 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         if (event.startsWith("g1utm_")) platformVisitors.google.add(visitorId);
         if (event.startsWith("butm_")) platformVisitors.bing.add(visitorId);
         if (event.startsWith("tutm_")) platformVisitors.tiktok.add(visitorId);
+        if (event.startsWith("outm_")) platformVisitors.organic.add(visitorId);
     });
     
     // Get l_f_s events with date filtering
@@ -2853,12 +2855,14 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
     const googleSources = ["google"];
     const bingSources = ["bing"];
     const tiktokSources = ["tiktok", "tt"];
+    const organicSources = ["organic", "direct", "", "(none)", "(direct)"];
     
     const analysis = {
         meta: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
         google: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
         bing: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
-        tiktok: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
+        tiktok: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        organic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
     };
     
     // Count visitors who entered via each platform
@@ -2866,6 +2870,7 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
     analysis.google.entered = platformVisitors.google.size;
     analysis.bing.entered = platformVisitors.bing.size;
     analysis.tiktok.entered = platformVisitors.tiktok.size;
+    analysis.organic.entered = platformVisitors.organic.size;
     
     // Analyze conversions
     lfsData.forEach(d => {
@@ -2873,13 +2878,14 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
         
         // Check each platform
-        ["meta", "google", "bing", "tiktok"].forEach(platform => {
+        ["meta", "google", "bing", "tiktok", "organic"].forEach(platform => {
             if (platformVisitors[platform].has(visitorId)) {
                 const platformSources = platform === "meta" ? metaSources :
                                        platform === "google" ? googleSources :
-                                       platform === "bing" ? bingSources : tiktokSources;
+                                       platform === "bing" ? bingSources :
+                                       platform === "tiktok" ? tiktokSources : organicSources;
                 
-                if (platformSources.some(s => utmSource.includes(s))) {
+                if (platformSources.some(s => utmSource.includes(s) || (s === "" && utmSource === ""))) {
                     analysis[platform].convertedSame++;
                 } else {
                     analysis[platform].convertedOther++;
@@ -2895,9 +2901,13 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         metaGoogle: [...platformVisitors.meta].filter(v => platformVisitors.google.has(v)).length,
         metaBing: [...platformVisitors.meta].filter(v => platformVisitors.bing.has(v)).length,
         metaTiktok: [...platformVisitors.meta].filter(v => platformVisitors.tiktok.has(v)).length,
+        metaOrganic: [...platformVisitors.meta].filter(v => platformVisitors.organic.has(v)).length,
         googleBing: [...platformVisitors.google].filter(v => platformVisitors.bing.has(v)).length,
         googleTiktok: [...platformVisitors.google].filter(v => platformVisitors.tiktok.has(v)).length,
-        bingTiktok: [...platformVisitors.bing].filter(v => platformVisitors.tiktok.has(v)).length
+        googleOrganic: [...platformVisitors.google].filter(v => platformVisitors.organic.has(v)).length,
+        bingTiktok: [...platformVisitors.bing].filter(v => platformVisitors.tiktok.has(v)).length,
+        bingOrganic: [...platformVisitors.bing].filter(v => platformVisitors.organic.has(v)).length,
+        tiktokOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.organic.has(v)).length
     };
     
     res.json({
