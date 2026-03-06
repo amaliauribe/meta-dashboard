@@ -6065,28 +6065,48 @@ async function loadOursPrivacyData() {
             const overlapsContainer = document.getElementById("platformOverlaps");
             const overlaps = crossData.overlaps || {};
             const overlapPairs = [
-                { key: 'metaGoogle', label: 'Meta + Google', colors: ['#4267B2', '#EA4335'] },
-                { key: 'metaBing', label: 'Meta + Bing', colors: ['#4267B2', '#00A4EF'] },
-                { key: 'metaTiktok', label: 'Meta + TikTok', colors: ['#4267B2', '#00f2ea'] },
-                { key: 'metaOrganic', label: 'Meta + Organic', colors: ['#4267B2', '#34A853'] },
-                { key: 'metaInstagramOrganic', label: 'Meta + IG Organic', colors: ['#4267B2', '#E4405F'] },
-                { key: 'googleBing', label: 'Google + Bing', colors: ['#EA4335', '#00A4EF'] },
-                { key: 'googleTiktok', label: 'Google + TikTok', colors: ['#EA4335', '#00f2ea'] },
-                { key: 'googleOrganic', label: 'Google + Organic', colors: ['#EA4335', '#34A853'] },
-                { key: 'googleInstagramOrganic', label: 'Google + IG Organic', colors: ['#EA4335', '#E4405F'] },
-                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'] },
-                { key: 'bingOrganic', label: 'Bing + Organic', colors: ['#00A4EF', '#34A853'] },
-                { key: 'tiktokOrganic', label: 'TikTok + Organic', colors: ['#00f2ea', '#34A853'] },
-                { key: 'tiktokInstagramOrganic', label: 'TikTok + IG Organic', colors: ['#00f2ea', '#E4405F'] },
-                { key: 'organicInstagramOrganic', label: 'Organic + IG Organic', colors: ['#34A853', '#E4405F'] }
+                { key: 'metaGoogle', label: 'Meta + Google', colors: ['#4267B2', '#EA4335'], platforms: ['meta', 'google'] },
+                { key: 'metaBing', label: 'Meta + Bing', colors: ['#4267B2', '#00A4EF'], platforms: ['meta', 'bing'] },
+                { key: 'metaTiktok', label: 'Meta + TikTok', colors: ['#4267B2', '#00f2ea'], platforms: ['meta', 'tiktok'] },
+                { key: 'metaOrganic', label: 'Meta + Organic', colors: ['#4267B2', '#34A853'], platforms: ['meta', 'organic'] },
+                { key: 'metaInstagramOrganic', label: 'Meta + IG Organic', colors: ['#4267B2', '#E4405F'], platforms: ['meta', 'instagramOrganic'] },
+                { key: 'googleBing', label: 'Google + Bing', colors: ['#EA4335', '#00A4EF'], platforms: ['google', 'bing'] },
+                { key: 'googleTiktok', label: 'Google + TikTok', colors: ['#EA4335', '#00f2ea'], platforms: ['google', 'tiktok'] },
+                { key: 'googleOrganic', label: 'Google + Organic', colors: ['#EA4335', '#34A853'], platforms: ['google', 'organic'] },
+                { key: 'googleInstagramOrganic', label: 'Google + IG Organic', colors: ['#EA4335', '#E4405F'], platforms: ['google', 'instagramOrganic'] },
+                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'], platforms: ['bing', 'tiktok'] },
+                { key: 'bingOrganic', label: 'Bing + Organic', colors: ['#00A4EF', '#34A853'], platforms: ['bing', 'organic'] },
+                { key: 'bingInstagramOrganic', label: 'Bing + IG Organic', colors: ['#00A4EF', '#E4405F'], platforms: ['bing', 'instagramOrganic'] },
+                { key: 'tiktokOrganic', label: 'TikTok + Organic', colors: ['#00f2ea', '#34A853'], platforms: ['tiktok', 'organic'] },
+                { key: 'tiktokInstagramOrganic', label: 'TikTok + IG Organic', colors: ['#00f2ea', '#E4405F'], platforms: ['tiktok', 'instagramOrganic'] },
+                { key: 'organicInstagramOrganic', label: 'Organic + IG Organic', colors: ['#34A853', '#E4405F'], platforms: ['organic', 'instagramOrganic'] }
             ];
             
-            overlapsContainer.innerHTML = overlapPairs.map(pair => `
-                <div style="background: linear-gradient(135deg, ${pair.colors[0]}22, ${pair.colors[1]}22); border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; text-align: center;">
-                    <div style="font-size: 11px; color: #666;">${pair.label}</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #333;">${overlaps[pair.key] || 0}</div>
-                </div>
-            `).join('');
+            // Store data for filtering
+            window.overlapData = { overlaps, overlapPairs };
+            
+            // Render function
+            function renderOverlaps(filter = 'all') {
+                const filtered = filter === 'all' 
+                    ? overlapPairs 
+                    : overlapPairs.filter(p => p.platforms.includes(filter));
+                
+                overlapsContainer.innerHTML = filtered.map(pair => `
+                    <div style="background: linear-gradient(135deg, ${pair.colors[0]}22, ${pair.colors[1]}22); border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; text-align: center;">
+                        <div style="font-size: 11px; color: #666;">${pair.label}</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #333;">${overlaps[pair.key] || 0}</div>
+                    </div>
+                `).join('') || '<div style="color: #666;">No overlaps for this filter</div>';
+            }
+            
+            // Initial render
+            renderOverlaps();
+            
+            // Filter change handler
+            const filterSelect = document.getElementById("overlapPlatformFilter");
+            if (filterSelect) {
+                filterSelect.onchange = () => renderOverlaps(filterSelect.value);
+            }
             
         } catch (crossErr) {
             console.error("Cross-attribution load error:", crossErr);

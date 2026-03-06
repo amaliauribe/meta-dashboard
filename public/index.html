@@ -1896,7 +1896,18 @@
                     </div>
                     
                     <div style="margin-top: 20px;">
-                        <h3 style="margin-bottom: 15px;">🔗 Platform Overlaps</h3>
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">🔗 Platform Overlaps</h3>
+                            <select id="overlapPlatformFilter" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
+                                <option value="all">All Platforms</option>
+                                <option value="meta">Meta only</option>
+                                <option value="google">Google only</option>
+                                <option value="bing">Bing only</option>
+                                <option value="tiktok">TikTok only</option>
+                                <option value="organic">Organic only</option>
+                                <option value="instagramOrganic">IG Organic only</option>
+                            </select>
+                        </div>
                         <p class="section-subtitle">Visitors who touched multiple ad platforms</p>
                         <div id="platformOverlaps" style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
                             <div class="loading">Loading...</div>
