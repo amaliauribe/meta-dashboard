@@ -3048,6 +3048,77 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
 });
 
 
+
+// Get visitor journey - all events for a specific visitor ID
+app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
+    const data = global.webhookData || [];
+    const visitorId = req.params.visitorId;
+    
+    const events = data.filter(d => 
+        d.headers?.["user-agent"]?.includes("ours-privacy") &&
+        d.body?.visitor?.visitor_id === visitorId
+    ).map(d => ({
+        timestamp: d.timestamp,
+        event: d.body?.event?.event,
+        utm_source: d.body?.visitor?.utm_source,
+        utm_campaign: d.body?.visitor?.utm_campaign,
+        utm_medium: d.body?.visitor?.utm_medium
+    })).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    res.json({
+        visitorId,
+        totalEvents: events.length,
+        events,
+        converted: events.some(e => e.event === "l_f_s"),
+        conversionSource: events.find(e => e.event === "l_f_s")?.utm_source || null
+    });
+});
+
+// Get list of visitors who converted (for dropdown selection)
+app.get("/api/ours-privacy/converted-visitors", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let allData = data.filter(d => 
+        d.headers?.["user-agent"]?.includes("ours-privacy")
+    );
+    
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        allData = allData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        allData = allData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    const lfsEvents = allData.filter(d => d.body?.event?.event === "l_f_s");
+    
+    const visitors = lfsEvents.map(d => ({
+        visitorId: d.body?.visitor?.visitor_id,
+        conversionTime: d.timestamp,
+        utm_source: d.body?.visitor?.utm_source
+    })).sort((a, b) => new Date(b.conversionTime) - new Date(a.conversionTime));
+    
+    const eventCounts = {};
+    allData.forEach(d => {
+        const vid = d.body?.visitor?.visitor_id;
+        if (vid) eventCounts[vid] = (eventCounts[vid] || 0) + 1;
+    });
+    
+    visitors.forEach(v => {
+        v.totalEvents = eventCounts[v.visitorId] || 0;
+    });
+    
+    res.json({
+        total: visitors.length,
+        visitors: visitors.slice(0, 100)
+    });
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -3230,79 +3301,4 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
         .sort((a, b) => b.conversions - a.conversions);
     
     res.json({ zipcodes: results });
-});
-
-
-
-// Get visitor journey - all events for a specific visitor ID
-app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
-    const data = global.webhookData || [];
-    const visitorId = req.params.visitorId;
-    
-    const events = data.filter(d => 
-        d.headers?.["user-agent"]?.includes("ours-privacy") &&
-        d.body?.visitor?.visitor_id === visitorId
-    ).map(d => ({
-        timestamp: d.timestamp,
-        event: d.body?.event?.event,
-        utm_source: d.body?.visitor?.utm_source,
-        utm_campaign: d.body?.visitor?.utm_campaign,
-        utm_medium: d.body?.visitor?.utm_medium
-    })).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    
-    res.json({
-        visitorId,
-        totalEvents: events.length,
-        events,
-        converted: events.some(e => e.event === "l_f_s"),
-        conversionSource: events.find(e => e.event === "l_f_s")?.utm_source || null
-    });
-});
-
-// Get list of visitors who converted (for dropdown selection)
-app.get("/api/ours-privacy/converted-visitors", (req, res) => {
-    const data = global.webhookData || [];
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    let allData = data.filter(d => 
-        d.headers?.["user-agent"]?.includes("ours-privacy")
-    );
-    
-    // Apply date filtering
-    if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        allData = allData.filter(d => new Date(d.timestamp) >= start);
-    }
-    if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        allData = allData.filter(d => new Date(d.timestamp) <= end);
-    }
-    
-    // Find visitors who converted
-    const lfsEvents = allData.filter(d => d.body?.event?.event === "l_f_s");
-    
-    const visitors = lfsEvents.map(d => ({
-        visitorId: d.body?.visitor?.visitor_id,
-        conversionTime: d.timestamp,
-        utm_source: d.body?.visitor?.utm_source
-    })).sort((a, b) => new Date(b.conversionTime) - new Date(a.conversionTime));
-    
-    // Count events per visitor
-    const eventCounts = {};
-    allData.forEach(d => {
-        const vid = d.body?.visitor?.visitor_id;
-        if (vid) eventCounts[vid] = (eventCounts[vid] || 0) + 1;
-    });
-    
-    visitors.forEach(v => {
-        v.totalEvents = eventCounts[v.visitorId] || 0;
-    });
-    
-    res.json({
-        total: visitors.length,
-        visitors: visitors.slice(0, 100) // Limit to 100
-    });
 });
