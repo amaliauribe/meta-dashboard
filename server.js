@@ -2810,12 +2810,24 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
-    const allData = data.filter(d => 
+    let allData = data.filter(d => 
         d.headers && d.headers["user-agent"] && 
         d.headers["user-agent"].includes("ours-privacy")
     );
     
-    // Build sets of visitor IDs by platform (based on their events)
+    // Apply date filtering to ALL data first
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        allData = allData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        allData = allData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Build sets of visitor IDs by platform (based on their events within date range)
     const platformVisitors = {
         meta: new Set(),
         google: new Set(),
@@ -2849,19 +2861,8 @@ app.get("/api/ours-privacy/cross-attribution", (req, res) => {
         }
     });
     
-    // Get l_f_s events with date filtering
+    // Get l_f_s events (already date filtered via allData)
     let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
-    
-    if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) >= start);
-    }
-    if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) <= end);
-    }
     
     // Analyze cross-attribution for each platform
     const metaSources = ["facebook", "fb", "meta"];  // instagram removed - it's now tracked separately
