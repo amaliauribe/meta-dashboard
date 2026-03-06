@@ -5872,29 +5872,32 @@ function truncate(str, maxLen) {
 
 async function loadOursPrivacyData() {
     try {
-        // Get current date range
-        const startDateEl = document.getElementById("startDate");
-        const endDateEl = document.getElementById("endDate");
-        let startDate = startDateEl ? startDateEl.value : "";
-        let endDate = endDateEl ? endDateEl.value : "";
+        // Get current date range - use preset buttons unless custom range is selected
+        let startDate, endDate;
+        
+        if (currentRange === "custom") {
+            const startDateEl = document.getElementById("startDate");
+            const endDateEl = document.getElementById("endDate");
+            startDate = startDateEl ? startDateEl.value : "";
+            endDate = endDateEl ? endDateEl.value : "";
+        }
         
         if (!startDate || !endDate) {
             const today = new Date();
             const end = new Date(today);
             let start = new Date(today);
             
-            if (typeof currentRange !== "undefined") {
-                if (currentRange === "today") {
-                } else if (currentRange === "yesterday") {
-                    start.setDate(start.getDate() - 1);
-                    end.setDate(end.getDate() - 1);
-                } else if (currentRange === "7d") {
-                    start.setDate(start.getDate() - 6);
-                } else if (currentRange === "14d") {
-                    start.setDate(start.getDate() - 13);
-                } else if (currentRange === "30d") {
-                    start.setDate(start.getDate() - 29);
-                }
+            if (currentRange === "today") {
+                // start and end are already today
+            } else if (currentRange === "yesterday") {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (currentRange === "7d") {
+                start.setDate(start.getDate() - 6);
+            } else if (currentRange === "14d") {
+                start.setDate(start.getDate() - 13);
+            } else if (currentRange === "30d") {
+                start.setDate(start.getDate() - 29);
             }
             
             startDate = start.toISOString().split("T")[0];
