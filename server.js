@@ -2804,6 +2804,142 @@ app.get("/api/ours-privacy/lfs", (req, res) => {
     });
 });
 
+// Cross-attribution analysis - visitors who entered via one platform but converted with another
+app.get("/api/ours-privacy/cross-attribution", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let allData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Apply date filtering to ALL data first
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        allData = allData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        allData = allData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Build sets of visitor IDs by platform (based on their events within date range)
+    const platformVisitors = {
+        meta: new Set(),
+        google: new Set(),
+        bing: new Set(),
+        tiktok: new Set(),
+        organic: new Set(),
+        instagramOrganic: new Set()
+    };
+    
+    // First pass: collect visitors by event prefix
+    allData.forEach(d => {
+        const event = d.body?.event?.event || "";
+        const visitorId = d.body?.visitor?.visitor_id;
+        if (!visitorId) return;
+        
+        if (event.startsWith("mutm_")) platformVisitors.meta.add(visitorId);
+        if (event.startsWith("g1utm_")) platformVisitors.google.add(visitorId);
+        if (event.startsWith("butm_")) platformVisitors.bing.add(visitorId);
+        if (event.startsWith("tutm_")) platformVisitors.tiktok.add(visitorId);
+        if (event.startsWith("outm_")) platformVisitors.organic.add(visitorId);
+    });
+    
+    // Second pass: find Instagram Organic (utm_source=instagram but NOT from Meta ads)
+    allData.forEach(d => {
+        const visitorId = d.body?.visitor?.visitor_id;
+        const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
+        if (!visitorId) return;
+        
+        if (utmSource === "instagram" && !platformVisitors.meta.has(visitorId)) {
+            platformVisitors.instagramOrganic.add(visitorId);
+        }
+    });
+    
+    // Get l_f_s events (already date filtered via allData)
+    let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
+    
+    // Analyze cross-attribution for each platform
+    const metaSources = ["facebook", "fb", "meta"];  // instagram removed - it's now tracked separately
+    const googleSources = ["google"];
+    const bingSources = ["bing"];
+    const tiktokSources = ["tiktok", "tt"];
+    const organicSources = ["organic", "direct", "", "(none)", "(direct)"];
+    const instagramOrganicSources = ["instagram"];
+    
+    const analysis = {
+        meta: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        google: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        bing: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        tiktok: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        organic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        instagramOrganic: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
+    };
+    
+    // Count visitors who entered via each platform
+    analysis.meta.entered = platformVisitors.meta.size;
+    analysis.google.entered = platformVisitors.google.size;
+    analysis.bing.entered = platformVisitors.bing.size;
+    analysis.tiktok.entered = platformVisitors.tiktok.size;
+    analysis.organic.entered = platformVisitors.organic.size;
+    analysis.instagramOrganic.entered = platformVisitors.instagramOrganic.size;
+    
+    // Analyze conversions
+    lfsData.forEach(d => {
+        const visitorId = d.body?.visitor?.visitor_id;
+        const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
+        
+        // Check each platform
+        ["meta", "google", "bing", "tiktok", "organic", "instagramOrganic"].forEach(platform => {
+            if (platformVisitors[platform].has(visitorId)) {
+                const platformSources = platform === "meta" ? metaSources :
+                                       platform === "google" ? googleSources :
+                                       platform === "bing" ? bingSources :
+                                       platform === "tiktok" ? tiktokSources :
+                                       platform === "instagramOrganic" ? instagramOrganicSources : organicSources;
+                
+                if (platformSources.some(s => utmSource.includes(s) || (s === "" && utmSource === ""))) {
+                    analysis[platform].convertedSame++;
+                } else {
+                    analysis[platform].convertedOther++;
+                    const lostSource = utmSource || "unknown";
+                    analysis[platform].lostTo[lostSource] = (analysis[platform].lostTo[lostSource] || 0) + 1;
+                }
+            }
+        });
+    });
+    
+    // Calculate cross-platform overlaps
+    const overlaps = {
+        metaGoogle: [...platformVisitors.meta].filter(v => platformVisitors.google.has(v)).length,
+        metaBing: [...platformVisitors.meta].filter(v => platformVisitors.bing.has(v)).length,
+        metaTiktok: [...platformVisitors.meta].filter(v => platformVisitors.tiktok.has(v)).length,
+        metaOrganic: [...platformVisitors.meta].filter(v => platformVisitors.organic.has(v)).length,
+        metaInstagramOrganic: [...platformVisitors.meta].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        googleBing: [...platformVisitors.google].filter(v => platformVisitors.bing.has(v)).length,
+        googleTiktok: [...platformVisitors.google].filter(v => platformVisitors.tiktok.has(v)).length,
+        googleOrganic: [...platformVisitors.google].filter(v => platformVisitors.organic.has(v)).length,
+        googleInstagramOrganic: [...platformVisitors.google].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        bingTiktok: [...platformVisitors.bing].filter(v => platformVisitors.tiktok.has(v)).length,
+        bingOrganic: [...platformVisitors.bing].filter(v => platformVisitors.organic.has(v)).length,
+        bingInstagramOrganic: [...platformVisitors.bing].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        tiktokOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.organic.has(v)).length,
+        tiktokInstagramOrganic: [...platformVisitors.tiktok].filter(v => platformVisitors.instagramOrganic.has(v)).length,
+        organicInstagramOrganic: [...platformVisitors.organic].filter(v => platformVisitors.instagramOrganic.has(v)).length
+    };
+    
+    res.json({
+        analysis,
+        overlaps,
+        totalLfs: lfsData.length
+    });
+});
+
 // ==================== Looker API Endpoints ====================
 
 // Get leads funnel data by tracking type
@@ -2911,6 +3047,77 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
     }
 });
 
+
+
+// Get visitor journey - all events for a specific visitor ID
+app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
+    const data = global.webhookData || [];
+    const visitorId = req.params.visitorId;
+    
+    const events = data.filter(d => 
+        d.headers?.["user-agent"]?.includes("ours-privacy") &&
+        d.body?.visitor?.visitor_id === visitorId
+    ).map(d => ({
+        timestamp: d.timestamp,
+        event: d.body?.event?.event,
+        utm_source: d.body?.visitor?.utm_source,
+        utm_campaign: d.body?.visitor?.utm_campaign,
+        utm_medium: d.body?.visitor?.utm_medium
+    })).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    res.json({
+        visitorId,
+        totalEvents: events.length,
+        events,
+        converted: events.some(e => e.event === "l_f_s"),
+        conversionSource: events.find(e => e.event === "l_f_s")?.utm_source || null
+    });
+});
+
+// Get list of visitors who converted (for dropdown selection)
+app.get("/api/ours-privacy/converted-visitors", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let allData = data.filter(d => 
+        d.headers?.["user-agent"]?.includes("ours-privacy")
+    );
+    
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        allData = allData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        allData = allData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    const lfsEvents = allData.filter(d => d.body?.event?.event === "l_f_s");
+    
+    const visitors = lfsEvents.map(d => ({
+        visitorId: d.body?.visitor?.visitor_id,
+        conversionTime: d.timestamp,
+        utm_source: d.body?.visitor?.utm_source
+    })).sort((a, b) => new Date(b.conversionTime) - new Date(a.conversionTime));
+    
+    const eventCounts = {};
+    allData.forEach(d => {
+        const vid = d.body?.visitor?.visitor_id;
+        if (vid) eventCounts[vid] = (eventCounts[vid] || 0) + 1;
+    });
+    
+    visitors.forEach(v => {
+        v.totalEvents = eventCounts[v.visitorId] || 0;
+    });
+    
+    res.json({
+        total: visitors.length,
+        visitors: visitors.slice(0, 100)
+    });
+});
 
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
@@ -3095,5 +3302,3 @@ app.post('/api/heatmap/zipcode-performance', async (req, res) => {
     
     res.json({ zipcodes: results });
 });
-
-

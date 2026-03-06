@@ -124,7 +124,7 @@ const BING_API_ENABLED = true;
 // Ads Filters
 let filterCampaign = '';
 let filterAdset = '';
-let filterAd = '';
+let filterAds = []; // Array for multi-select
 let filterPlatform = ''; // For platform → placement filtering
 let filterPlacement = ''; // For placement → creative filtering
 let filterPlacementPlatform = ''; // Store the platform of selected placement
@@ -892,18 +892,37 @@ function initializeDashboard() {
         refreshPlatformPlacementData();
     });
     
-    document.getElementById('filterAd').addEventListener('change', (e) => {
-        filterAd = e.target.value;
-        renderAdsTable();
+    // Multi-select Ads dropdown
+    const filterAdBtn = document.getElementById('filterAdBtn');
+    const filterAdDropdown = document.getElementById('filterAdDropdown');
+    const filterAdSelectAll = document.getElementById('filterAdSelectAll');
+    
+    filterAdBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        filterAdDropdown.style.display = filterAdDropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!filterAdDropdown.contains(e.target) && e.target !== filterAdBtn) {
+            filterAdDropdown.style.display = 'none';
+        }
+    });
+    
+    filterAdSelectAll.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('#filterAdOptions input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = filterAdSelectAll.checked);
+        updateFilterAdsFromCheckboxes();
     });
     
     document.getElementById('clearFilters').addEventListener('click', () => {
         filterCampaign = '';
         filterAdset = '';
-        filterAd = '';
+        filterAds = [];
         document.getElementById('filterCampaign').value = '';
         document.getElementById('filterAdset').value = '';
-        document.getElementById('filterAd').value = '';
+        document.getElementById('filterAdLabel').textContent = 'All Ads';
+        filterAdSelectAll.checked = false;
+        document.querySelectorAll('#filterAdOptions input[type="checkbox"]').forEach(cb => cb.checked = false);
         updateAdsetDropdown();
         updateAdDropdown();
         renderAdsTable();
@@ -1478,7 +1497,7 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="14" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="loading">Loading ads...</td></tr>';
 
     try {
         // Get ad-level insights for current period
@@ -1487,7 +1506,7 @@ async function loadAdsData() {
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="14" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="15" class="loading">No ad data for this period</td></tr>';
             return;
         }
         
@@ -1548,23 +1567,27 @@ async function loadAdsData() {
             });
         }
 
-        // Get creative info for each ad (batch requests in chunks of 50)
+        // Get creative info, status, and created_time for each ad (batch requests in chunks of 50)
         const adIds = insightsData.data.map(ad => ad.ad_id);
         const creativeData = {};
+        const adStatusData = {};
         
-        // Fetch creative IDs and created_time in batches of 50
+        // Fetch creative IDs, status, and created_time in batches of 50
         for (let i = 0; i < adIds.length; i += 50) {
             const batchIds = adIds.slice(i, i + 50);
             const adsWithCreatives = await apiCall(
-                `?ids=${batchIds.join(',')}&fields=creative,created_time`
+                `?ids=${batchIds.join(',')}&fields=creative,effective_status,created_time`
             );
             
-            // Collect creative IDs and created_time from this batch
+            // Collect creative IDs, status, and created_time from this batch
             Object.values(adsWithCreatives).forEach(ad => {
                 creativeData[ad.id] = { 
                     creativeId: ad.creative?.id,
                     created_time: ad.created_time
                 };
+                if (ad.effective_status) {
+                    adStatusData[ad.id] = ad.effective_status;
+                }
             });
         }
 
@@ -1633,7 +1656,8 @@ async function loadAdsData() {
                 avg_watch_time: avgWatchTime,
                 thumbnail: creative.thumbnail,
                 videoId: creative.videoId,
-                created_time: creative.created_time
+                created_time: creative.created_time,
+                status: adStatusData[ad.ad_id] || 'UNKNOWN'
             };
         });
         
@@ -1642,14 +1666,14 @@ async function loadAdsData() {
         // Reset filters and populate dropdowns
         filterCampaign = '';
         filterAdset = '';
-        filterAd = '';
+        filterAds = [];
         populateAdsFilterDropdowns();
         
         renderAdsTable();
         updateLastUpdated();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="14" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -1692,14 +1716,48 @@ function updateAdDropdown() {
     }
     
     const ads = [...new Set(filteredData.map(ad => ad.ad_name))].sort();
-    const adSelect = document.getElementById('filterAd');
-    adSelect.innerHTML = '<option value="">All Ads</option>' + 
-        ads.map(a => `<option value="${a}">${a}</option>`).join('');
+    const optionsContainer = document.getElementById('filterAdOptions');
     
-    // Reset ad filter if current selection is not in filtered list
-    if (filterAd && !ads.includes(filterAd)) {
-        filterAd = '';
-        adSelect.value = '';
+    optionsContainer.innerHTML = ads.map(ad => {
+        const checked = filterAds.includes(ad) ? 'checked' : '';
+        const shortName = ad.length > 35 ? ad.substring(0, 35) + '...' : ad;
+        return `
+            <label style="display: flex; align-items: center; padding: 6px 4px; cursor: pointer; border-radius: 4px;" 
+                   onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='transparent'">
+                <input type="checkbox" value="${ad}" ${checked} style="margin-right: 8px;" onchange="updateFilterAdsFromCheckboxes()">
+                <span title="${ad}" style="font-size: 13px;">${shortName}</span>
+            </label>
+        `;
+    }).join('');
+    
+    // Reset ad filter if current selections are not in filtered list
+    if (filterAds.length > 0) {
+        filterAds = filterAds.filter(ad => ads.includes(ad));
+        updateFilterAdLabel();
+    }
+}
+
+function updateFilterAdsFromCheckboxes() {
+    const checkboxes = document.querySelectorAll('#filterAdOptions input[type="checkbox"]');
+    filterAds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    updateFilterAdLabel();
+    
+    // Update select all checkbox
+    const selectAll = document.getElementById('filterAdSelectAll');
+    selectAll.checked = filterAds.length === checkboxes.length && checkboxes.length > 0;
+    
+    renderAdsTable();
+}
+
+function updateFilterAdLabel() {
+    const label = document.getElementById('filterAdLabel');
+    if (filterAds.length === 0) {
+        label.textContent = 'All Ads';
+    } else if (filterAds.length === 1) {
+        const name = filterAds[0];
+        label.textContent = name.length > 20 ? name.substring(0, 20) + '...' : name;
+    } else {
+        label.textContent = `${filterAds.length} ads selected`;
     }
 }
 
@@ -1715,8 +1773,8 @@ function renderAdsTable() {
     if (filterAdset) {
         filteredAds = filteredAds.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredAds = filteredAds.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredAds = filteredAds.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Sort the data
@@ -1793,10 +1851,26 @@ function renderAdsTable() {
             publishedDisplay = pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
+        // Format status with badge
+        let statusHtml;
+        const status = ad.status || 'UNKNOWN';
+        if (status === 'ACTIVE') {
+            statusHtml = '<span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Active</span>';
+        } else if (status === 'PAUSED') {
+            statusHtml = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Paused</span>';
+        } else if (status === 'DELETED' || status === 'ARCHIVED') {
+            statusHtml = '<span style="background: #6b7280; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.charAt(0) + status.slice(1).toLowerCase() + '</span>';
+        } else if (status === 'PENDING_REVIEW' || status === 'DISAPPROVED') {
+            statusHtml = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.replace('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) + '</span>';
+        } else {
+            statusHtml = '<span style="background: #9ca3af; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.replace('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) + '</span>';
+        }
+
         return `
             <tr>
                 <td>${thumbnailHtml}</td>
                 <td>${ad.ad_name}</td>
+                <td>${statusHtml}</td>
                 <td>${ad.adset_name}</td>
                 <td>${ad.campaign_name}</td>
                 <td>${publishedDisplay}</td>
@@ -1836,8 +1910,8 @@ function analyzeWinner() {
     if (filterAdset) {
         filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredData = filteredData.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Find ads with results, sorted by most results
@@ -2253,7 +2327,7 @@ async function selectPlacement(platform, position) {
     
     // Fetch ad-level data for this specific placement
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="14" class="loading">Loading ads for this placement...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="loading">Loading ads for this placement...</td></tr>';
     
     try {
         const range = dateRanges[currentRange];
@@ -2262,7 +2336,7 @@ async function selectPlacement(platform, position) {
         );
         
         if (!placementAdsData.data) {
-            tbody.innerHTML = '<tr><td colspan="14" class="loading">No data for this placement</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="15" class="loading">No data for this placement</td></tr>';
             return;
         }
         
@@ -2309,7 +2383,7 @@ async function selectPlacement(platform, position) {
         renderFilteredAdsTable(placementAds);
     } catch (e) {
         console.error('Error fetching placement ads:', e);
-        tbody.innerHTML = `<tr><td colspan="14" class="loading">Error: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -2318,7 +2392,7 @@ function renderFilteredAdsTable(ads) {
     const tbody = document.getElementById('adsBody');
     
     if (ads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="14" class="loading">No ads for this placement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="loading">No ads for this placement</td></tr>';
         return;
     }
     
@@ -2388,8 +2462,8 @@ function analyzeFatigue() {
     if (filterAdset) {
         filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredData = filteredData.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Find ads with frequency >= 4
@@ -2597,7 +2671,7 @@ async function loadMedworkFunnel() {
         
         // Tracking type labels
         const typeLabels = {
-            'mutm': { name: 'Meta', color: '#4267B2', emoji: '📘' },
+            'mutm': { name: 'Meta', color: '#4267B2', emoji: '<img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;">' },
             'outm': { name: 'Organic', color: '#34A853', emoji: '🌿' },
             'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
@@ -2756,6 +2830,131 @@ async function loadFunnelsData() {
             bing: { spend: bingSpend, results: bingResults, lfs: bingLfsCount }
         });
         
+        // Load Overall Patient Journey Funnel
+        try {
+            const [sourceRes, funnelRes] = await Promise.all([
+                fetch("/api/ours-privacy/by-source?" + params),
+                fetch("/api/looker/leads-funnel?" + params)
+            ]);
+            
+            const sourceData = await sourceRes.json();
+            const funnelData = await funnelRes.json();
+            
+            const funnelContainer = document.getElementById("overallJourneyFunnel");
+            const platformSelect = document.getElementById("journeyPlatformFilter");
+            
+            const platformMap = {
+                'mutm': { name: 'Meta', color: '#4267B2', funnelKey: 'mutm' },
+                'tutm': { name: 'TikTok', color: '#00f2ea', funnelKey: 'tutm' },
+                'outm': { name: 'Organic', color: '#34A853', funnelKey: 'outm' },
+                'g1utm': { name: 'Google', color: '#EA4335', funnelKey: 'g1utm' },
+                'butm': { name: 'Bing', color: '#00A4EF', funnelKey: 'butm' }
+            };
+            
+            function renderOverallJourney(platform) {
+                let config, platformData, medworkData;
+                
+                if (platform === 'all') {
+                    // Combine all sources
+                    config = { name: 'All Sources', color: '#6366f1' };
+                    
+                    // Sum up all platform events
+                    const eventTotals = {};
+                    sourceData.sources?.forEach(src => {
+                        src.events?.forEach(evt => {
+                            eventTotals[evt.event] = (eventTotals[evt.event] || 0) + evt.count;
+                        });
+                    });
+                    platformData = { events: Object.entries(eventTotals).map(([event, count]) => ({ event, count })) };
+                    
+                    // Sum up all medwork data
+                    medworkData = { l_f_s: 0, is_booked: 0, sent_to_verification: 0, is_booked_covered: 0, initial_fulfilled: 0 };
+                    Object.values(funnelData.data || {}).forEach(d => {
+                        medworkData.l_f_s += d.l_f_s || 0;
+                        medworkData.is_booked += d.is_booked || 0;
+                        medworkData.sent_to_verification += d.sent_to_verification || 0;
+                        medworkData.is_booked_covered += d.is_booked_covered || 0;
+                        medworkData.initial_fulfilled += d.initial_fulfilled || 0;
+                    });
+                } else {
+                    config = platformMap[platform];
+                    platformData = sourceData.sources?.find(s => s.prefix === platform);
+                    medworkData = funnelData.data?.[config.funnelKey] || {};
+                }
+                
+                if (!platformData) {
+                    funnelContainer.innerHTML = '<div style="color: #666;">No data for this platform</div>';
+                    return;
+                }
+                
+                const stages = [];
+                const eventOrder = ['e1s', 'e5s', 'e15s', 'e30s', 'e45s', 'e60s', 'l_f_s'];
+                eventOrder.forEach(evt => {
+                    const eventData = platformData.events?.find(e => e.event === evt);
+                    if (eventData) {
+                        const label = evt === 'l_f_s' ? '🎯 l_f_s (Lead)' : 
+                                     evt === 'e1s' ? '👁️ 1s view' :
+                                     evt === 'e5s' ? '⏱️ 5s engaged' :
+                                     evt === 'e15s' ? '⏱️ 15s engaged' :
+                                     evt === 'e30s' ? '⏱️ 30s engaged' :
+                                     evt === 'e45s' ? '⏱️ 45s engaged' :
+                                     '⏱️ 60s engaged';
+                        stages.push({ label, count: eventData.count, type: 'ours' });
+                    }
+                });
+                
+                if (medworkData.l_f_s > 0) {
+                    stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork' });
+                    stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork' });
+                    stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork' });
+                    stages.push({ label: '🏆 Fulfilled', count: medworkData.initial_fulfilled || 0, type: 'medwork' });
+                }
+                
+                const maxCount = Math.max(...stages.map(s => s.count), 1);
+                
+                funnelContainer.innerHTML = `
+                    <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; border-top: 4px solid ${config.color};">
+                        <h3 style="margin: 0 0 20px 0; color: ${config.color};">${config.name} Patient Journey</h3>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            ${stages.map((stage, i) => {
+                                const width = Math.max((stage.count / maxCount) * 100, 5);
+                                const prevCount = i > 0 ? stages[i-1].count : stage.count;
+                                const dropoff = prevCount > 0 ? ((1 - stage.count / prevCount) * 100).toFixed(1) : 0;
+                                const bgColor = stage.type === 'medwork' ? '#e8f5e9' : '#e3f2fd';
+                                const barColor = stage.type === 'medwork' ? '#4CAF50' : config.color;
+                                
+                                return `
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <div style="width: 140px; font-size: 13px; text-align: right;">${stage.label}</div>
+                                        <div style="flex: 1; background: ${bgColor}; border-radius: 4px; height: 32px; position: relative;">
+                                            <div style="width: ${width}%; background: ${barColor}; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; min-width: 50px;">
+                                                ${stage.count.toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <div style="width: 60px; font-size: 11px; color: ${dropoff > 50 ? '#dc3545' : '#666'};">
+                                            ${i > 0 ? (dropoff > 0 ? `-${dropoff}%` : '0%') : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="margin-top: 15px; font-size: 11px; color: #666; display: flex; gap: 20px;">
+                            <span>🔵 Website engagement (Ours Privacy)</span>
+                            <span>🟢 Lead funnel (Medwork)</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderOverallJourney(platformSelect?.value || 'all');
+            
+            if (platformSelect) {
+                platformSelect.onchange = () => renderOverallJourney(platformSelect.value);
+            }
+        } catch (journeyErr) {
+            console.error("Overall journey load error:", journeyErr);
+        }
+        
     } catch (e) {
         console.error('Error loading funnels data:', e);
     }
@@ -2789,7 +2988,7 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
         
         // Tracking type labels with logos
         const typeLabels = {
-            'mutm': { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">' },
+            'mutm': { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-icon.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">' },
             'outm': { name: 'Organic', color: '#34A853', icon: '🌿' },
             'tutm': { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', icon: '🔴' },
@@ -5882,29 +6081,32 @@ function truncate(str, maxLen) {
 
 async function loadOursPrivacyData() {
     try {
-        // Get current date range
-        const startDateEl = document.getElementById("startDate");
-        const endDateEl = document.getElementById("endDate");
-        let startDate = startDateEl ? startDateEl.value : "";
-        let endDate = endDateEl ? endDateEl.value : "";
+        // Get current date range - use preset buttons unless custom range is selected
+        let startDate, endDate;
+        
+        if (currentRange === "custom") {
+            const startDateEl = document.getElementById("startDate");
+            const endDateEl = document.getElementById("endDate");
+            startDate = startDateEl ? startDateEl.value : "";
+            endDate = endDateEl ? endDateEl.value : "";
+        }
         
         if (!startDate || !endDate) {
             const today = new Date();
             const end = new Date(today);
             let start = new Date(today);
             
-            if (typeof currentRange !== "undefined") {
-                if (currentRange === "today") {
-                } else if (currentRange === "yesterday") {
-                    start.setDate(start.getDate() - 1);
-                    end.setDate(end.getDate() - 1);
-                } else if (currentRange === "7d") {
-                    start.setDate(start.getDate() - 6);
-                } else if (currentRange === "14d") {
-                    start.setDate(start.getDate() - 13);
-                } else if (currentRange === "30d") {
-                    start.setDate(start.getDate() - 29);
-                }
+            if (currentRange === "today") {
+                // start and end are already today
+            } else if (currentRange === "yesterday") {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (currentRange === "7d") {
+                start.setDate(start.getDate() - 6);
+            } else if (currentRange === "14d") {
+                start.setDate(start.getDate() - 13);
+            } else if (currentRange === "30d") {
+                start.setDate(start.getDate() - 29);
             }
             
             startDate = start.toISOString().split("T")[0];
@@ -6020,6 +6222,213 @@ async function loadOursPrivacyData() {
                 const shortCampaign = campaign.length > 30 ? campaign.substring(0, 30) + "..." : campaign;
                 return "<tr><td>" + time + "</td><td><code>" + event + "</code></td><td>" + source + "</td><td title=\"" + campaign + "\">" + shortCampaign + "</td></tr>";
             }).join("");
+        }
+        
+        // Load cross-attribution analysis
+        try {
+            const crossRes = await fetch("/api/ours-privacy/cross-attribution?" + params);
+            const crossData = await crossRes.json();
+            
+            const platformConfig = {
+                meta: { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-icon.png" style="width: 20px; height: 20px; vertical-align: middle;">' },
+                google: { name: 'Google', color: '#EA4335', icon: '🔴' },
+                bing: { name: 'Bing', color: '#00A4EF', icon: '🔷' },
+                tiktok: { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
+                organic: { name: 'Organic', color: '#34A853', icon: '🌿' },
+                instagramOrganic: { name: 'IG Organic', color: '#E4405F', icon: '📸' }
+            };
+            
+            const crossContainer = document.getElementById("crossAttributionContainer");
+            let crossHtml = '';
+            
+            ['meta', 'google', 'bing', 'tiktok', 'organic', 'instagramOrganic'].forEach(platform => {
+                const data = crossData.analysis[platform];
+                const config = platformConfig[platform];
+                const lossRate = data.convertedSame + data.convertedOther > 0 
+                    ? ((data.convertedOther / (data.convertedSame + data.convertedOther)) * 100).toFixed(1) 
+                    : 0;
+                
+                const lostToList = Object.entries(data.lostTo || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([src, count]) => `${src}: ${count}`)
+                    .join(', ') || 'None';
+                
+                crossHtml += `
+                    <div class="funnel-card" style="flex: 1; min-width: 220px; max-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${config.color};">
+                        <h3 style="margin: 0 0 15px 0; color: ${config.color};">${config.icon} ${config.name}</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row"><span>Visitors Entered</span><span>${data.entered.toLocaleString()}</span></div>
+                            <div class="mini-funnel-row" style="background: #d4edda;"><span>Converted (same)</span><span>${data.convertedSame}</span></div>
+                            <div class="mini-funnel-row" style="background: #f8d7da;"><span>Converted (other)</span><span>${data.convertedOther}</span></div>
+                            <div class="mini-funnel-row"><span>Loss Rate</span><span>${lossRate}%</span></div>
+                        </div>
+                        ${data.convertedOther > 0 ? `<div style="margin-top: 10px; font-size: 11px; color: #666;">Lost to: ${lostToList}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            crossContainer.innerHTML = crossHtml || '<div class="loading">No data</div>';
+            
+            // Platform overlaps
+            const overlapsContainer = document.getElementById("platformOverlaps");
+            const overlaps = crossData.overlaps || {};
+            const overlapPairs = [
+                { key: 'metaGoogle', label: 'Meta + Google', colors: ['#4267B2', '#EA4335'], platforms: ['meta', 'google'] },
+                { key: 'metaBing', label: 'Meta + Bing', colors: ['#4267B2', '#00A4EF'], platforms: ['meta', 'bing'] },
+                { key: 'metaTiktok', label: 'Meta + TikTok', colors: ['#4267B2', '#00f2ea'], platforms: ['meta', 'tiktok'] },
+                { key: 'metaOrganic', label: 'Meta + Organic', colors: ['#4267B2', '#34A853'], platforms: ['meta', 'organic'] },
+                { key: 'metaInstagramOrganic', label: 'Meta + IG Organic', colors: ['#4267B2', '#E4405F'], platforms: ['meta', 'instagramOrganic'] },
+                { key: 'googleBing', label: 'Google + Bing', colors: ['#EA4335', '#00A4EF'], platforms: ['google', 'bing'] },
+                { key: 'googleTiktok', label: 'Google + TikTok', colors: ['#EA4335', '#00f2ea'], platforms: ['google', 'tiktok'] },
+                { key: 'googleOrganic', label: 'Google + Organic', colors: ['#EA4335', '#34A853'], platforms: ['google', 'organic'] },
+                { key: 'googleInstagramOrganic', label: 'Google + IG Organic', colors: ['#EA4335', '#E4405F'], platforms: ['google', 'instagramOrganic'] },
+                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'], platforms: ['bing', 'tiktok'] },
+                { key: 'bingOrganic', label: 'Bing + Organic', colors: ['#00A4EF', '#34A853'], platforms: ['bing', 'organic'] },
+                { key: 'bingInstagramOrganic', label: 'Bing + IG Organic', colors: ['#00A4EF', '#E4405F'], platforms: ['bing', 'instagramOrganic'] },
+                { key: 'tiktokOrganic', label: 'TikTok + Organic', colors: ['#00f2ea', '#34A853'], platforms: ['tiktok', 'organic'] },
+                { key: 'tiktokInstagramOrganic', label: 'TikTok + IG Organic', colors: ['#00f2ea', '#E4405F'], platforms: ['tiktok', 'instagramOrganic'] },
+                { key: 'organicInstagramOrganic', label: 'Organic + IG Organic', colors: ['#34A853', '#E4405F'], platforms: ['organic', 'instagramOrganic'] }
+            ];
+            
+            // Store data for filtering
+            window.overlapData = { overlaps, overlapPairs };
+            
+            // Render function
+            function renderOverlaps(filter = 'all') {
+                const filtered = filter === 'all' 
+                    ? overlapPairs 
+                    : overlapPairs.filter(p => p.platforms.includes(filter));
+                
+                overlapsContainer.innerHTML = filtered.map(pair => `
+                    <div style="background: linear-gradient(135deg, ${pair.colors[0]}22, ${pair.colors[1]}22); border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; text-align: center;">
+                        <div style="font-size: 11px; color: #666;">${pair.label}</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #333;">${overlaps[pair.key] || 0}</div>
+                    </div>
+                `).join('') || '<div style="color: #666;">No overlaps for this filter</div>';
+            }
+            
+            // Initial render
+            renderOverlaps();
+            
+            // Filter change handler
+            const filterSelect = document.getElementById("overlapPlatformFilter");
+            if (filterSelect) {
+                filterSelect.onchange = () => renderOverlaps(filterSelect.value);
+            }
+            
+        } catch (crossErr) {
+            console.error("Cross-attribution load error:", crossErr);
+        }
+        
+        // Load converted visitors for journey dropdown
+        try {
+            const visitorsRes = await fetch("/api/ours-privacy/converted-visitors?" + params);
+            const visitorsData = await visitorsRes.json();
+            
+            const select = document.getElementById("journeyVisitorSelect");
+            if (select && visitorsData.visitors) {
+                select.innerHTML = '<option value="">Select a converted visitor...</option>' +
+                    visitorsData.visitors.map(v => {
+                        const time = new Date(v.conversionTime).toLocaleString('en-US', { 
+                            timeZone: 'America/New_York', 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                        });
+                        const shortId = v.visitorId.substring(0, 8);
+                        return `<option value="${v.visitorId}">${shortId}... | ${v.utm_source || 'Unknown'} | ${v.totalEvents} events | ${time}</option>`;
+                    }).join('');
+            }
+            
+            // Journey button handler
+            const loadBtn = document.getElementById("loadJourneyBtn");
+            if (loadBtn) {
+                loadBtn.onclick = async () => {
+                    const visitorId = document.getElementById("journeyVisitorSelect").value;
+                    if (!visitorId) return;
+                    
+                    const timeline = document.getElementById("journeyTimeline");
+                    timeline.innerHTML = '<div class="loading">Loading journey...</div>';
+                    
+                    try {
+                        const journeyRes = await fetch(`/api/ours-privacy/visitor-journey/${visitorId}`);
+                        const journey = await journeyRes.json();
+                        
+                        const eventColors = {
+                            'mutm_': '#4267B2',
+                            'g1utm_': '#EA4335',
+                            'butm_': '#00A4EF',
+                            'tutm_': '#00f2ea',
+                            'outm_': '#34A853',
+                            'l_f_s': '#22c55e'
+                        };
+                        
+                        const getEventColor = (event) => {
+                            for (const [prefix, color] of Object.entries(eventColors)) {
+                                if (event.startsWith(prefix) || event === prefix) return color;
+                            }
+                            return '#666';
+                        };
+                        
+                        const getEventLabel = (event) => {
+                            if (event === 'l_f_s') return '🎯 CONVERTED';
+                            if (event.startsWith('mutm_')) return '📘 Meta: ' + event.replace('mutm_', '');
+                            if (event.startsWith('g1utm_')) return '🔴 Google: ' + event.replace('g1utm_', '');
+                            if (event.startsWith('butm_')) return '🔷 Bing: ' + event.replace('butm_', '');
+                            if (event.startsWith('tutm_')) return '🎵 TikTok: ' + event.replace('tutm_', '');
+                            if (event.startsWith('outm_')) return '🌿 Organic: ' + event.replace('outm_', '');
+                            return event;
+                        };
+                        
+                        timeline.innerHTML = `
+                            <div style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                                    <div>
+                                        <strong>Visitor ID:</strong> ${journey.visitorId.substring(0, 12)}...
+                                    </div>
+                                    <div>
+                                        <strong>Total Events:</strong> ${journey.totalEvents}
+                                    </div>
+                                    <div>
+                                        <strong>Converted:</strong> ${journey.converted ? '✅ Yes' : '❌ No'}
+                                        ${journey.conversionSource ? ` (via ${journey.conversionSource})` : ''}
+                                    </div>
+                                </div>
+                                <div style="position: relative; padding-left: 30px; border-left: 3px solid #ddd;">
+                                    ${journey.events.map((e, i) => {
+                                        const time = new Date(e.timestamp).toLocaleString('en-US', {
+                                            timeZone: 'America/New_York',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            second: '2-digit'
+                                        });
+                                        const color = getEventColor(e.event);
+                                        const isConversion = e.event === 'l_f_s';
+                                        return `
+                                            <div style="position: relative; margin-bottom: 15px; ${isConversion ? 'background: #d4edda; padding: 10px; border-radius: 8px; margin-left: -10px;' : ''}">
+                                                <div style="position: absolute; left: -38px; top: 5px; width: 16px; height: 16px; background: ${color}; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px ${color};"></div>
+                                                <div style="font-size: 11px; color: #666;">${time}</div>
+                                                <div style="font-weight: ${isConversion ? 'bold' : 'normal'}; color: ${color}; font-size: ${isConversion ? '16px' : '14px'};">
+                                                    ${getEventLabel(e.event)}
+                                                </div>
+                                                ${e.utm_source ? `<div style="font-size: 11px; color: #888;">Source: ${e.utm_source}</div>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } catch (journeyErr) {
+                        timeline.innerHTML = '<div style="color: red;">Error loading journey</div>';
+                    }
+                };
+            }
+        } catch (visitorsErr) {
+            console.error("Visitors load error:", visitorsErr);
         }
         
     } catch (err) {

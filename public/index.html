@@ -46,7 +46,7 @@
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title" data-toggle="meta">
-                        <span><img src="images/meta-logo.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</span>
+                        <span><img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</span>
                         <span class="nav-arrow">▼</span>
                     </div>
                     <div class="nav-section-items" id="metaItems">
@@ -140,7 +140,7 @@
                     <div class="kpi-subvalue"><span id="summaryTotalConversions">0</span> conversions</div>
                 </div>
                 <div class="kpi-card meta-card">
-                    <div class="kpi-label"><img src="images/meta-logo.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</div>
+                    <div class="kpi-label"><img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</div>
                     <div class="kpi-value" id="summaryMetaSpend">$0.00</div>
                     <div class="kpi-subvalue"><span id="summaryMetaConversions">0</span> conv.</div>
                 </div>
@@ -249,7 +249,7 @@
                     
                     <!-- Meta Funnel -->
                     <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #4267B2;">
-                        <h3 style="margin: 0 0 15px 0; color: #4267B2;"><img src="images/meta-logo.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</h3>
+                        <h3 style="margin: 0 0 15px 0; color: #4267B2;"><img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</h3>
                         <div class="mini-funnel">
                             <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelMetaCost">$0</span></div>
                             <div class="mini-funnel-row"><span>Impressions</span><span id="funnelMetaImpressions">0</span></div>
@@ -292,7 +292,7 @@
             <!-- Medwork Leads Funnel -->
             <section class="table-section">
                 <h2>📊 Medwork Leads Funnel</h2>
-                <p class="section-subtitle">Full funnel from l_f_s to fulfilled, by tracking source (from Looker)</p>
+                <p class="section-subtitle">Full funnel from l_f_s to fulfilled, by tracking source (from Looker). Date filter applies to lead_created_date_est_date.</p>
                 <div id="funnelsMedworkContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
                     <div class="loading" id="funnelsMedworkLoading">Loading Medwork funnel data...</div>
                 </div>
@@ -307,6 +307,27 @@
                 <h2>📈 Platform Comparison</h2>
                 <div class="chart-container">
                     <canvas id="funnelsComparisonChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Overall Patient Journey Funnel -->
+            <section class="table-section">
+                <h2>🛤️ Overall Patient Journey</h2>
+                <p class="section-subtitle">Full funnel from first engagement to fulfilled, by platform</p>
+                
+                <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
+                    <select id="journeyPlatformFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
+                        <option value="all">All Sources</option>
+                        <option value="mutm">Meta</option>
+                        <option value="tutm">TikTok</option>
+                        <option value="outm">Organic</option>
+                        <option value="g1utm">Google</option>
+                        <option value="butm">Bing</option>
+                    </select>
+                </div>
+                
+                <div id="overallJourneyFunnel" style="margin-top: 20px;">
+                    <div class="loading">Loading journey data...</div>
                 </div>
             </section>
 
@@ -439,6 +460,7 @@
         <!-- Journey Funnel -->
         <section class="table-section">
             <h2>🚀 Meta Journey Funnel</h2>
+            <p class="section-subtitle">l_f_s is calculated on any event of that visitor ID that contained mutm.</p>
             <div class="funnel-container">
                 <div class="funnel-step" style="--step-width: 100%;">
                     <div class="funnel-bar impressions"></div>
@@ -661,9 +683,20 @@
                     <select id="filterAdset" class="filter-dropdown">
                         <option value="">All Ad Sets</option>
                     </select>
-                    <select id="filterAd" class="filter-dropdown">
-                        <option value="">All Ads</option>
-                    </select>
+                    <div class="multi-select-container" style="position: relative; display: inline-block;">
+                        <button type="button" id="filterAdBtn" class="filter-dropdown" style="min-width: 180px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                            <span id="filterAdLabel">All Ads</span>
+                            <span style="margin-left: 10px;">▼</span>
+                        </button>
+                        <div id="filterAdDropdown" class="multi-select-dropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 300px; overflow-y: auto; z-index: 1000; min-width: 250px;">
+                            <div style="padding: 8px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: white;">
+                                <label style="display: flex; align-items: center; cursor: pointer; font-weight: bold;">
+                                    <input type="checkbox" id="filterAdSelectAll" style="margin-right: 8px;"> Select All
+                                </label>
+                            </div>
+                            <div id="filterAdOptions" style="padding: 8px;"></div>
+                        </div>
+                    </div>
                     <button id="clearFilters" class="clear-filters-btn">Clear Filters</button>
                 </div>
                 <div class="table-wrapper">
@@ -672,6 +705,7 @@
                             <tr>
                                 <th>Creative</th>
                                 <th class="sortable" data-sort="ad_name">Ad Name</th>
+                                <th class="sortable" data-sort="status">Status</th>
                                 <th class="sortable" data-sort="adset_name">Ad Set</th>
                                 <th class="sortable" data-sort="campaign_name">Campaign</th>
                                 <th class="sortable" data-sort="created_time">Published</th>
@@ -687,7 +721,7 @@
                             </tr>
                         </thead>
                         <tbody id="adsBody">
-                            <tr><td colspan="14" class="loading">Select this tab to load ads...</td></tr>
+                            <tr><td colspan="15" class="loading">Select this tab to load ads...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -696,7 +730,7 @@
 
         <!-- Meta Geographic View -->
         <div id="metaGeoView" class="view-content hidden">
-            <h1><img src="images/meta-logo.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta Geographic Performance</h1>
+            <h1><img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta Geographic Performance</h1>
             
             <!-- Filter -->
             <div class="filter-row" style="margin-bottom: 15px;">
@@ -1883,6 +1917,52 @@
                                 <tr><td colspan="4" class="loading">Loading...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </section>
+
+                <!-- Individual Patient Journey Viewer -->
+                <section class="table-section">
+                    <h2>🔍 Individual Journey Viewer</h2>
+                    <p class="section-subtitle">Visualize a specific visitor's touchpoints</p>
+                    
+                    <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
+                        <select id="journeyVisitorSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; min-width: 300px; font-size: 14px;">
+                            <option value="">Select a converted visitor...</option>
+                        </select>
+                        <button id="loadJourneyBtn" style="padding: 8px 16px; background: #4267B2; color: white; border: none; border-radius: 6px; cursor: pointer;">View Journey</button>
+                    </div>
+                    
+                    <div id="journeyTimeline" style="margin-top: 20px;">
+                        <div style="color: #666; font-style: italic;">Select a visitor to see their journey</div>
+                    </div>
+                </section>
+
+                <!-- Cross-Attribution Analysis -->
+                <section class="table-section">
+                    <h2>🔀 Cross-Attribution Analysis</h2>
+                    <p class="section-subtitle">Visitors who entered via one platform but converted with another source</p>
+                    
+                    <div id="crossAttributionContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                        <div class="loading">Loading cross-attribution data...</div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">🔗 Platform Overlaps</h3>
+                            <select id="overlapPlatformFilter" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
+                                <option value="all">All Platforms</option>
+                                <option value="meta">Meta only</option>
+                                <option value="google">Google only</option>
+                                <option value="bing">Bing only</option>
+                                <option value="tiktok">TikTok only</option>
+                                <option value="organic">Organic only</option>
+                                <option value="instagramOrganic">IG Organic only</option>
+                            </select>
+                        </div>
+                        <p class="section-subtitle">Visitors who touched multiple ad platforms</p>
+                        <div id="platformOverlaps" style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                            <div class="loading">Loading...</div>
+                        </div>
                     </div>
                 </section>
             </div>
