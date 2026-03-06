@@ -310,6 +310,26 @@
                 </div>
             </section>
 
+            <!-- Overall Patient Journey Funnel -->
+            <section class="table-section">
+                <h2>🛤️ Overall Patient Journey</h2>
+                <p class="section-subtitle">Full funnel from first engagement to fulfilled, by platform</p>
+                
+                <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
+                    <select id="journeyPlatformFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
+                        <option value="mutm">Meta</option>
+                        <option value="tutm">TikTok</option>
+                        <option value="outm">Organic</option>
+                        <option value="g1utm">Google</option>
+                        <option value="butm">Bing</option>
+                    </select>
+                </div>
+                
+                <div id="overallJourneyFunnel" style="margin-top: 20px;">
+                    <div class="loading">Loading journey data...</div>
+                </div>
+            </section>
+
         </div><!-- End Funnels View -->
 
         <!-- Heatmap View -->
@@ -1883,26 +1903,6 @@
                                 <tr><td colspan="4" class="loading">Loading...</td></tr>
                             </tbody>
                         </table>
-                    </div>
-                </section>
-
-                <!-- Overall Patient Journey Funnel -->
-                <section class="table-section">
-                    <h2>🛤️ Overall Patient Journey</h2>
-                    <p class="section-subtitle">Full funnel from first engagement to fulfilled, by platform</p>
-                    
-                    <div style="display: flex; gap: 15px; align-items: center; margin: 15px 0;">
-                        <select id="journeyPlatformFilter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;">
-                            <option value="mutm">Meta</option>
-                            <option value="tutm">TikTok</option>
-                            <option value="outm">Organic</option>
-                            <option value="g1utm">Google</option>
-                            <option value="butm">Bing</option>
-                        </select>
-                    </div>
-                    
-                    <div id="overallJourneyFunnel" style="margin-top: 20px;">
-                        <div class="loading">Loading journey data...</div>
                     </div>
                 </section>
 
