@@ -124,7 +124,7 @@ const BING_API_ENABLED = true;
 // Ads Filters
 let filterCampaign = '';
 let filterAdset = '';
-let filterAd = '';
+let filterAds = []; // Array for multi-select
 let filterPlatform = ''; // For platform → placement filtering
 let filterPlacement = ''; // For placement → creative filtering
 let filterPlacementPlatform = ''; // Store the platform of selected placement
@@ -893,17 +893,17 @@ function initializeDashboard() {
     });
     
     document.getElementById('filterAd').addEventListener('change', (e) => {
-        filterAd = e.target.value;
+        filterAds = Array.from(e.target.selectedOptions).map(opt => opt.value);
         renderAdsTable();
     });
     
     document.getElementById('clearFilters').addEventListener('click', () => {
         filterCampaign = '';
         filterAdset = '';
-        filterAd = '';
+        filterAds = [];
         document.getElementById('filterCampaign').value = '';
         document.getElementById('filterAdset').value = '';
-        document.getElementById('filterAd').value = '';
+        document.getElementById('filterAd').selectedIndex = -1;
         updateAdsetDropdown();
         updateAdDropdown();
         renderAdsTable();
@@ -1640,7 +1640,7 @@ async function loadAdsData() {
         // Reset filters and populate dropdowns
         filterCampaign = '';
         filterAdset = '';
-        filterAd = '';
+        filterAds = [];
         populateAdsFilterDropdowns();
         
         renderAdsTable();
@@ -1694,10 +1694,9 @@ function updateAdDropdown() {
     adSelect.innerHTML = '<option value="">All Ads</option>' + 
         ads.map(a => `<option value="${a}">${a}</option>`).join('');
     
-    // Reset ad filter if current selection is not in filtered list
-    if (filterAd && !ads.includes(filterAd)) {
-        filterAd = '';
-        adSelect.value = '';
+    // Reset ad filter if current selections are not in filtered list
+    if (filterAds.length > 0) {
+        filterAds = filterAds.filter(ad => ads.includes(ad));
     }
 }
 
@@ -1713,8 +1712,8 @@ function renderAdsTable() {
     if (filterAdset) {
         filteredAds = filteredAds.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredAds = filteredAds.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredAds = filteredAds.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Sort the data
@@ -1826,8 +1825,8 @@ function analyzeWinner() {
     if (filterAdset) {
         filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredData = filteredData.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Find ads with results, sorted by most results
@@ -2378,8 +2377,8 @@ function analyzeFatigue() {
     if (filterAdset) {
         filteredData = filteredData.filter(ad => ad.adset_name === filterAdset);
     }
-    if (filterAd) {
-        filteredData = filteredData.filter(ad => ad.ad_name === filterAd);
+    if (filterAds.length > 0) {
+        filteredData = filteredData.filter(ad => filterAds.includes(ad.ad_name));
     }
     
     // Find ads with frequency >= 4
