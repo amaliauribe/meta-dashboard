@@ -1497,7 +1497,7 @@ async function loadDailyData() {
 async function loadAdsData() {
     const range = dateRanges[currentRange];
     const tbody = document.getElementById('adsBody');
-    tbody.innerHTML = '<tr><td colspan="13" class="loading">Loading ads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="loading">Loading ads...</td></tr>';
 
     try {
         // Get ad-level insights for current period
@@ -1506,7 +1506,7 @@ async function loadAdsData() {
         );
 
         if (!insightsData.data || insightsData.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="13" class="loading">No ad data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">No ad data for this period</td></tr>';
             return;
         }
         
@@ -1567,21 +1567,25 @@ async function loadAdsData() {
             });
         }
 
-        // Get creative info for each ad (batch requests in chunks of 50)
+        // Get creative info and status for each ad (batch requests in chunks of 50)
         const adIds = insightsData.data.map(ad => ad.ad_id);
         const creativeData = {};
+        const adStatusData = {};
         
-        // Fetch creative IDs in batches of 50
+        // Fetch creative IDs and status in batches of 50
         for (let i = 0; i < adIds.length; i += 50) {
             const batchIds = adIds.slice(i, i + 50);
             const adsWithCreatives = await apiCall(
-                `?ids=${batchIds.join(',')}&fields=creative`
+                `?ids=${batchIds.join(',')}&fields=creative,effective_status`
             );
             
-            // Collect creative IDs from this batch
+            // Collect creative IDs and status from this batch
             Object.values(adsWithCreatives).forEach(ad => {
                 if (ad.creative?.id) {
                     creativeData[ad.id] = { creativeId: ad.creative.id };
+                }
+                if (ad.effective_status) {
+                    adStatusData[ad.id] = ad.effective_status;
                 }
             });
         }
@@ -1650,7 +1654,8 @@ async function loadAdsData() {
                 cpr_trend: cprTrend,
                 avg_watch_time: avgWatchTime,
                 thumbnail: creative.thumbnail,
-                videoId: creative.videoId
+                videoId: creative.videoId,
+                status: adStatusData[ad.ad_id] || 'UNKNOWN'
             };
         });
         
@@ -1666,7 +1671,7 @@ async function loadAdsData() {
         updateLastUpdated();
     } catch (e) {
         console.error('Ads error:', e);
-        tbody.innerHTML = `<tr><td colspan="13" class="loading">Error loading ads: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" class="loading">Error loading ads: ${e.message}</td></tr>`;
     }
 }
 
@@ -1837,10 +1842,26 @@ function renderAdsTable() {
             frequencyHtml = '-';
         }
 
+        // Format status with badge
+        let statusHtml;
+        const status = ad.status || 'UNKNOWN';
+        if (status === 'ACTIVE') {
+            statusHtml = '<span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Active</span>';
+        } else if (status === 'PAUSED') {
+            statusHtml = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Paused</span>';
+        } else if (status === 'DELETED' || status === 'ARCHIVED') {
+            statusHtml = '<span style="background: #6b7280; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.charAt(0) + status.slice(1).toLowerCase() + '</span>';
+        } else if (status === 'PENDING_REVIEW' || status === 'DISAPPROVED') {
+            statusHtml = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.replace('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) + '</span>';
+        } else {
+            statusHtml = '<span style="background: #9ca3af; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">' + status.replace('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) + '</span>';
+        }
+
         return `
             <tr>
                 <td>${thumbnailHtml}</td>
                 <td>${ad.ad_name}</td>
+                <td>${statusHtml}</td>
                 <td>${ad.adset_name}</td>
                 <td>${ad.campaign_name}</td>
                 <td>$${ad.spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
