@@ -2804,6 +2804,109 @@ app.get("/api/ours-privacy/lfs", (req, res) => {
     });
 });
 
+// Cross-attribution analysis - visitors who entered via one platform but converted with another
+app.get("/api/ours-privacy/cross-attribution", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    const allData = data.filter(d => 
+        d.headers && d.headers["user-agent"] && 
+        d.headers["user-agent"].includes("ours-privacy")
+    );
+    
+    // Build sets of visitor IDs by platform (based on their events)
+    const platformVisitors = {
+        meta: new Set(),
+        google: new Set(),
+        bing: new Set(),
+        tiktok: new Set()
+    };
+    
+    allData.forEach(d => {
+        const event = d.body?.event?.event || "";
+        const visitorId = d.body?.visitor?.visitor_id;
+        if (!visitorId) return;
+        
+        if (event.startsWith("mutm_")) platformVisitors.meta.add(visitorId);
+        if (event.startsWith("g1utm_")) platformVisitors.google.add(visitorId);
+        if (event.startsWith("butm_")) platformVisitors.bing.add(visitorId);
+        if (event.startsWith("tutm_")) platformVisitors.tiktok.add(visitorId);
+    });
+    
+    // Get l_f_s events with date filtering
+    let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
+    
+    if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        lfsData = lfsData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        lfsData = lfsData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Analyze cross-attribution for each platform
+    const metaSources = ["facebook", "fb", "instagram", "meta"];
+    const googleSources = ["google"];
+    const bingSources = ["bing"];
+    const tiktokSources = ["tiktok", "tt"];
+    
+    const analysis = {
+        meta: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        google: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        bing: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} },
+        tiktok: { entered: 0, convertedSame: 0, convertedOther: 0, lostTo: {} }
+    };
+    
+    // Count visitors who entered via each platform
+    analysis.meta.entered = platformVisitors.meta.size;
+    analysis.google.entered = platformVisitors.google.size;
+    analysis.bing.entered = platformVisitors.bing.size;
+    analysis.tiktok.entered = platformVisitors.tiktok.size;
+    
+    // Analyze conversions
+    lfsData.forEach(d => {
+        const visitorId = d.body?.visitor?.visitor_id;
+        const utmSource = (d.body?.visitor?.utm_source || "").toLowerCase();
+        
+        // Check each platform
+        ["meta", "google", "bing", "tiktok"].forEach(platform => {
+            if (platformVisitors[platform].has(visitorId)) {
+                const platformSources = platform === "meta" ? metaSources :
+                                       platform === "google" ? googleSources :
+                                       platform === "bing" ? bingSources : tiktokSources;
+                
+                if (platformSources.some(s => utmSource.includes(s))) {
+                    analysis[platform].convertedSame++;
+                } else {
+                    analysis[platform].convertedOther++;
+                    const lostSource = utmSource || "unknown";
+                    analysis[platform].lostTo[lostSource] = (analysis[platform].lostTo[lostSource] || 0) + 1;
+                }
+            }
+        });
+    });
+    
+    // Calculate cross-platform overlaps
+    const overlaps = {
+        metaGoogle: [...platformVisitors.meta].filter(v => platformVisitors.google.has(v)).length,
+        metaBing: [...platformVisitors.meta].filter(v => platformVisitors.bing.has(v)).length,
+        metaTiktok: [...platformVisitors.meta].filter(v => platformVisitors.tiktok.has(v)).length,
+        googleBing: [...platformVisitors.google].filter(v => platformVisitors.bing.has(v)).length,
+        googleTiktok: [...platformVisitors.google].filter(v => platformVisitors.tiktok.has(v)).length,
+        bingTiktok: [...platformVisitors.bing].filter(v => platformVisitors.tiktok.has(v)).length
+    };
+    
+    res.json({
+        analysis,
+        overlaps,
+        totalLfs: lfsData.length
+    });
+});
+
 // ==================== Looker API Endpoints ====================
 
 // Get leads funnel data by tracking type

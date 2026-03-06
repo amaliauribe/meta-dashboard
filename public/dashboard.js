@@ -6015,6 +6015,73 @@ async function loadOursPrivacyData() {
             }).join("");
         }
         
+        // Load cross-attribution analysis
+        try {
+            const crossRes = await fetch("/api/ours-privacy/cross-attribution?" + params);
+            const crossData = await crossRes.json();
+            
+            const platformConfig = {
+                meta: { name: 'Meta', color: '#4267B2', icon: '<img src="images/meta-icon.png" style="width: 20px; height: 20px; vertical-align: middle;">' },
+                google: { name: 'Google', color: '#EA4335', icon: '🔴' },
+                bing: { name: 'Bing', color: '#00A4EF', icon: '🔷' },
+                tiktok: { name: 'TikTok', color: '#00f2ea', icon: '🎵' }
+            };
+            
+            const crossContainer = document.getElementById("crossAttributionContainer");
+            let crossHtml = '';
+            
+            ['meta', 'google', 'bing', 'tiktok'].forEach(platform => {
+                const data = crossData.analysis[platform];
+                const config = platformConfig[platform];
+                const lossRate = data.convertedSame + data.convertedOther > 0 
+                    ? ((data.convertedOther / (data.convertedSame + data.convertedOther)) * 100).toFixed(1) 
+                    : 0;
+                
+                const lostToList = Object.entries(data.lostTo || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([src, count]) => `${src}: ${count}`)
+                    .join(', ') || 'None';
+                
+                crossHtml += `
+                    <div class="funnel-card" style="flex: 1; min-width: 220px; max-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${config.color};">
+                        <h3 style="margin: 0 0 15px 0; color: ${config.color};">${config.icon} ${config.name}</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row"><span>Visitors Entered</span><span>${data.entered.toLocaleString()}</span></div>
+                            <div class="mini-funnel-row" style="background: #d4edda;"><span>Converted (same)</span><span>${data.convertedSame}</span></div>
+                            <div class="mini-funnel-row" style="background: #f8d7da;"><span>Converted (other)</span><span>${data.convertedOther}</span></div>
+                            <div class="mini-funnel-row"><span>Loss Rate</span><span>${lossRate}%</span></div>
+                        </div>
+                        ${data.convertedOther > 0 ? `<div style="margin-top: 10px; font-size: 11px; color: #666;">Lost to: ${lostToList}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            crossContainer.innerHTML = crossHtml || '<div class="loading">No data</div>';
+            
+            // Platform overlaps
+            const overlapsContainer = document.getElementById("platformOverlaps");
+            const overlaps = crossData.overlaps || {};
+            const overlapPairs = [
+                { key: 'metaGoogle', label: 'Meta + Google', colors: ['#4267B2', '#EA4335'] },
+                { key: 'metaBing', label: 'Meta + Bing', colors: ['#4267B2', '#00A4EF'] },
+                { key: 'metaTiktok', label: 'Meta + TikTok', colors: ['#4267B2', '#00f2ea'] },
+                { key: 'googleBing', label: 'Google + Bing', colors: ['#EA4335', '#00A4EF'] },
+                { key: 'googleTiktok', label: 'Google + TikTok', colors: ['#EA4335', '#00f2ea'] },
+                { key: 'bingTiktok', label: 'Bing + TikTok', colors: ['#00A4EF', '#00f2ea'] }
+            ];
+            
+            overlapsContainer.innerHTML = overlapPairs.map(pair => `
+                <div style="background: linear-gradient(135deg, ${pair.colors[0]}22, ${pair.colors[1]}22); border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; text-align: center;">
+                    <div style="font-size: 11px; color: #666;">${pair.label}</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #333;">${overlaps[pair.key] || 0}</div>
+                </div>
+            `).join('');
+            
+        } catch (crossErr) {
+            console.error("Cross-attribution load error:", crossErr);
+        }
+        
     } catch (err) {
         console.error("Ours Privacy load error:", err);
     }
