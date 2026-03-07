@@ -2914,11 +2914,14 @@ async function loadFunnelsData() {
                 });
                 
                 if (medworkData.l_f_s > 0) {
-                    stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork' });
-                    stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork' });
-                    stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork' });
-                    stages.push({ label: '🏆 Fulfilled', count: medworkData.initial_fulfilled || 0, type: 'medwork' });
+                    stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork', key: 'is_booked' });
+                    stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork', key: 'sent_to_verification' });
+                    stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork', key: 'is_booked_covered' });
+                    stages.push({ label: '🏆 Fulfilled', count: medworkData.initial_fulfilled || 0, type: 'medwork', key: 'initial_fulfilled' });
                 }
+                
+                // Get insurance data for breakdown
+                const insuranceBreakdown = funnelData.insurance || {};
                 
                 const maxCount = Math.max(...stages.map(s => s.count), 1);
                 
@@ -2952,6 +2955,54 @@ async function loadFunnelsData() {
                             <span>🔵 Website engagement (Ours Privacy)</span>
                             <span>🟢 Lead funnel (Medwork)</span>
                         </div>
+                        
+                        ${Object.keys(insuranceBreakdown).length > 0 ? `
+                        <div style="margin-top: 25px; padding-top: 20px; border-top: 2px dashed #e0e0e0;">
+                            <h4 style="margin: 0 0 15px 0; color: #666;">🏥 Insurance Breakdown (Medwork Stages)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                                ${['is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'].map(stageKey => {
+                                    const stageLabel = stageKey === 'is_booked' ? 'Is Booked' :
+                                                       stageKey === 'sent_to_verification' ? 'Sent to Verif.' :
+                                                       stageKey === 'is_booked_covered' ? 'Booked Covered' : 'Fulfilled';
+                                    const ppo = insuranceBreakdown.PPO?.[stageKey] || 0;
+                                    const hmo = insuranceBreakdown.HMO?.[stageKey] || 0;
+                                    const medicare = insuranceBreakdown.Medicare?.[stageKey] || 0;
+                                    const total = ppo + hmo + medicare;
+                                    const unknown = (medworkData[stageKey] || 0) - total;
+                                    
+                                    return `
+                                        <div style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                            <div style="font-size: 11px; color: #888; margin-bottom: 8px;">${stageLabel}</div>
+                                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
+                                                    <span style="font-size: 12px; flex: 1;">PPO</span>
+                                                    <span style="font-weight: bold; color: #22c55e;">${ppo}</span>
+                                                </div>
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+                                                    <span style="font-size: 12px; flex: 1;">HMO</span>
+                                                    <span style="font-weight: bold; color: #f59e0b;">${hmo}</span>
+                                                </div>
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+                                                    <span style="font-size: 12px; flex: 1;">Medicare</span>
+                                                    <span style="font-weight: bold; color: #3b82f6;">${medicare}</span>
+                                                </div>
+                                                ${unknown > 0 ? `
+                                                <div style="display: flex; align-items: center; gap: 8px; opacity: 0.5;">
+                                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #9ca3af;"></span>
+                                                    <span style="font-size: 12px; flex: 1;">Unknown</span>
+                                                    <span style="font-weight: bold; color: #9ca3af;">${unknown}</span>
+                                                </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 `;
             }

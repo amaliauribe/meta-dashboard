@@ -3030,6 +3030,31 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
             }
         });
         
+        // Get insurance breakdown for each stage
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
+        const insuranceData = {};
+        
+        for (const insType of insuranceTypes) {
+            const insFilter = { ...dateFilter, [`${v}.insurance_type`]: insType };
+            
+            const [insLeads, insBooked, insVerified, insCovered, insFulfilled] = await Promise.all([
+                lookerQuery(v, [`${v}.count`], insFilter),
+                lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked`]: '1' }),
+                lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.sent_to_verification`]: '1' }),
+                lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked_covered`]: '1' }),
+                lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.initial_fulfilled`]: '1' })
+            ]);
+            
+            insuranceData[insType] = {
+                l_f_s: insLeads[0]?.[`${v}.count`] || 0,
+                is_booked: insBooked[0]?.[`${v}.count`] || 0,
+                sent_to_verification: insVerified[0]?.[`${v}.count`] || 0,
+                is_booked_covered: insCovered[0]?.[`${v}.count`] || 0,
+                initial_fulfilled: insFulfilled[0]?.[`${v}.count`] || 0
+            };
+        }
+        
         res.json({
             success: true,
             data: funnelData,
@@ -3039,7 +3064,8 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
                 sent_to_verification: Object.values(verificationMap).reduce((a, b) => a + b, 0),
                 is_booked_covered: Object.values(coveredMap).reduce((a, b) => a + b, 0),
                 initial_fulfilled: Object.values(fulfilledMap).reduce((a, b) => a + b, 0)
-            }
+            },
+            insurance: insuranceData
         });
     } catch (error) {
         console.error('Looker leads funnel error:', error);
