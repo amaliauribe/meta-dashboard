@@ -2920,8 +2920,10 @@ async function loadFunnelsData() {
                     stages.push({ label: '🏆 Fulfilled', count: medworkData.initial_fulfilled || 0, type: 'medwork', key: 'initial_fulfilled' });
                 }
                 
-                // Get insurance data for breakdown
-                const insuranceBreakdown = funnelData.insurance || {};
+                // Get insurance data for breakdown - use platform-specific if selected
+                const insuranceBreakdown = platform === 'all' 
+                    ? (funnelData.insurance?.all || {})
+                    : (funnelData.insurance?.byPlatform?.[platform] || {});
                 
                 const maxCount = Math.max(...stages.map(s => s.count), 1);
                 

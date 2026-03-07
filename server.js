@@ -3030,11 +3030,12 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
             }
         });
         
-        // Get insurance breakdown for each stage
+        // Get insurance breakdown for each stage, by platform
         const v = 'fct_leads_funnel_marketing_phi_exclude';
         const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
-        const insuranceData = {};
+        const insuranceData = { all: {}, byPlatform: {} };
         
+        // Get totals (all platforms)
         for (const insType of insuranceTypes) {
             const insFilter = { ...dateFilter, [`${v}.insurance_type`]: insType };
             
@@ -3046,13 +3047,37 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
                 lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.initial_fulfilled`]: '1' })
             ]);
             
-            insuranceData[insType] = {
+            insuranceData.all[insType] = {
                 l_f_s: insLeads[0]?.[`${v}.count`] || 0,
                 is_booked: insBooked[0]?.[`${v}.count`] || 0,
                 sent_to_verification: insVerified[0]?.[`${v}.count`] || 0,
                 is_booked_covered: insCovered[0]?.[`${v}.count`] || 0,
                 initial_fulfilled: insFulfilled[0]?.[`${v}.count`] || 0
             };
+        }
+        
+        // Get by platform
+        for (const platform of trackingTypes) {
+            insuranceData.byPlatform[platform] = {};
+            for (const insType of insuranceTypes) {
+                const insFilter = { ...dateFilter, [`${v}.insurance_type`]: insType, [`${v}.tracking_type`]: platform };
+                
+                const [insLeads, insBooked, insVerified, insCovered, insFulfilled] = await Promise.all([
+                    lookerQuery(v, [`${v}.count`], insFilter),
+                    lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.sent_to_verification`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked_covered`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.initial_fulfilled`]: '1' })
+                ]);
+                
+                insuranceData.byPlatform[platform][insType] = {
+                    l_f_s: insLeads[0]?.[`${v}.count`] || 0,
+                    is_booked: insBooked[0]?.[`${v}.count`] || 0,
+                    sent_to_verification: insVerified[0]?.[`${v}.count`] || 0,
+                    is_booked_covered: insCovered[0]?.[`${v}.count`] || 0,
+                    initial_fulfilled: insFulfilled[0]?.[`${v}.count`] || 0
+                };
+            }
         }
         
         res.json({
