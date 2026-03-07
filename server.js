@@ -3047,6 +3047,91 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
     }
 });
 
+// Get insurance funnel data - full funnel breakdown by platform and insurance type
+app.get('/api/looker/insurance-funnel', async (req, res) => {
+    try {
+        const startDate = req.query.startDate;
+        const endDate = req.query.endDate;
+        
+        const dateFilter = {};
+        if (startDate && endDate) {
+            dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = `${startDate} to ${endDate}`;
+        }
+        
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm', 'gbputm', 'outm'];
+        const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
+        
+        const result = {};
+        
+        for (const platform of platforms) {
+            result[platform] = { total: 0, insurance: {} };
+            
+            // Get total for platform
+            const totalData = await lookerQuery(v, [`${v}.count`], { ...dateFilter, [`${v}.tracking_type`]: platform });
+            result[platform].total = totalData[0]?.[`${v}.count`] || 0;
+            
+            // Get breakdown by insurance type
+            for (const insType of insuranceTypes) {
+                const filters = { 
+                    ...dateFilter, 
+                    [`${v}.tracking_type`]: platform,
+                    [`${v}.insurance_type`]: insType
+                };
+                
+                const leads = await lookerQuery(v, [`${v}.count`], filters);
+                const booked = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.is_booked`]: '1' });
+                const verified = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.sent_to_verification`]: '1' });
+                const covered = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.is_booked_covered`]: '1' });
+                const fulfilled = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.initial_fulfilled`]: '1' });
+                
+                result[platform].insurance[insType] = {
+                    leads: leads[0]?.[`${v}.count`] || 0,
+                    booked: booked[0]?.[`${v}.count`] || 0,
+                    verified: verified[0]?.[`${v}.count`] || 0,
+                    covered: covered[0]?.[`${v}.count`] || 0,
+                    fulfilled: fulfilled[0]?.[`${v}.count`] || 0
+                };
+            }
+            
+            // Get unknown insurance count
+            const unknownFilters = { ...dateFilter, [`${v}.tracking_type`]: platform, [`${v}.insurance_type`]: 'NULL' };
+            const unknownLeads = await lookerQuery(v, [`${v}.count`], unknownFilters);
+            result[platform].insurance['Unknown'] = {
+                leads: unknownLeads[0]?.[`${v}.count`] || 0,
+                booked: 0, verified: 0, covered: 0, fulfilled: 0
+            };
+        }
+        
+        // Calculate totals across all platforms
+        const totals = { PPO: { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 }, 
+                        HMO: { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 },
+                        Medicare: { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 },
+                        Unknown: { leads: 0 } };
+        
+        for (const platform of platforms) {
+            for (const insType of [...insuranceTypes, 'Unknown']) {
+                const data = result[platform].insurance[insType];
+                if (data) {
+                    totals[insType].leads += data.leads;
+                    if (insType !== 'Unknown') {
+                        totals[insType].booked += data.booked;
+                        totals[insType].verified += data.verified;
+                        totals[insType].covered += data.covered;
+                        totals[insType].fulfilled += data.fulfilled;
+                    }
+                }
+            }
+        }
+        
+        res.json({ success: true, data: result, totals, platforms: {
+            mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok', gbputm: 'GBP', outm: 'Organic'
+        }});
+    } catch (error) {
+        console.error('Looker insurance funnel error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 
 // Get visitor journey - all events for a specific visitor ID

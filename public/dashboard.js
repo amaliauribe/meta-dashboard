@@ -118,6 +118,9 @@ let searchTermsCampaignFilter = 'all';
 // Summary State
 let summaryDataLoaded = false;
 
+// Insurance Funnel State
+let insuranceDataLoaded = false;
+
 // Bing API is handled by the backend server
 const BING_API_ENABLED = true;
 
@@ -286,10 +289,13 @@ function initializeDashboard() {
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             heatmapDataLoaded = false; // Reset heatmap data when date changes
+            insuranceDataLoaded = false; // Reset insurance data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
             } else if (currentView === 'funnels') {
                 loadFunnelsData();
+            } else if (currentView === 'insuranceFunnel') {
+                loadInsuranceFunnel();
             } else if (currentView === 'campaigns') {
                 loadData();
             } else if (currentView === 'ads') {
@@ -411,6 +417,7 @@ function initializeDashboard() {
             // Show/hide views
             document.getElementById('summaryView').classList.toggle('hidden', currentView !== 'summary');
             document.getElementById('funnelsView').classList.toggle('hidden', currentView !== 'funnels');
+            document.getElementById('insuranceFunnelView').classList.toggle('hidden', currentView !== 'insuranceFunnel');
             document.getElementById('heatmapView').classList.toggle('hidden', currentView !== 'heatmap');
             document.getElementById('campaignsView').classList.toggle('hidden', currentView !== 'campaigns');
             document.getElementById('adsView').classList.toggle('hidden', currentView !== 'ads');
@@ -440,6 +447,9 @@ function initializeDashboard() {
             }
             if (currentView === 'funnels') {
                 loadFunnelsData();
+            }
+            if (currentView === 'insuranceFunnel' && !insuranceDataLoaded) {
+                loadInsuranceFunnel();
             }
             if (currentView === 'ads' && !adsDataLoaded) {
                 loadAdsData();
@@ -4569,6 +4579,255 @@ function updateQsHistoryChart(chartData) {
             }
         }
     });
+}
+
+// ==================== Insurance Funnel ====================
+
+let insuranceChartPpo = null;
+let insuranceChartMix = null;
+
+async function loadInsuranceFunnel() {
+    const loading = document.getElementById('insuranceLoading');
+    const kpis = document.getElementById('insuranceKpis');
+    const charts = document.getElementById('insuranceCharts');
+    const tableContainer = document.getElementById('insuranceTableContainer');
+    const insights = document.getElementById('insuranceInsights');
+    
+    loading.style.display = 'block';
+    kpis.style.display = 'none';
+    charts.style.display = 'none';
+    tableContainer.style.display = 'none';
+    insights.style.display = 'none';
+    
+    try {
+        const range = dateRanges[currentRange];
+        let url = '/api/looker/insurance-funnel';
+        if (range.startDate && range.endDate) {
+            url += `?startDate=${range.startDate}&endDate=${range.endDate}`;
+        }
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load insurance data');
+        }
+        
+        const { data, totals, platforms } = result;
+        
+        // Update date range text
+        document.getElementById('insuranceDateRange').textContent = 
+            range.startDate && range.endDate 
+                ? `${range.startDate} to ${range.endDate}` 
+                : 'Full funnel by platform and insurance type';
+        
+        // Update KPIs
+        const ppoRate = totals.PPO.leads > 0 ? ((totals.PPO.fulfilled / totals.PPO.leads) * 100).toFixed(1) : 0;
+        const hmoRate = totals.HMO.leads > 0 ? ((totals.HMO.fulfilled / totals.HMO.leads) * 100).toFixed(1) : 0;
+        
+        document.getElementById('insurancePpoLeads').textContent = totals.PPO.leads.toLocaleString();
+        document.getElementById('insurancePpoFulfilled').textContent = totals.PPO.fulfilled.toLocaleString();
+        document.getElementById('insurancePpoRate').textContent = ppoRate + '%';
+        document.getElementById('insuranceHmoLeads').textContent = totals.HMO.leads.toLocaleString();
+        document.getElementById('insuranceHmoFulfilled').textContent = totals.HMO.fulfilled.toLocaleString();
+        document.getElementById('insuranceHmoRate').textContent = hmoRate + '%';
+        
+        // Build table
+        const tbody = document.getElementById('insuranceTableBody');
+        let tableHtml = '';
+        
+        const platformOrder = ['mutm', 'tutm', 'g1utm', 'butm', 'gbputm', 'outm'];
+        const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
+        
+        for (const platformKey of platformOrder) {
+            const platformData = data[platformKey];
+            if (!platformData || platformData.total === 0) continue;
+            
+            const platformName = platforms[platformKey];
+            let firstRow = true;
+            
+            for (const insType of insuranceTypes) {
+                const ins = platformData.insurance[insType];
+                if (!ins || ins.leads === 0) continue;
+                
+                const bookRate = ins.leads > 0 ? ((ins.booked / ins.leads) * 100).toFixed(1) : 0;
+                const fulfillRate = ins.leads > 0 ? ((ins.fulfilled / ins.leads) * 100).toFixed(1) : 0;
+                
+                const insClass = insType === 'PPO' ? 'style="color: #22c55e; font-weight: bold;"' : 
+                                 insType === 'HMO' ? 'style="color: #f59e0b;"' : '';
+                
+                const fulfillClass = parseFloat(fulfillRate) >= 15 ? 'style="color: #22c55e; font-weight: bold;"' :
+                                     parseFloat(fulfillRate) >= 8 ? 'style="color: #3b82f6;"' : '';
+                
+                tableHtml += `<tr>
+                    <td>${firstRow ? '<strong>' + platformName + '</strong>' : ''}</td>
+                    <td ${insClass}>${insType}</td>
+                    <td>${ins.leads}</td>
+                    <td>${ins.booked}</td>
+                    <td>${bookRate}%</td>
+                    <td>${ins.verified}</td>
+                    <td>${ins.covered}</td>
+                    <td>${ins.fulfilled}</td>
+                    <td ${fulfillClass}>${fulfillRate}%</td>
+                </tr>`;
+                firstRow = false;
+            }
+            
+            // Add unknown row
+            const unknown = platformData.insurance['Unknown'];
+            if (unknown && unknown.leads > 0) {
+                tableHtml += `<tr style="color: #9ca3af;">
+                    <td>${firstRow ? '<strong>' + platformName + '</strong>' : ''}</td>
+                    <td>(Unknown)</td>
+                    <td>${unknown.leads}</td>
+                    <td colspan="6">-</td>
+                </tr>`;
+            }
+        }
+        
+        tbody.innerHTML = tableHtml;
+        
+        // Build charts
+        const ppoByPlatform = {};
+        const hmoByPlatform = {};
+        
+        for (const [key, pData] of Object.entries(data)) {
+            const name = platforms[key];
+            ppoByPlatform[name] = pData.insurance.PPO?.leads || 0;
+            hmoByPlatform[name] = pData.insurance.HMO?.leads || 0;
+        }
+        
+        // PPO by Platform Chart
+        if (insuranceChartPpo) insuranceChartPpo.destroy();
+        const ctxPpo = document.getElementById('ppoPlatformChart').getContext('2d');
+        insuranceChartPpo = new Chart(ctxPpo, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(ppoByPlatform).filter(k => ppoByPlatform[k] > 0),
+                datasets: [{
+                    label: 'PPO Leads',
+                    data: Object.values(ppoByPlatform).filter(v => v > 0),
+                    backgroundColor: '#22c55e'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+        
+        // Insurance Mix Chart (stacked bar)
+        if (insuranceChartMix) insuranceChartMix.destroy();
+        const ctxMix = document.getElementById('insuranceMixChart').getContext('2d');
+        const mixLabels = Object.keys(platforms).map(k => platforms[k]).filter(name => {
+            const key = Object.keys(platforms).find(k => platforms[k] === name);
+            return data[key] && data[key].total > 0;
+        });
+        
+        insuranceChartMix = new Chart(ctxMix, {
+            type: 'bar',
+            data: {
+                labels: mixLabels,
+                datasets: [
+                    {
+                        label: 'PPO',
+                        data: mixLabels.map(name => {
+                            const key = Object.keys(platforms).find(k => platforms[k] === name);
+                            return data[key]?.insurance.PPO?.leads || 0;
+                        }),
+                        backgroundColor: '#22c55e'
+                    },
+                    {
+                        label: 'HMO',
+                        data: mixLabels.map(name => {
+                            const key = Object.keys(platforms).find(k => platforms[k] === name);
+                            return data[key]?.insurance.HMO?.leads || 0;
+                        }),
+                        backgroundColor: '#f59e0b'
+                    },
+                    {
+                        label: 'Medicare',
+                        data: mixLabels.map(name => {
+                            const key = Object.keys(platforms).find(k => platforms[k] === name);
+                            return data[key]?.insurance.Medicare?.leads || 0;
+                        }),
+                        backgroundColor: '#3b82f6'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { 
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true } 
+                }
+            }
+        });
+        
+        // Generate insights
+        const insightsList = document.getElementById('insuranceInsightsList');
+        let insightsHtml = '<ul style="list-style: none; padding: 0; margin: 0;">';
+        
+        // Best PPO platform
+        let bestPpoPlatform = { name: '', rate: 0, leads: 0 };
+        for (const [key, pData] of Object.entries(data)) {
+            const ppo = pData.insurance.PPO;
+            if (ppo && ppo.leads >= 10) {
+                const rate = (ppo.fulfilled / ppo.leads) * 100;
+                if (rate > bestPpoPlatform.rate) {
+                    bestPpoPlatform = { name: platforms[key], rate, leads: ppo.leads, fulfilled: ppo.fulfilled };
+                }
+            }
+        }
+        if (bestPpoPlatform.name) {
+            insightsHtml += `<li style="margin-bottom: 10px;">🏆 <strong>${bestPpoPlatform.name}</strong> has the best PPO fulfillment rate at <strong>${bestPpoPlatform.rate.toFixed(1)}%</strong> (${bestPpoPlatform.fulfilled}/${bestPpoPlatform.leads} leads)</li>`;
+        }
+        
+        // PPO vs HMO comparison
+        if (totals.PPO.leads > 0 && totals.HMO.leads > 0) {
+            const ppoVsHmo = (parseFloat(ppoRate) / parseFloat(hmoRate)).toFixed(1);
+            if (parseFloat(ppoRate) > parseFloat(hmoRate)) {
+                insightsHtml += `<li style="margin-bottom: 10px;">📈 PPO leads convert <strong>${ppoVsHmo}x better</strong> than HMO leads (${ppoRate}% vs ${hmoRate}%)</li>`;
+            }
+        }
+        
+        // Volume leader
+        let volumeLeader = { name: '', ppo: 0 };
+        for (const [key, pData] of Object.entries(data)) {
+            const ppo = pData.insurance.PPO?.leads || 0;
+            if (ppo > volumeLeader.ppo) {
+                volumeLeader = { name: platforms[key], ppo };
+            }
+        }
+        if (volumeLeader.name) {
+            insightsHtml += `<li style="margin-bottom: 10px;">📊 <strong>${volumeLeader.name}</strong> brings the most PPO volume with <strong>${volumeLeader.ppo}</strong> leads</li>`;
+        }
+        
+        // Unknown insurance warning
+        const totalUnknown = Object.values(data).reduce((sum, p) => sum + (p.insurance.Unknown?.leads || 0), 0);
+        const totalLeads = Object.values(data).reduce((sum, p) => sum + p.total, 0);
+        const unknownPct = totalLeads > 0 ? ((totalUnknown / totalLeads) * 100).toFixed(0) : 0;
+        if (parseInt(unknownPct) > 50) {
+            insightsHtml += `<li style="margin-bottom: 10px;">⚠️ <strong>${unknownPct}%</strong> of leads have unknown insurance - captured later in funnel</li>`;
+        }
+        
+        insightsHtml += '</ul>';
+        insightsList.innerHTML = insightsHtml;
+        
+        // Show everything
+        loading.style.display = 'none';
+        kpis.style.display = 'flex';
+        charts.style.display = 'block';
+        tableContainer.style.display = 'block';
+        insights.style.display = 'block';
+        
+        insuranceDataLoaded = true;
+        
+    } catch (error) {
+        console.error('Insurance funnel error:', error);
+        loading.innerHTML = `<div class="error">Error loading insurance data: ${error.message}</div>`;
+    }
 }
 
 // ==================== Geographic Performance ====================

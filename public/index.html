@@ -42,6 +42,7 @@
                 <div class="nav-section">
                     <button class="nav-item nav-item-main active" data-view="summary">📊 Summary</button>
                     <button class="nav-item nav-item-main" data-view="funnels">🚀 Funnels</button>
+                    <button class="nav-item nav-item-main" data-view="insuranceFunnel">🏥 Insurance</button>
                     <button class="nav-item nav-item-main" data-view="heatmap">🗺️ Heatmap</button>
                 </div>
                 <div class="nav-section">
@@ -332,6 +333,89 @@
             </section>
 
         </div><!-- End Funnels View -->
+
+        <!-- Insurance Funnel View -->
+        <div id="insuranceFunnelView" class="view-content hidden">
+            <section class="content-section">
+                <h2>🏥 Insurance Funnel Analysis</h2>
+                <p class="section-subtitle" id="insuranceDateRange">Full funnel by platform and insurance type</p>
+                
+                <!-- Loading indicator -->
+                <div id="insuranceLoading" class="loading">Loading insurance data...</div>
+                
+                <!-- KPI Cards -->
+                <section class="kpi-cards" id="insuranceKpis" style="display: none;">
+                    <div class="kpi-card">
+                        <div class="kpi-label">PPO Leads</div>
+                        <div class="kpi-value" id="insurancePpoLeads">0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">PPO Fulfilled</div>
+                        <div class="kpi-value" id="insurancePpoFulfilled">0</div>
+                    </div>
+                    <div class="kpi-card highlight">
+                        <div class="kpi-label">PPO Rate</div>
+                        <div class="kpi-value" id="insurancePpoRate">0%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">HMO Leads</div>
+                        <div class="kpi-value" id="insuranceHmoLeads">0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">HMO Fulfilled</div>
+                        <div class="kpi-value" id="insuranceHmoFulfilled">0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">HMO Rate</div>
+                        <div class="kpi-value" id="insuranceHmoRate">0%</div>
+                    </div>
+                </section>
+                
+                <!-- Charts Row -->
+                <div id="insuranceCharts" style="display: none; margin: 20px 0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="margin-bottom: 15px;">📊 PPO Leads by Platform</h3>
+                            <canvas id="ppoPlatformChart"></canvas>
+                        </div>
+                        <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="margin-bottom: 15px;">📊 Insurance Mix by Platform</h3>
+                            <canvas id="insuranceMixChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Platform Comparison Table -->
+                <div id="insuranceTableContainer" style="display: none; margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px;">🔥 Platform Performance by Insurance Type</h3>
+                    <div class="table-wrapper">
+                        <table id="insuranceTable">
+                            <thead>
+                                <tr>
+                                    <th>Platform</th>
+                                    <th>Insurance</th>
+                                    <th>Leads</th>
+                                    <th>Booked</th>
+                                    <th>Book Rate</th>
+                                    <th>Verified</th>
+                                    <th>Covered</th>
+                                    <th>Fulfilled</th>
+                                    <th>Fulfill Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="insuranceTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Insights Section -->
+                <div id="insuranceInsights" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                    <h3 style="margin-bottom: 15px;">💡 Key Insights</h3>
+                    <div id="insuranceInsightsList"></div>
+                </div>
+            </section>
+        </div><!-- End Insurance Funnel View -->
 
         <!-- Heatmap View -->
         <div id="heatmapView" class="view-content hidden">
