@@ -5891,7 +5891,63 @@ let heatmapDataLoaded = false;
 let heatmapMap = null;
 let heatmapLayer = null;
 let zipcodeMarkers = [];
+let clinicMarkers = [];
 let heatmapRawData = [];
+
+// VTC Clinic Locations
+const VTC_CLINICS = [
+    // New York
+    { name: 'Astoria', address: '23-25 31st St, Astoria, NY', lat: 40.7699, lng: -73.9103, state: 'NY' },
+    { name: 'Brighton Beach', address: '23 Brighton 11th St, Brooklyn, NY', lat: 40.5780, lng: -73.9595, state: 'NY' },
+    { name: 'Bronx', address: '2100 Bartow Ave, Bronx, NY', lat: 40.8719, lng: -73.8256, state: 'NY' },
+    { name: 'Downtown Brooklyn', address: '188 Montague St, Brooklyn, NY', lat: 40.6935, lng: -73.9910, state: 'NY' },
+    { name: 'Financial District', address: '156 William St, New York, NY', lat: 40.7094, lng: -74.0066, state: 'NY' },
+    { name: 'Forest Hills', address: '107-30 71st Rd, Forest Hills, NY', lat: 40.7210, lng: -73.8448, state: 'NY' },
+    { name: 'Hartsdale', address: '280 N Central Ave, Hartsdale, NY', lat: 41.0190, lng: -73.7987, state: 'NY' },
+    { name: 'Jericho', address: '350 Jericho Tpke, Jericho, NY', lat: 40.7920, lng: -73.5396, state: 'NY' },
+    { name: 'Midtown Manhattan', address: '290 Madison Ave, New York, NY', lat: 40.7527, lng: -73.9796, state: 'NY' },
+    { name: 'Port Jefferson', address: '70 N Country Rd, Port Jefferson, NY', lat: 40.9465, lng: -73.0691, state: 'NY' },
+    { name: 'Staten Island', address: '4236 Hylan Blvd, Staten Island, NY', lat: 40.5440, lng: -74.1518, state: 'NY' },
+    { name: 'Upper East Side', address: '1111 Park Ave, New York, NY', lat: 40.7873, lng: -73.9559, state: 'NY' },
+    { name: 'West Islip', address: '500 Montauk Hwy, West Islip, NY', lat: 40.7065, lng: -73.2912, state: 'NY' },
+    { name: 'Yonkers', address: '124 New Main St, Yonkers, NY', lat: 40.9312, lng: -73.8987, state: 'NY' },
+    // New Jersey
+    { name: 'Clifton', address: '1117 US-46, Clifton, NJ', lat: 40.8584, lng: -74.1638, state: 'NJ' },
+    { name: 'Edgewater', address: '968 River Rd, Edgewater, NJ', lat: 40.8270, lng: -73.9754, state: 'NJ' },
+    { name: 'Harrison', address: '620 Essex St, Harrison, NJ', lat: 40.7465, lng: -74.1565, state: 'NJ' },
+    { name: 'Hoboken', address: '70 Hudson St, Hoboken, NJ', lat: 40.7359, lng: -74.0307, state: 'NJ' },
+    { name: 'Parsippany', address: '3695 Hill Rd, Parsippany, NJ', lat: 40.8578, lng: -74.4260, state: 'NJ' },
+    { name: 'Morristown', address: '310 Madison Ave, Morristown, NJ', lat: 40.7968, lng: -74.4773, state: 'NJ' },
+    { name: 'Paramus', address: '140 NJ-17, Paramus, NJ', lat: 40.9445, lng: -74.0702, state: 'NJ' },
+    { name: 'Princeton', address: '8 Forrestal Rd S, Princeton, NJ', lat: 40.3267, lng: -74.6592, state: 'NJ' },
+    { name: 'Scotch Plains', address: '2253 South Ave, Scotch Plains, NJ', lat: 40.6531, lng: -74.3890, state: 'NJ' },
+    { name: 'West Orange', address: '405 Northfield Ave, West Orange, NJ', lat: 40.7879, lng: -74.2390, state: 'NJ' },
+    { name: 'Woodbridge', address: '517 U.S. Rte 1, Iselin, NJ', lat: 40.5687, lng: -74.3224, state: 'NJ' },
+    { name: 'Woodland Park', address: '1167 McBride Ave, Woodland Park, NJ', lat: 40.8898, lng: -74.1943, state: 'NJ' },
+    // California
+    { name: 'Huntington Beach', address: '7677 Center Ave, Huntington Beach, CA', lat: 33.7175, lng: -117.9989, state: 'CA' },
+    { name: 'Irvine', address: '4482 Barranca Pkwy, Irvine, CA', lat: 33.6846, lng: -117.8265, state: 'CA' },
+    { name: 'National City', address: '22 W 35th St, National City, CA', lat: 32.6781, lng: -117.0992, state: 'CA' },
+    { name: 'Newport Beach', address: '1525 Superior Ave, Newport Beach, CA', lat: 33.6189, lng: -117.9298, state: 'CA' },
+    { name: 'Palo Alto', address: '2248 Park Blvd, Palo Alto, CA', lat: 37.4419, lng: -122.1430, state: 'CA' },
+    { name: 'Poway', address: '15708 Pomerado Rd, Poway, CA', lat: 32.9628, lng: -117.0359, state: 'CA' },
+    { name: 'San Diego', address: '5330 Carroll Canyon Rd, San Diego, CA', lat: 32.9051, lng: -117.1958, state: 'CA' },
+    { name: 'San Jose', address: '1270 S Winchester Blvd, San Jose, CA', lat: 37.2969, lng: -121.9510, state: 'CA' },
+    { name: 'Temecula', address: '27290 Madison Ave, Temecula, CA', lat: 33.4936, lng: -117.1484, state: 'CA' },
+    // Texas
+    { name: 'Arlington', address: '3050 S Center St, Arlington, TX', lat: 32.7002, lng: -97.1031, state: 'TX' },
+    { name: 'Cedar Park', address: '351 Cypress Creek Road, Cedar Park, TX', lat: 30.5052, lng: -97.8203, state: 'TX' },
+    { name: 'Fort Worth', address: '3455 Locke Ave, Fort Worth, TX', lat: 32.7340, lng: -97.3830, state: 'TX' },
+    { name: 'Kyle', address: '135 Bunton Creek Rd, Kyle, TX', lat: 29.9891, lng: -97.8772, state: 'TX' },
+    // Maryland
+    { name: 'Bethesda', address: '6903 Rockledge Dr, Bethesda, MD', lat: 39.0030, lng: -77.0998, state: 'MD' },
+    { name: 'Bowie', address: '4201 Northview Dr, Bowie, MD', lat: 38.9784, lng: -76.7253, state: 'MD' },
+    { name: 'Maple Lawn', address: '11810 W Market Pl, Fulton, MD', lat: 39.1515, lng: -76.9238, state: 'MD' },
+    // Connecticut
+    { name: 'Farmington', address: '399 Farmington Ave, Farmington, CT', lat: 41.7270, lng: -72.8312, state: 'CT' },
+    { name: 'Hamden', address: '2080 Whitney Ave, Hamden, CT', lat: 41.3540, lng: -72.9098, state: 'CT' },
+    { name: 'Stamford', address: '1266 E Main St, Stamford, CT', lat: 41.0534, lng: -73.5387, state: 'CT' }
+];
 let heatmapSortColumn = 'conversions';
 let heatmapSortDirection = 'desc';
 let heatmapSourceFilter = 'all';
@@ -6164,6 +6220,30 @@ function renderHeatmap(zipcodes) {
             }
         }).addTo(heatmapMap);
     }
+    
+    // Add clinic markers
+    clinicMarkers.forEach(m => heatmapMap.removeLayer(m));
+    clinicMarkers = [];
+    
+    // Create clinic icon
+    const clinicIcon = L.divIcon({
+        className: 'clinic-marker',
+        html: '<div style="background: #7c3aed; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🏥</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+    
+    VTC_CLINICS.forEach(clinic => {
+        // Only show clinics in filtered state, or all if no filter
+        if (heatmapStateFilter !== 'all' && clinic.state !== heatmapStateFilter) return;
+        
+        const marker = L.marker([clinic.lat, clinic.lng], { icon: clinicIcon }).addTo(heatmapMap);
+        marker.bindPopup(`
+            <div style="font-weight: bold; font-size: 14px; color: #7c3aed;">🏥 VTC ${clinic.name}</div>
+            <div style="font-size: 12px; color: #666; margin-top: 4px;">${clinic.address}</div>
+        `);
+        clinicMarkers.push(marker);
+    });
 }
 
 function getHeatColor(intensity) {
