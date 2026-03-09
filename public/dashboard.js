@@ -6238,6 +6238,16 @@ function renderHeatmap(zipcodes) {
         if (heatmapStateFilter !== 'all' && clinic.state !== heatmapStateFilter) return;
         
         const marker = L.marker([clinic.lat, clinic.lng], { icon: clinicIcon }).addTo(heatmapMap);
+        
+        // Show name on hover (tooltip)
+        marker.bindTooltip(`VTC ${clinic.name}`, {
+            permanent: false,
+            direction: 'top',
+            offset: [0, -10],
+            className: 'clinic-tooltip'
+        });
+        
+        // Show full details on click (popup)
         marker.bindPopup(`
             <div style="font-weight: bold; font-size: 14px; color: #7c3aed;">🏥 VTC ${clinic.name}</div>
             <div style="font-size: 12px; color: #666; margin-top: 4px;">${clinic.address}</div>
