@@ -3278,7 +3278,11 @@ app.get('/api/looker/monthly-cost-trends', async (req, res) => {
             }
         }
         
-        const result = { months: months.map(m => m.label), data: {} };
+        const result = { 
+            months: months.map(m => m.label), 
+            periods: months.map(m => ({ start: m.start, end: m.end })),
+            data: {} 
+        };
         
         // Build ALL queries upfront and run in parallel
         const allQueries = [];
@@ -3397,7 +3401,11 @@ app.get('/api/looker/weekly-cost-trends', async (req, res) => {
             }
         }
         
-        const result = { weeks: weeks.map(w => w.label), data: {} };
+        const result = { 
+            weeks: weeks.map(w => w.label), 
+            periods: weeks.map(w => ({ start: w.start, end: w.end })),
+            data: {} 
+        };
         
         // Build queries
         const allQueries = [];

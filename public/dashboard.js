@@ -3046,6 +3046,70 @@ async function loadFunnelsData() {
     }
 }
 
+// Helper function to fetch real spend from all platforms for a date range
+async function fetchPlatformSpend(startDate, endDate, idx) {
+    const result = { meta: 0, google: 0, bing: 0, tiktok: 0 };
+    
+    try {
+        // Fetch Meta spend
+        const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${ACCESS_TOKEN}`;
+        const metaRes = await fetch(metaUrl);
+        const metaData = await metaRes.json();
+        if (metaData.data && metaData.data[0]) {
+            result.meta = parseFloat(metaData.data[0].spend) || 0;
+        }
+    } catch (e) {
+        console.error('Meta spend error:', e);
+    }
+    
+    try {
+        // Fetch Google spend
+        const googleRes = await fetch('/api/google/account-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const googleData = await googleRes.json();
+        if (googleData && !googleData.error) {
+            result.google = parseFloat(googleData.spend) || 0;
+        }
+    } catch (e) {
+        console.error('Google spend error:', e);
+    }
+    
+    try {
+        // Fetch Bing spend
+        const bingRes = await fetch('/api/bing/account-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const bingData = await bingRes.json();
+        if (bingData && !bingData.error) {
+            result.bing = parseFloat(bingData.spend) || 0;
+        }
+    } catch (e) {
+        console.error('Bing spend error:', e);
+    }
+    
+    try {
+        // Fetch TikTok spend
+        const tiktokRes = await fetch('/api/tiktok/account-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const tiktokData = await tiktokRes.json();
+        if (tiktokData && !tiktokData.error) {
+            result.tiktok = parseFloat(tiktokData.spend) || 0;
+        }
+    } catch (e) {
+        console.error('TikTok spend error:', e);
+    }
+    
+    return result;
+}
+
 // Monthly Cost Per Stage Trends Chart
 let costTrendChart = null;
 let costTrendWeeklyChart = null;
@@ -3112,36 +3176,60 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         costTrendData = monthlyData;
         costTrendWeeklyData = weeklyData.success ? weeklyData : null;
         
-        // Process monthly spend data
-        const estimatedCPL = { mutm: 150, g1utm: 200, butm: 180, tutm: 120 };
-        
+        // Fetch REAL spend data from each platform for monthly periods
         costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
-        for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
-            costTrendSpendData[platform] = monthlyData.data[platform].l_f_s.map(
-                count => count * estimatedCPL[platform]
-            );
-        }
+        
+        // Initialize arrays
         for (let i = 0; i < monthlyData.months.length; i++) {
-            costTrendSpendData.all.push(
-                costTrendSpendData.mutm[i] + costTrendSpendData.g1utm[i] + 
-                costTrendSpendData.butm[i] + costTrendSpendData.tutm[i]
-            );
+            costTrendSpendData.mutm.push(0);
+            costTrendSpendData.g1utm.push(0);
+            costTrendSpendData.butm.push(0);
+            costTrendSpendData.tutm.push(0);
+            costTrendSpendData.all.push(0);
         }
         
-        // Process weekly spend data
+        // Fetch real spend for each month from each platform
+        const monthlySpendPromises = [];
+        for (let i = 0; i < monthlyData.months.length; i++) {
+            const period = monthlyData.periods[i]; // {start, end}
+            monthlySpendPromises.push(fetchPlatformSpend(period.start, period.end, i));
+        }
+        
+        const monthlySpendResults = await Promise.all(monthlySpendPromises);
+        monthlySpendResults.forEach((spend, idx) => {
+            costTrendSpendData.mutm[idx] = spend.meta;
+            costTrendSpendData.g1utm[idx] = spend.google;
+            costTrendSpendData.butm[idx] = spend.bing;
+            costTrendSpendData.tutm[idx] = spend.tiktok;
+            costTrendSpendData.all[idx] = spend.meta + spend.google + spend.bing + spend.tiktok;
+        });
+        
+        // Fetch REAL spend data for weekly periods
         if (costTrendWeeklyData) {
             costTrendWeeklySpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
-            for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
-                costTrendWeeklySpendData[platform] = weeklyData.data[platform].l_f_s.map(
-                    count => count * estimatedCPL[platform]
-                );
-            }
+            
             for (let i = 0; i < weeklyData.weeks.length; i++) {
-                costTrendWeeklySpendData.all.push(
-                    costTrendWeeklySpendData.mutm[i] + costTrendWeeklySpendData.g1utm[i] + 
-                    costTrendWeeklySpendData.butm[i] + costTrendWeeklySpendData.tutm[i]
-                );
+                costTrendWeeklySpendData.mutm.push(0);
+                costTrendWeeklySpendData.g1utm.push(0);
+                costTrendWeeklySpendData.butm.push(0);
+                costTrendWeeklySpendData.tutm.push(0);
+                costTrendWeeklySpendData.all.push(0);
             }
+            
+            const weeklySpendPromises = [];
+            for (let i = 0; i < weeklyData.weeks.length; i++) {
+                const period = weeklyData.periods[i];
+                weeklySpendPromises.push(fetchPlatformSpend(period.start, period.end, i));
+            }
+            
+            const weeklySpendResults = await Promise.all(weeklySpendPromises);
+            weeklySpendResults.forEach((spend, idx) => {
+                costTrendWeeklySpendData.mutm[idx] = spend.meta;
+                costTrendWeeklySpendData.g1utm[idx] = spend.google;
+                costTrendWeeklySpendData.butm[idx] = spend.bing;
+                costTrendWeeklySpendData.tutm[idx] = spend.tiktok;
+                costTrendWeeklySpendData.all[idx] = spend.meta + spend.google + spend.bing + spend.tiktok;
+            });
         }
         
         renderCostTrendChart(costTrendSource, costTrendStage);
@@ -3883,12 +3971,182 @@ async function loadSummaryData() {
         `;
         document.getElementById('summaryMonthlyBody').innerHTML = monthlyHtml;
         
+        // Load State Spend Breakdown
+        await loadStateSpend(startDate, endDate);
+        
         summaryDataLoaded = true;
         updateLastUpdated();
         
     } catch (error) {
         console.error('Summary error:', error);
         document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="error">Error loading summary data</td></tr>';
+    }
+}
+
+// Load State Spend Breakdown
+async function loadStateSpend(startDate, endDate) {
+    const tbody = document.getElementById('summaryStateBody');
+    const tfoot = document.getElementById('summaryStateFoot');
+    
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading state data...</td></tr>';
+    
+    try {
+        // VTC states we care about
+        const vtcStates = ['New York', 'New Jersey', 'California', 'Texas', 'Maryland', 'Connecticut'];
+        const stateAbbrev = {
+            'New York': 'NY', 'New Jersey': 'NJ', 'California': 'CA', 
+            'Texas': 'TX', 'Maryland': 'MD', 'Connecticut': 'CT'
+        };
+        
+        // Initialize state data
+        const stateData = {};
+        vtcStates.forEach(state => {
+            stateData[state] = { meta: 0, google: 0, bing: 0, total: 0 };
+        });
+        stateData['Other'] = { meta: 0, google: 0, bing: 0, total: 0 };
+        
+        // Fetch Meta geographic data
+        try {
+            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${ACCESS_TOKEN}`;
+            const metaRes = await fetch(metaUrl);
+            const metaData = await metaRes.json();
+            
+            if (metaData.data) {
+                metaData.data.forEach(row => {
+                    const region = row.region || 'Unknown';
+                    const spend = parseFloat(row.spend) || 0;
+                    
+                    if (vtcStates.includes(region)) {
+                        stateData[region].meta += spend;
+                    } else {
+                        stateData['Other'].meta += spend;
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Meta state spend error:', e);
+        }
+        
+        // Fetch Bing geographic data
+        try {
+            const bingRes = await fetch('/api/bing/geographic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            });
+            const bingData = await bingRes.json();
+            
+            if (bingData.locations) {
+                bingData.locations.forEach(row => {
+                    const state = row.state || row.location || 'Unknown';
+                    const spend = parseFloat(row.cost) || 0;
+                    
+                    // Match state name
+                    const matchedState = vtcStates.find(s => 
+                        state.includes(s) || s.includes(state) ||
+                        state === stateAbbrev[s]
+                    );
+                    
+                    if (matchedState) {
+                        stateData[matchedState].bing += spend;
+                    } else {
+                        stateData['Other'].bing += spend;
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Bing state spend error:', e);
+        }
+        
+        // Fetch Google geographic data
+        try {
+            const googleRes = await fetch('/api/google/geographic-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            });
+            const googleData = await googleRes.json();
+            
+            if (googleData.locations) {
+                googleData.locations.forEach(row => {
+                    const state = row.state || row.location || 'Unknown';
+                    const spend = parseFloat(row.cost) || 0;
+                    
+                    const matchedState = vtcStates.find(s => 
+                        state.includes(s) || s.includes(state) ||
+                        state === stateAbbrev[s]
+                    );
+                    
+                    if (matchedState) {
+                        stateData[matchedState].google += spend;
+                    } else {
+                        stateData['Other'].google += spend;
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Google state spend error:', e);
+        }
+        
+        // Calculate totals
+        let grandTotal = 0;
+        Object.keys(stateData).forEach(state => {
+            stateData[state].total = stateData[state].meta + stateData[state].google + stateData[state].bing;
+            grandTotal += stateData[state].total;
+        });
+        
+        // Sort by total spend descending
+        const sortedStates = Object.keys(stateData)
+            .filter(s => s !== 'Other')
+            .sort((a, b) => stateData[b].total - stateData[a].total);
+        sortedStates.push('Other'); // Add Other at the end
+        
+        // Render table
+        let html = '';
+        let totalMeta = 0, totalGoogle = 0, totalBing = 0;
+        
+        sortedStates.forEach(state => {
+            const data = stateData[state];
+            if (data.total === 0 && state === 'Other') return; // Skip if no other spend
+            
+            const pct = grandTotal > 0 ? (data.total / grandTotal * 100).toFixed(1) : 0;
+            const displayName = state === 'Other' ? 'Other States' : `${stateAbbrev[state] || state}`;
+            
+            totalMeta += data.meta;
+            totalGoogle += data.google;
+            totalBing += data.bing;
+            
+            html += `
+                <tr>
+                    <td><strong>${displayName}</strong></td>
+                    <td>$${data.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>$${data.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>$${data.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td><strong>$${data.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                    <td>${pct}%</td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html || '<tr><td colspan="6">No state data available</td></tr>';
+        
+        // Add totals row
+        tfoot.innerHTML = `
+            <tr class="total-row">
+                <td><strong>Total</strong></td>
+                <td><strong>$${totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>100%</strong></td>
+            </tr>
+        `;
+        
+    } catch (error) {
+        console.error('State spend error:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="error">Error loading state data</td></tr>';
     }
 }
 
