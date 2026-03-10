@@ -7290,9 +7290,9 @@ function sortAndRenderClinicPerfTable() {
             <tr>
                 <td><strong>${c.clinic}</strong></td>
                 <td>${c.adClicks > 0 ? c.adClicks.toLocaleString() : '-'}</td>
+                <td>${c.leads.toLocaleString()}</td>
                 <td><strong>${c.booked}</strong></td>
                 <td class="${clickRateClass}"><strong>${clickRate !== null ? clickRate.toFixed(1) : '-'}</strong> ${clickRateEmoji}</td>
-                <td>${c.leads.toLocaleString()}</td>
                 <td>${leadRate !== null ? leadRate.toFixed(1) : '-'}</td>
             </tr>
         `;
