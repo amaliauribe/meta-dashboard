@@ -7160,22 +7160,28 @@ async function loadClinicPerformanceData() {
 }
 
 function renderClinicPerfChart(clinics) {
-    const ctx = document.getElementById('clinicPerfChart').getContext('2d');
+    const chartContainer = document.getElementById('clinicPerfChartContainer');
+    const canvas = document.getElementById('clinicPerfChart');
+    const ctx = canvas.getContext('2d');
     
     // Filter clinics with ad click data and sort by booked per 100 clicks
     const withRate = clinics
-        .filter(c => c.adClicks >= 10 && c.bookedPer100Clicks !== null) // At least 10 clicks
+        .filter(c => c.adClicks >= 5 && c.bookedPer100Clicks !== null) // At least 5 clicks
         .sort((a, b) => (b.bookedPer100Clicks || 0) - (a.bookedPer100Clicks || 0))
-        .slice(0, 15);
+        .slice(0, 25); // Show top 25
     
     if (clinicPerfChart) {
         clinicPerfChart.destroy();
     }
     
     if (withRate.length === 0) {
-        document.getElementById('clinicPerfChartContainer').innerHTML = '<p style="padding: 20px; color: #666;">Not enough ad click data to show chart. Try a longer date range.</p>';
+        chartContainer.innerHTML = '<p style="padding: 20px; color: #666;">Not enough ad click data to show chart. Try a longer date range.</p>';
         return;
     }
+    
+    // Dynamic height based on number of clinics (35px per bar)
+    const chartHeight = Math.max(400, withRate.length * 35);
+    canvas.parentElement.style.height = chartHeight + 'px';
     
     clinicPerfChart = new Chart(ctx, {
         type: 'bar',
@@ -7187,15 +7193,18 @@ function renderClinicPerfChart(clinics) {
                     data: withRate.map(c => c.bookedPer100Clicks?.toFixed(1) || 0),
                     backgroundColor: withRate.map(c => {
                         const rate = c.bookedPer100Clicks || 0;
-                        return rate >= 5 ? 'rgba(34, 197, 94, 0.8)' :
+                        return rate >= 10 ? 'rgba(34, 197, 94, 0.85)' :
+                               rate >= 5 ? 'rgba(74, 222, 128, 0.8)' :
                                rate >= 2 ? 'rgba(250, 204, 21, 0.8)' :
                                'rgba(239, 68, 68, 0.8)';
                     }),
                     borderColor: withRate.map(c => {
                         const rate = c.bookedPer100Clicks || 0;
-                        return rate >= 5 ? '#22c55e' : rate >= 2 ? '#facc15' : '#ef4444';
+                        return rate >= 10 ? '#16a34a' : rate >= 5 ? '#22c55e' : rate >= 2 ? '#eab308' : '#dc2626';
                     }),
-                    borderWidth: 1
+                    borderWidth: 1,
+                    barThickness: 22,
+                    borderRadius: 4
                 }
             ]
         },
@@ -7205,6 +7214,13 @@ function renderClinicPerfChart(clinics) {
             indexAxis: 'y',
             plugins: {
                 legend: { display: false },
+                title: {
+                    display: true,
+                    text: '🟢 ≥10 (Excellent)  |  🟩 ≥5 (Good)  |  🟡 ≥2 (Okay)  |  🔴 <2 (Needs work)',
+                    font: { size: 12, weight: 'normal' },
+                    color: '#666',
+                    padding: { bottom: 15 }
+                },
                 tooltip: {
                     callbacks: {
                         label: (ctx) => {
@@ -7217,7 +7233,12 @@ function renderClinicPerfChart(clinics) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Booked per 100 Ad Clicks' }
+                    title: { display: true, text: 'Booked per 100 Ad Clicks' },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                y: {
+                    ticks: { font: { size: 11 } },
+                    grid: { display: false }
                 }
             }
         }
