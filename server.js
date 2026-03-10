@@ -3235,19 +3235,47 @@ app.get('/api/looker/monthly-cost-trends', async (req, res) => {
     try {
         const v = 'fct_leads_funnel_marketing_phi_exclude';
         const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
-        const numMonths = parseInt(req.query.months) || 6;
         
-        // Get last N months of data
+        // Support custom date range or fall back to months parameter
+        const { startDate, endDate, months: monthsParam } = req.query;
         const months = [];
-        const today = new Date();
-        for (let i = numMonths - 1; i >= 0; i--) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-            months.push({
-                label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-                start: d.toISOString().split('T')[0],
-                end: endOfMonth.toISOString().split('T')[0]
-            });
+        
+        if (startDate && endDate) {
+            // Custom date range - group by month within the range
+            const start = new Date(startDate + 'T12:00:00');
+            const end = new Date(endDate + 'T12:00:00');
+            
+            // Generate months between start and end dates
+            let current = new Date(start.getFullYear(), start.getMonth(), 1);
+            while (current <= end) {
+                const monthStart = new Date(current);
+                const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+                
+                // Clamp to actual date range
+                const actualStart = monthStart < start ? start : monthStart;
+                const actualEnd = monthEnd > end ? end : monthEnd;
+                
+                months.push({
+                    label: current.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                    start: actualStart.toISOString().split('T')[0],
+                    end: actualEnd.toISOString().split('T')[0]
+                });
+                
+                current.setMonth(current.getMonth() + 1);
+            }
+        } else {
+            // Fall back to numMonths parameter
+            const numMonths = parseInt(monthsParam) || 6;
+            const today = new Date();
+            for (let i = numMonths - 1; i >= 0; i--) {
+                const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                months.push({
+                    label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                    start: d.toISOString().split('T')[0],
+                    end: endOfMonth.toISOString().split('T')[0]
+                });
+            }
         }
         
         const result = { months: months.map(m => m.label), data: {} };

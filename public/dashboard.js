@@ -3050,26 +3050,40 @@ async function loadFunnelsData() {
 let costTrendChart = null;
 let costTrendData = null;
 let costTrendSpendData = null;
-let costTrendMonths = 6;
 let costTrendSource = 'all';
+let costTrendStage = 'all';
+let costTrendStartDate = null;
+let costTrendEndDate = null;
 let costTrendFiltersInitialized = false;
 
-async function loadMonthlyCostTrends(months = null) {
+async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     const container = document.getElementById('costTrendChartContainer');
     const loading = document.getElementById('costTrendLoading');
     
     if (!container) return;
     
-    if (months !== null) {
-        costTrendMonths = months;
+    // Use provided dates or defaults
+    if (startDate !== null) costTrendStartDate = startDate;
+    if (endDate !== null) costTrendEndDate = endDate;
+    
+    // Build API URL with date params
+    let apiUrl = '/api/looker/monthly-cost-trends';
+    const params = [];
+    if (costTrendStartDate) params.push(`startDate=${costTrendStartDate}`);
+    if (costTrendEndDate) params.push(`endDate=${costTrendEndDate}`);
+    if (params.length > 0) {
+        apiUrl += '?' + params.join('&');
+    } else {
+        // Default to 6 months if no dates specified
+        apiUrl += '?months=6';
     }
     
     loading.style.display = 'block';
     container.style.opacity = '0.5';
     
     try {
-        // Fetch funnel data from Looker with months parameter
-        const funnelRes = await fetch(`/api/looker/monthly-cost-trends?months=${costTrendMonths}`);
+        // Fetch funnel data from Looker with date parameters
+        const funnelRes = await fetch(apiUrl);
         const funnelData = await funnelRes.json();
         
         if (!funnelData.success) {
@@ -3101,17 +3115,42 @@ async function loadMonthlyCostTrends(months = null) {
             );
         }
         
-        renderCostTrendChart(costTrendSource);
+        renderCostTrendChart(costTrendSource, costTrendStage);
         
         // Setup filters (only once)
         if (!costTrendFiltersInitialized) {
             document.getElementById('costTrendSourceFilter').addEventListener('change', (e) => {
                 costTrendSource = e.target.value;
-                renderCostTrendChart(costTrendSource);
+                renderCostTrendChart(costTrendSource, costTrendStage);
             });
             
-            document.getElementById('costTrendMonthsFilter').addEventListener('change', (e) => {
-                loadMonthlyCostTrends(parseInt(e.target.value));
+            document.getElementById('costTrendStageFilter').addEventListener('change', (e) => {
+                costTrendStage = e.target.value;
+                renderCostTrendChart(costTrendSource, costTrendStage);
+            });
+            
+            // Initialize date pickers with default values (last 6 months)
+            const today = new Date();
+            const sixMonthsAgo = new Date(today);
+            sixMonthsAgo.setMonth(today.getMonth() - 6);
+            
+            document.getElementById('costTrendEndDate').value = today.toISOString().split('T')[0];
+            document.getElementById('costTrendStartDate').value = sixMonthsAgo.toISOString().split('T')[0];
+            
+            document.getElementById('costTrendApplyDate').addEventListener('click', () => {
+                const start = document.getElementById('costTrendStartDate').value;
+                const end = document.getElementById('costTrendEndDate').value;
+                
+                if (!start || !end) {
+                    alert('Please select both start and end dates');
+                    return;
+                }
+                if (start > end) {
+                    alert('Start date must be before end date');
+                    return;
+                }
+                
+                loadMonthlyCostTrends(start, end);
             });
             
             costTrendFiltersInitialized = true;
@@ -3126,7 +3165,7 @@ async function loadMonthlyCostTrends(months = null) {
     }
 }
 
-function renderCostTrendChart(source) {
+function renderCostTrendChart(source, stage = 'all') {
     if (!costTrendData || !costTrendSpendData) return;
     
     const ctx = document.getElementById('costTrendChart').getContext('2d');
@@ -3134,64 +3173,87 @@ function renderCostTrendChart(source) {
     const spend = costTrendSpendData[source];
     
     // Calculate cost per stage for each month
-    const costPerLfs = data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null);
-    const costPerBooked = data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null);
-    const costPerVerified = data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null);
-    const costPerCovered = data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null);
-    const costPerFulfilled = data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null);
+    const stageConfig = {
+        l_f_s: {
+            label: 'Cost per l_f_s',
+            data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)'
+        },
+        is_booked: {
+            label: 'Cost per Is Booked',
+            data: data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)'
+        },
+        sent_to_verification: {
+            label: 'Cost per Sent to Verif.',
+            data: data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)'
+        },
+        is_booked_covered: {
+            label: 'Cost per Booked Covered',
+            data: data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+        },
+        initial_fulfilled: {
+            label: 'Cost per Fulfilled',
+            data: data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)'
+        }
+    };
+    
+    // Build datasets based on stage filter
+    let datasets;
+    if (stage === 'all') {
+        // Show all stages
+        datasets = Object.keys(stageConfig).map(key => ({
+            label: stageConfig[key].label,
+            data: stageConfig[key].data,
+            borderColor: stageConfig[key].borderColor,
+            backgroundColor: stageConfig[key].backgroundColor,
+            tension: 0.3,
+            fill: false
+        }));
+    } else {
+        // Show only selected stage
+        const cfg = stageConfig[stage];
+        datasets = [{
+            label: cfg.label,
+            data: cfg.data,
+            borderColor: cfg.borderColor,
+            backgroundColor: cfg.backgroundColor,
+            tension: 0.3,
+            fill: true
+        }];
+    }
     
     if (costTrendChart) {
         costTrendChart.destroy();
     }
     
     const sourceNames = { all: 'All Sources', mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok' };
+    const stageNames = { 
+        all: 'All Stages',
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    const titleText = stage === 'all' 
+        ? `Cost Per Stage Trends - ${sourceNames[source]}`
+        : `Cost Per ${stageNames[stage]} - ${sourceNames[source]}`;
     
     costTrendChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: costTrendData.months,
-            datasets: [
-                {
-                    label: 'Cost per l_f_s',
-                    data: costPerLfs,
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    tension: 0.3,
-                    fill: false
-                },
-                {
-                    label: 'Cost per Is Booked',
-                    data: costPerBooked,
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    tension: 0.3,
-                    fill: false
-                },
-                {
-                    label: 'Cost per Sent to Verif.',
-                    data: costPerVerified,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    tension: 0.3,
-                    fill: false
-                },
-                {
-                    label: 'Cost per Booked Covered',
-                    data: costPerCovered,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.3,
-                    fill: false
-                },
-                {
-                    label: 'Cost per Fulfilled',
-                    data: costPerFulfilled,
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    tension: 0.3,
-                    fill: false
-                }
-            ]
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -3199,7 +3261,7 @@ function renderCostTrendChart(source) {
             plugins: {
                 title: {
                     display: true,
-                    text: `Cost Per Stage Trends - ${sourceNames[source]}`,
+                    text: titleText,
                     font: { size: 16 }
                 },
                 tooltip: {

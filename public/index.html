@@ -350,12 +350,22 @@
                         </select>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <label for="costTrendMonthsFilter" style="font-weight: 500;">Time Range:</label>
-                        <select id="costTrendMonthsFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
-                            <option value="3">Last 3 Months</option>
-                            <option value="6" selected>Last 6 Months</option>
-                            <option value="12">Last 12 Months</option>
+                        <label for="costTrendStageFilter" style="font-weight: 500;">Stage:</label>
+                        <select id="costTrendStageFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option value="all">All Stages</option>
+                            <option value="l_f_s">Cost per l_f_s</option>
+                            <option value="is_booked">Cost per Is Booked</option>
+                            <option value="sent_to_verification">Cost per Sent to Verif.</option>
+                            <option value="is_booked_covered">Cost per Booked Covered</option>
+                            <option value="initial_fulfilled">Cost per Fulfilled</option>
                         </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="font-weight: 500;">Date Range:</label>
+                        <input type="date" id="costTrendStartDate" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                        <span>to</span>
+                        <input type="date" id="costTrendEndDate" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                        <button id="costTrendApplyDate" style="padding: 8px 16px; background: #1877f2; color: white; border: none; border-radius: 6px; cursor: pointer;">Apply</button>
                     </div>
                 </div>
                 
