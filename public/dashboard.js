@@ -4561,7 +4561,7 @@ function renderQsHistoryTable() {
         const qs7d = kw.qs7dAgo || '-';
         const qs30d = kw.qs30dAgo || '-';
         
-        const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+        const compareValue = kw.qs7dAgo || kw.qs30dAgo; const change = kw.currentQs && compareValue ? kw.currentQs - compareValue : 0;
         let trendIcon, trendClass, changeText;
         
         if (change > 0) {
@@ -5183,7 +5183,7 @@ async function loadBingQsHistoryData() {
                 oldQsCount++;
             }
             
-            const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+            const compareValue = kw.qs7dAgo || kw.qs30dAgo; const change = kw.currentQs && compareValue ? kw.currentQs - compareValue : 0;
             if (change > 0) improved++;
             else if (change < 0) declined++;
             else stable++;
@@ -5224,7 +5224,7 @@ function renderBingQsHistoryTable() {
         const qs7d = kw.qs7dAgo || '-';
         const qs30d = kw.qs30dAgo || '-';
         
-        const change = kw.currentQs && kw.qs30dAgo ? kw.currentQs - kw.qs30dAgo : 0;
+        const compareValue = kw.qs7dAgo || kw.qs30dAgo; const change = kw.currentQs && compareValue ? kw.currentQs - compareValue : 0;
         let trendIcon, trendClass, changeText;
         
         if (change > 0) {
