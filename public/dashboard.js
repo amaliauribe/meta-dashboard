@@ -291,6 +291,7 @@ function initializeDashboard() {
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             heatmapDataLoaded = false; // Reset heatmap data when date changes
+            clinicPerfDataLoaded = false; // Reset clinic performance data when date changes
             insuranceDataLoaded = false; // Reset insurance data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
@@ -365,6 +366,7 @@ function initializeDashboard() {
         searchTermsDataLoaded = false;
         summaryDataLoaded = false;
         heatmapDataLoaded = false;
+        clinicPerfDataLoaded = false;
         
         // Load data for current view
         if (currentView === 'summary') {
@@ -399,6 +401,8 @@ function initializeDashboard() {
             loadGoogleAdsData();
         } else if (currentView === 'heatmap') {
             loadHeatmapData();
+        } else if (currentView === 'clinicPerformance') {
+            loadClinicPerformanceData();
         }
     });
     
@@ -7059,6 +7063,200 @@ async function loadOursPrivacyData() {
 }
 
 
+// ==================== Clinic Performance ====================
+let clinicPerfDataLoaded = false;
+let clinicPerfChart = null;
+
+async function loadClinicPerformanceData() {
+    if (clinicPerfDataLoaded) return;
+    
+    const loading = document.getElementById('clinicPerfLoading');
+    const kpis = document.getElementById('clinicPerfKpis');
+    const chartContainer = document.getElementById('clinicPerfChartContainer');
+    const tableContainer = document.getElementById('clinicPerfTableContainer');
+    const insights = document.getElementById('clinicPerfInsights');
+    
+    loading.style.display = 'block';
+    kpis.style.display = 'none';
+    chartContainer.style.display = 'none';
+    tableContainer.style.display = 'none';
+    insights.style.display = 'none';
+    
+    try {
+        const range = dateRanges[currentRange];
+        let startDate, endDate;
+        
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else {
+            const today = getESTDate();
+            const end = new Date(today);
+            const start = new Date(today);
+            if (range.preset === 'today') {
+                // start and end are already today
+            } else if (range.preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (range.days && range.days > 1) {
+                start.setDate(start.getDate() - range.days + 1);
+            }
+            startDate = formatDateEST(start);
+            endDate = formatDateEST(end);
+        }
+        
+        const response = await fetch(`/api/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load clinic data');
+        }
+        
+        const { clinics, correlation, summary } = result;
+        
+        // Update KPIs
+        document.getElementById('clinicPerfCorrelation').textContent = correlation.clicks_vs_booked || '-';
+        document.getElementById('clinicPerfClinicsCount').textContent = summary.clinicsWithData;
+        document.getElementById('clinicPerfTotalClicks').textContent = summary.totalClicks.toLocaleString();
+        document.getElementById('clinicPerfTotalBooked').textContent = summary.totalBooked.toLocaleString();
+        const avgConv = summary.totalClicks > 0 ? ((summary.totalBooked / summary.totalClicks) * 100).toFixed(1) : 0;
+        document.getElementById('clinicPerfAvgConversion').textContent = avgConv + '%';
+        
+        // Filter clinics with data
+        const clinicsWithData = clinics.filter(c => c.booked > 0 || c.clicks > 0);
+        
+        // Render chart
+        renderClinicPerfChart(clinicsWithData);
+        
+        // Render table
+        renderClinicPerfTable(clinicsWithData);
+        
+        // Generate insights
+        generateClinicPerfInsights(clinicsWithData, correlation);
+        
+        loading.style.display = 'none';
+        kpis.style.display = 'flex';
+        chartContainer.style.display = 'block';
+        tableContainer.style.display = 'block';
+        insights.style.display = 'block';
+        
+        clinicPerfDataLoaded = true;
+    } catch (error) {
+        console.error('Clinic performance error:', error);
+        loading.innerHTML = `<div class="error">Error loading data: ${error.message}</div>`;
+    }
+}
+
+function renderClinicPerfChart(clinics) {
+    const ctx = document.getElementById('clinicPerfChart').getContext('2d');
+    
+    // Sort by booked descending, take top 15
+    const top = clinics.filter(c => c.booked > 0).sort((a, b) => b.booked - a.booked).slice(0, 15);
+    
+    if (clinicPerfChart) {
+        clinicPerfChart.destroy();
+    }
+    
+    clinicPerfChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: top.map(c => c.clinic),
+            datasets: [
+                {
+                    label: 'Clicks',
+                    data: top.map(c => c.clicks),
+                    backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                    borderColor: '#6366f1',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Booked',
+                    data: top.map(c => c.booked),
+                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                    borderColor: '#10b981',
+                    borderWidth: 1,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: 'Clicks' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: 'Booked' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+function renderClinicPerfTable(clinics) {
+    const tbody = document.getElementById('clinicPerfTableBody');
+    
+    // Sort by booked descending
+    const sorted = clinics.filter(c => c.booked > 0 || c.clicks > 0).sort((a, b) => b.booked - a.booked);
+    
+    tbody.innerHTML = sorted.map(c => {
+        const convRate = c.clicks > 0 ? ((c.booked / c.clicks) * 100).toFixed(1) : '-';
+        const convClass = c.clicks > 0 ? (c.booked / c.clicks >= 0.2 ? 'qs-good' : c.booked / c.clicks >= 0.1 ? 'qs-ok' : 'qs-low') : '';
+        return `
+            <tr>
+                <td><strong>${c.clinic}</strong></td>
+                <td>${c.impressions.toLocaleString()}</td>
+                <td>${c.clicks.toLocaleString()}</td>
+                <td><strong>${c.booked}</strong></td>
+                <td class="${convClass}">${convRate}%</td>
+                <td>${c.ctr}%</td>
+                <td>${c.zipcodes}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function generateClinicPerfInsights(clinics, correlation) {
+    const insights = [];
+    
+    // Correlation insight
+    const corr = parseFloat(correlation.clicks_vs_booked);
+    if (!isNaN(corr)) {
+        if (corr > 0.5) {
+            insights.push(`📈 <strong>Strong correlation (${corr.toFixed(2)})</strong> - Click volume is a good predictor of bookings`);
+        } else if (corr > 0.3) {
+            insights.push(`📊 <strong>Moderate correlation (${corr.toFixed(2)})</strong> - Click volume partially predicts bookings`);
+        } else {
+            insights.push(`⚠️ <strong>Weak correlation (${corr.toFixed(2)})</strong> - Click volume alone doesn't predict bookings well`);
+        }
+    }
+    
+    // Top performers
+    const withData = clinics.filter(c => c.booked > 0 && c.clicks > 0);
+    if (withData.length > 0) {
+        const byConversion = [...withData].sort((a, b) => (b.booked / b.clicks) - (a.booked / a.clicks));
+        const top3 = byConversion.slice(0, 3);
+        insights.push(`🏆 <strong>Most efficient:</strong> ${top3.map(c => c.clinic + ' (' + ((c.booked / c.clicks) * 100).toFixed(0) + '%)').join(', ')}`);
+        
+        if (byConversion.length > 3) {
+            const bottom3 = byConversion.slice(-3).reverse();
+            insights.push(`⚡ <strong>Needs attention:</strong> ${bottom3.map(c => c.clinic + ' (' + ((c.booked / c.clicks) * 100).toFixed(0) + '%)').join(', ')}`);
+        }
+    }
+    
+    document.getElementById('clinicPerfInsightsList').innerHTML = insights.map(i => `<p style="margin: 8px 0;">${i}</p>`).join('');
+}
+
 // Hook into view switching
 const originalSwitchView = typeof switchView === "function" ? switchView : null;
 if (originalSwitchView) {
@@ -7066,6 +7264,8 @@ if (originalSwitchView) {
         originalSwitchView(view);
         if (view === "oursPrivacy") {
             loadOursPrivacyData();
+        } else if (view === "clinicPerformance") {
+            loadClinicPerformanceData();
         }
     };
     // Replace switchView reference
@@ -7078,6 +7278,12 @@ if (originalSwitchView) {
                 document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
                 btn.classList.add("active");
                 loadOursPrivacyData();
+            } else if (view === "clinicPerformance") {
+                document.querySelectorAll(".view-content").forEach(v => v.classList.add("hidden"));
+                document.getElementById("clinicPerformanceView")?.classList.remove("hidden");
+                document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+                btn.classList.add("active");
+                loadClinicPerformanceData();
             }
         });
     });

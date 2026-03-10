@@ -3381,6 +3381,186 @@ app.get("/api/ours-privacy/converted-visitors", (req, res) => {
     });
 });
 
+// ==================== Clinic Performance ====================
+// VTC Clinic zipcode mappings
+const CLINIC_ZIPCODES = {
+    'Astoria': ['11102', '11103', '11105', '11106', '11370', '11371', '11372', '11373'],
+    'Brighton Beach': ['11223', '11224', '11229', '11235', '11218', '11219', '11230'],
+    'Bronx': ['10461', '10462', '10469', '10470', '10466', '10467', '10475', '10464'],
+    'Downtown Brooklyn': ['11201', '11205', '11217', '11231', '11215', '11238', '11217'],
+    'Financial District': ['10004', '10005', '10006', '10007', '10038', '10280', '10281'],
+    'Forest Hills': ['11375', '11374', '11379', '11385', '11418', '11419', '11421'],
+    'Harlem': ['10026', '10027', '10030', '10031', '10032', '10033', '10034', '10037', '10039', '10040'],
+    'Jamaica': ['11432', '11433', '11434', '11435', '11436', '11412', '11413', '11423'],
+    'Riverdale': ['10463', '10471', '10024', '10025', '10069', '10023'],
+    'South Brooklyn': ['11209', '11214', '11219', '11228', '11220', '11232', '11204'],
+    'Upper East Side': ['10021', '10028', '10065', '10075', '10128', '10162', '10044'],
+    'Williamsburg': ['11206', '11211', '11222', '11249', '11237', '11385'],
+    'Paramus': ['07652', '07601', '07631', '07632', '07645', '07648', '07649', '07650'],
+    'Clifton': ['07011', '07012', '07013', '07014', '07043', '07055', '07424'],
+    'Wayne': ['07470', '07424', '07430', '07436', '07444', '07456'],
+    'Woodbridge': ['07095', '07001', '07067', '07077', '07080', '08817', '08818'],
+    'Scotch Plains': ['07076', '07060', '07023', '07090', '07091', '07092'],
+    'Edison': ['08817', '08818', '08820', '08837', '08840', '08846'],
+    'West Orange': ['07052', '07039', '07017', '07018', '07028', '07078'],
+    'Spring Valley': ['10977', '10952', '10960', '10954', '10956', '10980', '10974'],
+    'Houston': ['77030', '77054', '77004', '77021', '77025', '77027', '77036', '77051', '77053', '77074', '77087'],
+    'San Antonio': ['78229', '78230', '78231', '78232', '78201', '78209', '78212', '78213', '78216'],
+    'Dallas': ['75230', '75231', '75234', '75240', '75243', '75248', '75252', '75287'],
+    'Fairfax': ['22030', '22031', '22032', '22033', '22041', '22042', '22043', '22044', '22046'],
+    'Bethesda': ['20814', '20815', '20816', '20817', '20854', '20852', '20850', '20889'],
+    'Stamford': ['06901', '06902', '06903', '06905', '06906', '06907', '06910', '06911'],
+    'Westport': ['06880', '06820', '06824', '06830', '06840', '06870', '06878', '06883'],
+    'San Diego': ['92101', '92102', '92103', '92104', '92105', '92108', '92110', '92111', '92116', '92117'],
+    'La Jolla': ['92037', '92038', '92092', '92093', '92122', '92123', '92128', '92130', '92131']
+};
+
+app.get('/api/clinic-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, error: 'Missing startDate or endDate' });
+        }
+        
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        
+        // Get Meta Ads data by zipcode from heatmap endpoint logic
+        let metaData = [];
+        try {
+            const metaResponse = await getMetaGeoData(startDate, endDate);
+            metaData = metaResponse || [];
+        } catch (e) {
+            console.log('Meta geo data not available:', e.message);
+        }
+        
+        // Get Bing data by location
+        let bingData = [];
+        try {
+            const bingResponse = await getBingGeoData(startDate, endDate);
+            bingData = bingResponse || [];
+        } catch (e) {
+            console.log('Bing geo data not available:', e.message);
+        }
+        
+        // Get booking data from webhook events
+        const bookedEvents = webhookEvents.filter(e => 
+            e.event_type === 'is_booked' &&
+            new Date(e.timestamp) >= start &&
+            new Date(e.timestamp) <= end
+        );
+        
+        // Aggregate data by clinic
+        const clinicData = {};
+        
+        // Initialize clinics
+        Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
+            clinicData[clinic] = {
+                clinic,
+                impressions: 0,
+                clicks: 0,
+                booked: 0,
+                ctr: 0,
+                zipcodes: CLINIC_ZIPCODES[clinic].length
+            };
+        });
+        
+        // Aggregate Meta data by clinic
+        metaData.forEach(row => {
+            const zip = row.zipcode || row.postal_code;
+            if (!zip) return;
+            
+            Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
+                if (CLINIC_ZIPCODES[clinic].includes(zip)) {
+                    clinicData[clinic].impressions += parseInt(row.impressions) || 0;
+                    clinicData[clinic].clicks += parseInt(row.clicks) || 0;
+                }
+            });
+        });
+        
+        // Aggregate Bing data
+        bingData.forEach(row => {
+            const zip = row.PostalCode || row.zipcode;
+            if (!zip) return;
+            
+            Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
+                if (CLINIC_ZIPCODES[clinic].includes(zip)) {
+                    clinicData[clinic].impressions += parseInt(row.Impressions || row.impressions) || 0;
+                    clinicData[clinic].clicks += parseInt(row.Clicks || row.clicks) || 0;
+                }
+            });
+        });
+        
+        // Aggregate booked appointments by clinic (using lead's clinic field if available)
+        bookedEvents.forEach(e => {
+            const eventClinic = e.clinic || e.location || '';
+            const matchedClinic = Object.keys(CLINIC_ZIPCODES).find(c => 
+                eventClinic.toLowerCase().includes(c.toLowerCase()) ||
+                c.toLowerCase().includes(eventClinic.toLowerCase())
+            );
+            
+            if (matchedClinic) {
+                clinicData[matchedClinic].booked++;
+            }
+        });
+        
+        // Calculate CTR
+        Object.values(clinicData).forEach(clinic => {
+            clinic.ctr = clinic.impressions > 0 
+                ? ((clinic.clicks / clinic.impressions) * 100).toFixed(2)
+                : '0.00';
+        });
+        
+        // Calculate correlation
+        const clinicsWithData = Object.values(clinicData).filter(c => c.clicks > 0 && c.booked > 0);
+        let correlation = { clicks_vs_booked: 'N/A' };
+        
+        if (clinicsWithData.length >= 3) {
+            const clicks = clinicsWithData.map(c => c.clicks);
+            const booked = clinicsWithData.map(c => c.booked);
+            const corr = calculateCorrelation(clicks, booked);
+            correlation.clicks_vs_booked = corr.toFixed(2);
+        }
+        
+        // Summary
+        const summary = {
+            clinicsWithData: Object.values(clinicData).filter(c => c.clicks > 0 || c.booked > 0).length,
+            totalClicks: Object.values(clinicData).reduce((sum, c) => sum + c.clicks, 0),
+            totalBooked: Object.values(clinicData).reduce((sum, c) => sum + c.booked, 0)
+        };
+        
+        res.json({
+            success: true,
+            clinics: Object.values(clinicData),
+            correlation,
+            summary
+        });
+        
+    } catch (error) {
+        console.error('Clinic performance error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper: Calculate Pearson correlation coefficient
+function calculateCorrelation(x, y) {
+    const n = x.length;
+    if (n === 0) return 0;
+    
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((acc, xi, i) => acc + xi * y[i], 0);
+    const sumX2 = x.reduce((acc, xi) => acc + xi * xi, 0);
+    const sumY2 = y.reduce((acc, yi) => acc + yi * yi, 0);
+    
+    const num = n * sumXY - sumX * sumY;
+    const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+    
+    return den === 0 ? 0 : num / den;
+}
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
