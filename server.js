@@ -188,7 +188,23 @@ async function getLookerToken() {
     return lookerAccessToken;
 }
 
+// Looker query cache (15 min TTL)
+const lookerCache = new Map();
+const LOOKER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+function getCacheKey(view, fields, filters, sorts, limit) {
+    return JSON.stringify({ view, fields, filters, sorts, limit });
+}
+
 async function lookerQuery(view, fields, filters = {}, sorts = [], limit = 500) {
+    const cacheKey = getCacheKey(view, fields, filters, sorts, limit);
+    
+    // Check cache
+    const cached = lookerCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < LOOKER_CACHE_TTL) {
+        return cached.data;
+    }
+    
     const token = await getLookerToken();
     const response = await fetch(`${LOOKER_CONFIG.baseUrl}/api/4.0/queries/run/json`, {
         method: 'POST',
@@ -205,7 +221,22 @@ async function lookerQuery(view, fields, filters = {}, sorts = [], limit = 500) 
             limit: String(limit)
         })
     });
-    return response.json();
+    const data = await response.json();
+    
+    // Store in cache
+    lookerCache.set(cacheKey, { data, timestamp: Date.now() });
+    
+    // Clean old cache entries periodically
+    if (lookerCache.size > 500) {
+        const now = Date.now();
+        for (const [key, value] of lookerCache) {
+            if (now - value.timestamp > LOOKER_CACHE_TTL) {
+                lookerCache.delete(key);
+            }
+        }
+    }
+    
+    return data;
 }
 
 // Microsoft Advertising API Configuration (from environment variables)
@@ -2958,45 +2989,18 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
             }
         }
         
-        // Get total leads by tracking type
-        const totalLeads = await lookerQuery(
-            'fct_leads_funnel_marketing_phi_exclude',
-            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
-            dateFilter,
-            ['fct_leads_funnel_marketing_phi_exclude.count desc']
-        );
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const fields = [`${v}.tracking_type`, `${v}.count`];
+        const sorts = [`${v}.count desc`];
         
-        // Get is_booked by tracking type
-        const isBooked = await lookerQuery(
-            'fct_leads_funnel_marketing_phi_exclude',
-            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
-            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.is_booked': '1' },
-            ['fct_leads_funnel_marketing_phi_exclude.count desc']
-        );
-        
-        // Get sent_to_verification by tracking type
-        const sentToVerification = await lookerQuery(
-            'fct_leads_funnel_marketing_phi_exclude',
-            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
-            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.sent_to_verification': '1' },
-            ['fct_leads_funnel_marketing_phi_exclude.count desc']
-        );
-        
-        // Get is_booked_covered by tracking type
-        const isBookedCovered = await lookerQuery(
-            'fct_leads_funnel_marketing_phi_exclude',
-            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
-            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.is_booked_covered': '1' },
-            ['fct_leads_funnel_marketing_phi_exclude.count desc']
-        );
-        
-        // Get initial_fulfilled by tracking type
-        const initialFulfilled = await lookerQuery(
-            'fct_leads_funnel_marketing_phi_exclude',
-            ['fct_leads_funnel_marketing_phi_exclude.tracking_type', 'fct_leads_funnel_marketing_phi_exclude.count'],
-            { ...dateFilter, 'fct_leads_funnel_marketing_phi_exclude.initial_fulfilled': '1' },
-            ['fct_leads_funnel_marketing_phi_exclude.count desc']
-        );
+        // Run all base queries in parallel
+        const [totalLeads, isBooked, sentToVerification, isBookedCovered, initialFulfilled] = await Promise.all([
+            lookerQuery(v, fields, dateFilter, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.sent_to_verification`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked_covered`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.initial_fulfilled`]: '1' }, sorts)
+        ]);
         
         // Helper to convert array to map
         const toMap = (arr) => {
@@ -3030,55 +3034,74 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
             }
         });
         
-        // Get insurance breakdown for each stage, by platform
-        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        // Get insurance breakdown for each stage - ALL queries in parallel
         const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
         const insuranceData = { all: {}, byPlatform: {} };
         
-        // Get totals (all platforms)
+        // Build all insurance queries upfront
+        const insuranceQueries = [];
+        const queryMeta = []; // Track what each query is for
+        
+        // Queries for totals (all platforms)
         for (const insType of insuranceTypes) {
             const insFilter = { ...dateFilter, [`${v}.insurance_type`]: insType };
-            
-            const [insLeads, insBooked, insVerified, insCovered, insFulfilled] = await Promise.all([
+            insuranceQueries.push(
                 lookerQuery(v, [`${v}.count`], insFilter),
                 lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked`]: '1' }),
                 lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.sent_to_verification`]: '1' }),
                 lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked_covered`]: '1' }),
                 lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.initial_fulfilled`]: '1' })
-            ]);
-            
-            insuranceData.all[insType] = {
-                l_f_s: insLeads[0]?.[`${v}.count`] || 0,
-                is_booked: insBooked[0]?.[`${v}.count`] || 0,
-                sent_to_verification: insVerified[0]?.[`${v}.count`] || 0,
-                is_booked_covered: insCovered[0]?.[`${v}.count`] || 0,
-                initial_fulfilled: insFulfilled[0]?.[`${v}.count`] || 0
-            };
+            );
+            queryMeta.push({ type: 'all', insType, stage: 'l_f_s' });
+            queryMeta.push({ type: 'all', insType, stage: 'is_booked' });
+            queryMeta.push({ type: 'all', insType, stage: 'sent_to_verification' });
+            queryMeta.push({ type: 'all', insType, stage: 'is_booked_covered' });
+            queryMeta.push({ type: 'all', insType, stage: 'initial_fulfilled' });
         }
         
-        // Get by platform
+        // Queries for each platform
         for (const platform of trackingTypes) {
-            insuranceData.byPlatform[platform] = {};
             for (const insType of insuranceTypes) {
                 const insFilter = { ...dateFilter, [`${v}.insurance_type`]: insType, [`${v}.tracking_type`]: platform };
-                
-                const [insLeads, insBooked, insVerified, insCovered, insFulfilled] = await Promise.all([
+                insuranceQueries.push(
                     lookerQuery(v, [`${v}.count`], insFilter),
                     lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked`]: '1' }),
                     lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.sent_to_verification`]: '1' }),
                     lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.is_booked_covered`]: '1' }),
                     lookerQuery(v, [`${v}.count`], { ...insFilter, [`${v}.initial_fulfilled`]: '1' })
-                ]);
-                
-                insuranceData.byPlatform[platform][insType] = {
-                    l_f_s: insLeads[0]?.[`${v}.count`] || 0,
-                    is_booked: insBooked[0]?.[`${v}.count`] || 0,
-                    sent_to_verification: insVerified[0]?.[`${v}.count`] || 0,
-                    is_booked_covered: insCovered[0]?.[`${v}.count`] || 0,
-                    initial_fulfilled: insFulfilled[0]?.[`${v}.count`] || 0
-                };
+                );
+                queryMeta.push({ type: 'platform', platform, insType, stage: 'l_f_s' });
+                queryMeta.push({ type: 'platform', platform, insType, stage: 'is_booked' });
+                queryMeta.push({ type: 'platform', platform, insType, stage: 'sent_to_verification' });
+                queryMeta.push({ type: 'platform', platform, insType, stage: 'is_booked_covered' });
+                queryMeta.push({ type: 'platform', platform, insType, stage: 'initial_fulfilled' });
             }
         }
+        
+        // Run ALL insurance queries in parallel
+        const insuranceResults = await Promise.all(insuranceQueries);
+        
+        // Process results
+        for (const insType of insuranceTypes) {
+            insuranceData.all[insType] = { l_f_s: 0, is_booked: 0, sent_to_verification: 0, is_booked_covered: 0, initial_fulfilled: 0 };
+        }
+        for (const platform of trackingTypes) {
+            insuranceData.byPlatform[platform] = {};
+            for (const insType of insuranceTypes) {
+                insuranceData.byPlatform[platform][insType] = { l_f_s: 0, is_booked: 0, sent_to_verification: 0, is_booked_covered: 0, initial_fulfilled: 0 };
+            }
+        }
+        
+        insuranceResults.forEach((result, idx) => {
+            const meta = queryMeta[idx];
+            const count = result[0]?.[`${v}.count`] || 0;
+            
+            if (meta.type === 'all') {
+                insuranceData.all[meta.insType][meta.stage] = count;
+            } else {
+                insuranceData.byPlatform[meta.platform][meta.insType][meta.stage] = count;
+            }
+        });
         
         res.json({
             success: true,
@@ -3112,47 +3135,70 @@ app.get('/api/looker/insurance-funnel', async (req, res) => {
         const v = 'fct_leads_funnel_marketing_phi_exclude';
         const platforms = ['mutm', 'g1utm', 'butm', 'tutm', 'gbputm', 'outm'];
         const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
+        const stages = ['leads', 'booked', 'verified', 'covered', 'fulfilled'];
+        const stageFilters = {
+            leads: {},
+            booked: { [`${v}.is_booked`]: '1' },
+            verified: { [`${v}.sent_to_verification`]: '1' },
+            covered: { [`${v}.is_booked_covered`]: '1' },
+            fulfilled: { [`${v}.initial_fulfilled`]: '1' }
+        };
         
+        // Build ALL queries upfront
+        const allQueries = [];
+        const queryMeta = [];
+        
+        // Total queries per platform
+        for (const platform of platforms) {
+            allQueries.push(lookerQuery(v, [`${v}.count`], { ...dateFilter, [`${v}.tracking_type`]: platform }));
+            queryMeta.push({ type: 'total', platform });
+        }
+        
+        // Insurance breakdown queries
+        for (const platform of platforms) {
+            for (const insType of insuranceTypes) {
+                for (const stage of stages) {
+                    const filters = { 
+                        ...dateFilter, 
+                        [`${v}.tracking_type`]: platform,
+                        [`${v}.insurance_type`]: insType,
+                        ...stageFilters[stage]
+                    };
+                    allQueries.push(lookerQuery(v, [`${v}.count`], filters));
+                    queryMeta.push({ type: 'insurance', platform, insType, stage });
+                }
+            }
+            // Unknown insurance
+            allQueries.push(lookerQuery(v, [`${v}.count`], { ...dateFilter, [`${v}.tracking_type`]: platform, [`${v}.insurance_type`]: 'NULL' }));
+            queryMeta.push({ type: 'unknown', platform });
+        }
+        
+        // Run ALL queries in parallel
+        const allResults = await Promise.all(allQueries);
+        
+        // Initialize result structure
         const result = {};
-        
         for (const platform of platforms) {
             result[platform] = { total: 0, insurance: {} };
-            
-            // Get total for platform
-            const totalData = await lookerQuery(v, [`${v}.count`], { ...dateFilter, [`${v}.tracking_type`]: platform });
-            result[platform].total = totalData[0]?.[`${v}.count`] || 0;
-            
-            // Get breakdown by insurance type
             for (const insType of insuranceTypes) {
-                const filters = { 
-                    ...dateFilter, 
-                    [`${v}.tracking_type`]: platform,
-                    [`${v}.insurance_type`]: insType
-                };
-                
-                const leads = await lookerQuery(v, [`${v}.count`], filters);
-                const booked = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.is_booked`]: '1' });
-                const verified = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.sent_to_verification`]: '1' });
-                const covered = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.is_booked_covered`]: '1' });
-                const fulfilled = await lookerQuery(v, [`${v}.count`], { ...filters, [`${v}.initial_fulfilled`]: '1' });
-                
-                result[platform].insurance[insType] = {
-                    leads: leads[0]?.[`${v}.count`] || 0,
-                    booked: booked[0]?.[`${v}.count`] || 0,
-                    verified: verified[0]?.[`${v}.count`] || 0,
-                    covered: covered[0]?.[`${v}.count`] || 0,
-                    fulfilled: fulfilled[0]?.[`${v}.count`] || 0
-                };
+                result[platform].insurance[insType] = { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 };
             }
-            
-            // Get unknown insurance count
-            const unknownFilters = { ...dateFilter, [`${v}.tracking_type`]: platform, [`${v}.insurance_type`]: 'NULL' };
-            const unknownLeads = await lookerQuery(v, [`${v}.count`], unknownFilters);
-            result[platform].insurance['Unknown'] = {
-                leads: unknownLeads[0]?.[`${v}.count`] || 0,
-                booked: 0, verified: 0, covered: 0, fulfilled: 0
-            };
+            result[platform].insurance['Unknown'] = { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 };
         }
+        
+        // Process results
+        allResults.forEach((res, idx) => {
+            const meta = queryMeta[idx];
+            const count = res[0]?.[`${v}.count`] || 0;
+            
+            if (meta.type === 'total') {
+                result[meta.platform].total = count;
+            } else if (meta.type === 'insurance') {
+                result[meta.platform].insurance[meta.insType][meta.stage] = count;
+            } else if (meta.type === 'unknown') {
+                result[meta.platform].insurance['Unknown'].leads = count;
+            }
+        });
         
         // Calculate totals across all platforms
         const totals = { PPO: { leads: 0, booked: 0, verified: 0, covered: 0, fulfilled: 0 }, 
@@ -3205,44 +3251,55 @@ app.get('/api/looker/monthly-cost-trends', async (req, res) => {
         
         const result = { months: months.map(m => m.label), data: {} };
         
-        // For each platform
+        // Build ALL queries upfront and run in parallel
+        const allQueries = [];
+        const queryMeta = [];
+        const stages = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+        const stageFilters = {
+            l_f_s: {},
+            is_booked: { [`${v}.is_booked`]: '1' },
+            sent_to_verification: { [`${v}.sent_to_verification`]: '1' },
+            is_booked_covered: { [`${v}.is_booked_covered`]: '1' },
+            initial_fulfilled: { [`${v}.initial_fulfilled`]: '1' }
+        };
+        
         for (const platform of platforms) {
-            result.data[platform] = {
-                l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: []
-            };
-            
-            for (const month of months) {
+            for (let monthIdx = 0; monthIdx < months.length; monthIdx++) {
+                const month = months[monthIdx];
                 const dateFilter = { [`${v}.lead_created_date_est_date`]: `${month.start} to ${month.end}` };
                 const platformFilter = { ...dateFilter, [`${v}.tracking_type`]: platform };
                 
-                // Get funnel counts for this month/platform
-                const [lfs, booked, verified, covered, fulfilled] = await Promise.all([
-                    lookerQuery(v, [`${v}.count`], platformFilter),
-                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.is_booked`]: '1' }),
-                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.sent_to_verification`]: '1' }),
-                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.is_booked_covered`]: '1' }),
-                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.initial_fulfilled`]: '1' })
-                ]);
-                
-                result.data[platform].l_f_s.push(lfs[0]?.[`${v}.count`] || 0);
-                result.data[platform].is_booked.push(booked[0]?.[`${v}.count`] || 0);
-                result.data[platform].sent_to_verification.push(verified[0]?.[`${v}.count`] || 0);
-                result.data[platform].is_booked_covered.push(covered[0]?.[`${v}.count`] || 0);
-                result.data[platform].initial_fulfilled.push(fulfilled[0]?.[`${v}.count`] || 0);
+                for (const stage of stages) {
+                    allQueries.push(lookerQuery(v, [`${v}.count`], { ...platformFilter, ...stageFilters[stage] }));
+                    queryMeta.push({ platform, monthIdx, stage });
+                }
             }
         }
         
-        // Also get totals across all platforms
-        result.data.all = {
-            l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: []
-        };
+        // Run ALL queries in parallel
+        const allResults = await Promise.all(allQueries);
         
+        // Initialize result structure
+        for (const platform of platforms) {
+            result.data[platform] = { l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: [] };
+            for (let i = 0; i < months.length; i++) {
+                stages.forEach(s => result.data[platform][s].push(0));
+            }
+        }
+        
+        // Process results
+        allResults.forEach((res, idx) => {
+            const meta = queryMeta[idx];
+            const count = res[0]?.[`${v}.count`] || 0;
+            result.data[meta.platform][meta.stage][meta.monthIdx] = count;
+        });
+        
+        // Calculate totals across all platforms
+        result.data.all = { l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: [] };
         for (let i = 0; i < months.length; i++) {
-            result.data.all.l_f_s.push(platforms.reduce((sum, p) => sum + result.data[p].l_f_s[i], 0));
-            result.data.all.is_booked.push(platforms.reduce((sum, p) => sum + result.data[p].is_booked[i], 0));
-            result.data.all.sent_to_verification.push(platforms.reduce((sum, p) => sum + result.data[p].sent_to_verification[i], 0));
-            result.data.all.is_booked_covered.push(platforms.reduce((sum, p) => sum + result.data[p].is_booked_covered[i], 0));
-            result.data.all.initial_fulfilled.push(platforms.reduce((sum, p) => sum + result.data[p].initial_fulfilled[i], 0));
+            stages.forEach(stage => {
+                result.data.all[stage].push(platforms.reduce((sum, p) => sum + result.data[p][stage][i], 0));
+            });
         }
         
         res.json({ success: true, ...result });
