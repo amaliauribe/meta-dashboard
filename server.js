@@ -3424,22 +3424,98 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         const bookedMap = toMap(isBooked);
         const fulfilledMap = toMap(initialFulfilled);
         
-        // 2. Get ad clicks by zipcode from Bing
+        // 2. Get ad clicks by zipcode from Bing + Google
         let adClicksByZip = {};
+        
+        // Bing geo data
         if (isBingConfigured()) {
             try {
                 const bingData = await getBingGeographicReport(startDate, endDate);
                 bingData.forEach(row => {
                     const zip = row.PostalCode;
                     if (zip && /^\d{5}$/.test(zip)) {
-                        if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0 };
+                        if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0, sources: [] };
                         adClicksByZip[zip].clicks += parseInt(row.Clicks) || 0;
                         adClicksByZip[zip].impressions += parseInt(row.Impressions) || 0;
                         adClicksByZip[zip].spend += parseFloat(row.Spend) || 0;
+                        if (!adClicksByZip[zip].sources.includes('Bing')) adClicksByZip[zip].sources.push('Bing');
                     }
                 });
+                console.log('Clinic perf: Bing geo loaded, zips:', Object.keys(adClicksByZip).length);
             } catch (e) {
                 console.log('Bing geo for clinic perf:', e.message);
+            }
+        }
+        
+        // Google Ads geo data
+        if (isGoogleAdsConfigured()) {
+            try {
+                const query = `
+                    SELECT 
+                        campaign_criterion.location.geo_target_constant,
+                        metrics.impressions,
+                        metrics.clicks,
+                        metrics.cost_micros
+                    FROM location_view
+                    WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                        AND metrics.impressions > 0
+                `;
+                const googleData = await googleAdsApiRequest(query);
+                
+                // Get geo IDs and look up names
+                const geoIds = [...new Set(googleData.map(r => {
+                    const geoConstant = r.campaign_criterion?.location?.geo_target_constant || '';
+                    const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+                    return match ? match[1] : null;
+                }).filter(Boolean))];
+                
+                const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
+                if (uncachedIds.length > 0) {
+                    const geoQuery = `
+                        SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.target_type
+                        FROM geo_target_constant
+                        WHERE geo_target_constant.id IN (${uncachedIds.join(',')})
+                    `;
+                    const geoResults = await googleAdsApiRequest(geoQuery);
+                    geoResults.forEach(r => {
+                        const g = r.geo_target_constant || {};
+                        geoNameCache[g.id] = { name: g.name, targetType: g.target_type };
+                    });
+                }
+                
+                // Aggregate by geo ID
+                const geoMap = {};
+                googleData.forEach(row => {
+                    const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
+                    const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+                    if (!match) return;
+                    const geoId = match[1];
+                    const metrics = row.metrics || {};
+                    if (!geoMap[geoId]) geoMap[geoId] = { impressions: 0, clicks: 0, cost: 0 };
+                    geoMap[geoId].impressions += parseInt(metrics.impressions) || 0;
+                    geoMap[geoId].clicks += parseInt(metrics.clicks) || 0;
+                    geoMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+                });
+                
+                // Extract postal codes
+                let googleZipCount = 0;
+                Object.entries(geoMap).forEach(([geoId, metrics]) => {
+                    const geoInfo = geoNameCache[geoId];
+                    if (!geoInfo || geoInfo.targetType !== 'Postal Code') return;
+                    const zipMatch = geoInfo.name.match(/^(\d{5})/);
+                    if (!zipMatch) return;
+                    const zip = zipMatch[1];
+                    
+                    if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0, sources: [] };
+                    adClicksByZip[zip].clicks += metrics.clicks;
+                    adClicksByZip[zip].impressions += metrics.impressions;
+                    adClicksByZip[zip].spend += metrics.cost;
+                    if (!adClicksByZip[zip].sources.includes('Google')) adClicksByZip[zip].sources.push('Google');
+                    googleZipCount++;
+                });
+                console.log('Clinic perf: Google geo loaded, zips:', googleZipCount);
+            } catch (e) {
+                console.log('Google geo for clinic perf:', e.message);
             }
         }
         
