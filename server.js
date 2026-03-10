@@ -3184,6 +3184,74 @@ app.get('/api/looker/insurance-funnel', async (req, res) => {
     }
 });
 
+// Get monthly cost per funnel stage trends
+app.get('/api/looker/monthly-cost-trends', async (req, res) => {
+    try {
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+        
+        // Get last 6 months of data
+        const months = [];
+        const today = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            months.push({
+                label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                start: d.toISOString().split('T')[0],
+                end: endOfMonth.toISOString().split('T')[0]
+            });
+        }
+        
+        const result = { months: months.map(m => m.label), data: {} };
+        
+        // For each platform
+        for (const platform of platforms) {
+            result.data[platform] = {
+                l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: []
+            };
+            
+            for (const month of months) {
+                const dateFilter = { [`${v}.lead_created_date_est_date`]: `${month.start} to ${month.end}` };
+                const platformFilter = { ...dateFilter, [`${v}.tracking_type`]: platform };
+                
+                // Get funnel counts for this month/platform
+                const [lfs, booked, verified, covered, fulfilled] = await Promise.all([
+                    lookerQuery(v, [`${v}.count`], platformFilter),
+                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.is_booked`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.sent_to_verification`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.is_booked_covered`]: '1' }),
+                    lookerQuery(v, [`${v}.count`], { ...platformFilter, [`${v}.initial_fulfilled`]: '1' })
+                ]);
+                
+                result.data[platform].l_f_s.push(lfs[0]?.[`${v}.count`] || 0);
+                result.data[platform].is_booked.push(booked[0]?.[`${v}.count`] || 0);
+                result.data[platform].sent_to_verification.push(verified[0]?.[`${v}.count`] || 0);
+                result.data[platform].is_booked_covered.push(covered[0]?.[`${v}.count`] || 0);
+                result.data[platform].initial_fulfilled.push(fulfilled[0]?.[`${v}.count`] || 0);
+            }
+        }
+        
+        // Also get totals across all platforms
+        result.data.all = {
+            l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: []
+        };
+        
+        for (let i = 0; i < months.length; i++) {
+            result.data.all.l_f_s.push(platforms.reduce((sum, p) => sum + result.data[p].l_f_s[i], 0));
+            result.data.all.is_booked.push(platforms.reduce((sum, p) => sum + result.data[p].is_booked[i], 0));
+            result.data.all.sent_to_verification.push(platforms.reduce((sum, p) => sum + result.data[p].sent_to_verification[i], 0));
+            result.data.all.is_booked_covered.push(platforms.reduce((sum, p) => sum + result.data[p].is_booked_covered[i], 0));
+            result.data.all.initial_fulfilled.push(platforms.reduce((sum, p) => sum + result.data[p].initial_fulfilled[i], 0));
+        }
+        
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Monthly cost trends error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 // Get visitor journey - all events for a specific visitor ID
 app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {

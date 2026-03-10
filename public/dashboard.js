@@ -3030,9 +3030,170 @@ async function loadFunnelsData() {
             console.error("Overall journey load error:", journeyErr);
         }
         
+        // Load monthly cost trend chart
+        loadMonthlyCostTrends();
+        
     } catch (e) {
         console.error('Error loading funnels data:', e);
     }
+}
+
+// Monthly Cost Per Stage Trends Chart
+let costTrendChart = null;
+let costTrendData = null;
+let costTrendSpendData = null;
+
+async function loadMonthlyCostTrends() {
+    const container = document.getElementById('costTrendChartContainer');
+    const loading = document.getElementById('costTrendLoading');
+    
+    if (!container) return;
+    
+    loading.style.display = 'block';
+    
+    try {
+        // Fetch funnel data from Looker
+        const funnelRes = await fetch('/api/looker/monthly-cost-trends');
+        const funnelData = await funnelRes.json();
+        
+        if (!funnelData.success) {
+            throw new Error(funnelData.error || 'Failed to load funnel data');
+        }
+        
+        costTrendData = funnelData;
+        
+        // Fetch monthly spend data from each platform
+        const months = funnelData.months;
+        costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
+        
+        // For now, we'll use placeholder spend data
+        // In production, this would come from the ad platform APIs
+        // We'll estimate based on the l_f_s counts and typical CPLs
+        const estimatedCPL = { mutm: 150, g1utm: 200, butm: 180, tutm: 120 };
+        
+        for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
+            costTrendSpendData[platform] = funnelData.data[platform].l_f_s.map(
+                count => count * estimatedCPL[platform]
+            );
+        }
+        
+        // Calculate all sources spend
+        for (let i = 0; i < months.length; i++) {
+            costTrendSpendData.all.push(
+                costTrendSpendData.mutm[i] + costTrendSpendData.g1utm[i] + 
+                costTrendSpendData.butm[i] + costTrendSpendData.tutm[i]
+            );
+        }
+        
+        renderCostTrendChart('all');
+        
+        // Setup filter
+        document.getElementById('costTrendSourceFilter').addEventListener('change', (e) => {
+            renderCostTrendChart(e.target.value);
+        });
+        
+        loading.style.display = 'none';
+    } catch (error) {
+        console.error('Cost trend error:', error);
+        loading.innerHTML = `<div class="error">Error loading trend data: ${error.message}</div>`;
+    }
+}
+
+function renderCostTrendChart(source) {
+    if (!costTrendData || !costTrendSpendData) return;
+    
+    const ctx = document.getElementById('costTrendChart').getContext('2d');
+    const data = costTrendData.data[source];
+    const spend = costTrendSpendData[source];
+    
+    // Calculate cost per stage for each month
+    const costPerLfs = data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null);
+    const costPerBooked = data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null);
+    const costPerVerified = data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null);
+    const costPerCovered = data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null);
+    const costPerFulfilled = data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null);
+    
+    if (costTrendChart) {
+        costTrendChart.destroy();
+    }
+    
+    const sourceNames = { all: 'All Sources', mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok' };
+    
+    costTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costTrendData.months,
+            datasets: [
+                {
+                    label: 'Cost per l_f_s',
+                    data: costPerLfs,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Cost per Is Booked',
+                    data: costPerBooked,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Cost per Sent to Verif.',
+                    data: costPerVerified,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Cost per Booked Covered',
+                    data: costPerCovered,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Cost per Fulfilled',
+                    data: costPerFulfilled,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Cost Per Stage Trends - ${sourceNames[source]}`,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Load Medwork funnel for Funnels view
