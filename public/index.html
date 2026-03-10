@@ -98,7 +98,7 @@
             
                 <div class="nav-section">
                     <button class="nav-item nav-item-main" data-view="oursPrivacy">🔒 Ours Privacy</button>
-                    <button class="nav-item nav-item-main" data-view="clinicPerformance">🏥 Clinic Performance</button>
+                    <button class="nav-item nav-item-main" data-view="clinicPerformance">📈 Platform Funnel</button>
                 </div>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -2100,23 +2100,23 @@
 
         <!-- Clinic Performance View -->
         <div id="clinicPerformanceView" class="view-content hidden">
-            <h1>🏥 Clinic Performance Analysis</h1>
-            <p class="section-subtitle">Clicks vs Booked appointments by clinic location</p>
+            <h1>🏥 Platform Performance Analysis</h1>
+            <p class="section-subtitle">Leads → Booked → Fulfilled funnel by ad platform</p>
             
-            <div id="clinicPerfLoading" class="loading">Loading clinic data...</div>
+            <div id="clinicPerfLoading" class="loading">Loading performance data...</div>
             
             <!-- KPI Cards -->
             <div id="clinicPerfKpis" class="kpi-cards" style="display: none;">
                 <div class="kpi-card">
-                    <div class="kpi-label">Correlation (Clicks↔Booked)</div>
+                    <div class="kpi-label">Lead → Booked Rate</div>
                     <div class="kpi-value" id="clinicPerfCorrelation">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Clinics with Data</div>
+                    <div class="kpi-label">Platforms</div>
                     <div class="kpi-value" id="clinicPerfClinicsCount">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Total Clicks</div>
+                    <div class="kpi-label">Total Leads</div>
                     <div class="kpi-value" id="clinicPerfTotalClicks">-</div>
                 </div>
                 <div class="kpi-card">
@@ -2124,14 +2124,14 @@
                     <div class="kpi-value" id="clinicPerfTotalBooked">-</div>
                 </div>
                 <div class="kpi-card highlight">
-                    <div class="kpi-label">Avg Conversion</div>
+                    <div class="kpi-label">Booked → Fulfilled %</div>
                     <div class="kpi-value" id="clinicPerfAvgConversion">-</div>
                 </div>
             </div>
             
             <!-- Chart -->
             <section id="clinicPerfChartContainer" class="chart-section" style="display: none;">
-                <h2>📊 Clicks vs Booked by Clinic (Top 15)</h2>
+                <h2>📊 Funnel by Platform</h2>
                 <div class="chart-container">
                     <canvas id="clinicPerfChart"></canvas>
                 </div>
@@ -2139,18 +2139,18 @@
             
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
-                <h2>📋 All Clinics</h2>
+                <h2>📋 Platform Breakdown</h2>
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
-                                <th>Clinic</th>
-                                <th>Impressions</th>
-                                <th>Clicks</th>
+                                <th>Platform</th>
+                                <th>Leads (L_F_S)</th>
                                 <th>Booked</th>
-                                <th>Conv %</th>
-                                <th>CTR</th>
-                                <th>Zipcodes</th>
+                                <th>Sent to Verif.</th>
+                                <th>Covered</th>
+                                <th>Fulfilled</th>
+                                <th>Lead→Booked %</th>
                             </tr>
                         </thead>
                         <tbody id="clinicPerfTableBody"></tbody>

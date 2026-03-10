@@ -7105,34 +7105,49 @@ async function loadClinicPerformanceData() {
             endDate = formatDateEST(end);
         }
         
-        const response = await fetch(`/api/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
+        // Use the Looker funnel data instead
+        const response = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`);
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || 'Failed to load clinic data');
+            throw new Error(result.error || 'Failed to load data');
         }
         
-        const { clinics, correlation, summary } = result;
+        const { funnel, totals } = result;
+        
+        // Transform funnel data for clinic view (by platform as proxy)
+        const platforms = Object.keys(funnel).filter(k => funnel[k].l_f_s > 0);
+        const platformNames = { mutm: 'Meta', outm: 'Organic', tutm: 'TikTok', g1utm: 'Google', butm: 'Bing', gbputm: 'GBP' };
+        
+        const clinicsData = platforms.map(p => ({
+            clinic: platformNames[p] || p,
+            clicks: funnel[p].l_f_s || 0,
+            booked: funnel[p].is_booked || 0,
+            verified: funnel[p].sent_to_verification || 0,
+            covered: funnel[p].is_booked_covered || 0,
+            fulfilled: funnel[p].initial_fulfilled || 0
+        }));
         
         // Update KPIs
-        document.getElementById('clinicPerfCorrelation').textContent = correlation.clicks_vs_booked || '-';
-        document.getElementById('clinicPerfClinicsCount').textContent = summary.clinicsWithData;
-        document.getElementById('clinicPerfTotalClicks').textContent = summary.totalClicks.toLocaleString();
-        document.getElementById('clinicPerfTotalBooked').textContent = summary.totalBooked.toLocaleString();
-        const avgConv = summary.totalClicks > 0 ? ((summary.totalBooked / summary.totalClicks) * 100).toFixed(1) : 0;
+        const totalLfs = clinicsData.reduce((s, c) => s + c.clicks, 0);
+        const totalBooked = clinicsData.reduce((s, c) => s + c.booked, 0);
+        const totalFulfilled = clinicsData.reduce((s, c) => s + c.fulfilled, 0);
+        
+        document.getElementById('clinicPerfCorrelation').textContent = totalLfs > 0 ? ((totalBooked / totalLfs) * 100).toFixed(1) + '%' : '-';
+        document.getElementById('clinicPerfClinicsCount').textContent = platforms.length;
+        document.getElementById('clinicPerfTotalClicks').textContent = totalLfs.toLocaleString();
+        document.getElementById('clinicPerfTotalBooked').textContent = totalBooked.toLocaleString();
+        const avgConv = totalBooked > 0 ? ((totalFulfilled / totalBooked) * 100).toFixed(1) : 0;
         document.getElementById('clinicPerfAvgConversion').textContent = avgConv + '%';
         
-        // Filter clinics with data
-        const clinicsWithData = clinics.filter(c => c.booked > 0 || c.clicks > 0);
-        
         // Render chart
-        renderClinicPerfChart(clinicsWithData);
+        renderClinicPerfChart(clinicsData);
         
         // Render table
-        renderClinicPerfTable(clinicsWithData);
+        renderClinicPerfTable(clinicsData);
         
         // Generate insights
-        generateClinicPerfInsights(clinicsWithData, correlation);
+        generateClinicPerfInsights(clinicsData, { clicks_vs_booked: (totalBooked / totalLfs).toFixed(2) });
         
         loading.style.display = 'none';
         kpis.style.display = 'flex';
@@ -7150,8 +7165,8 @@ async function loadClinicPerformanceData() {
 function renderClinicPerfChart(clinics) {
     const ctx = document.getElementById('clinicPerfChart').getContext('2d');
     
-    // Sort by booked descending, take top 15
-    const top = clinics.filter(c => c.booked > 0).sort((a, b) => b.booked - a.booked).slice(0, 15);
+    // Sort by booked descending
+    const sorted = [...clinics].sort((a, b) => b.booked - a.booked);
     
     if (clinicPerfChart) {
         clinicPerfChart.destroy();
@@ -7160,23 +7175,28 @@ function renderClinicPerfChart(clinics) {
     clinicPerfChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: top.map(c => c.clinic),
+            labels: sorted.map(c => c.clinic),
             datasets: [
                 {
-                    label: 'Clicks',
-                    data: top.map(c => c.clicks),
+                    label: 'Leads (L_F_S)',
+                    data: sorted.map(c => c.clicks),
                     backgroundColor: 'rgba(99, 102, 241, 0.7)',
                     borderColor: '#6366f1',
-                    borderWidth: 1,
-                    yAxisID: 'y'
+                    borderWidth: 1
                 },
                 {
                     label: 'Booked',
-                    data: top.map(c => c.booked),
+                    data: sorted.map(c => c.booked),
                     backgroundColor: 'rgba(16, 185, 129, 0.7)',
                     borderColor: '#10b981',
-                    borderWidth: 1,
-                    yAxisID: 'y1'
+                    borderWidth: 1
+                },
+                {
+                    label: 'Fulfilled',
+                    data: sorted.map(c => c.fulfilled),
+                    backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                    borderColor: '#f59e0b',
+                    borderWidth: 1
                 }
             ]
         },
@@ -7188,15 +7208,8 @@ function renderClinicPerfChart(clinics) {
             },
             scales: {
                 y: {
-                    type: 'linear',
-                    position: 'left',
-                    title: { display: true, text: 'Clicks' }
-                },
-                y1: {
-                    type: 'linear',
-                    position: 'right',
-                    title: { display: true, text: 'Booked' },
-                    grid: { drawOnChartArea: false }
+                    beginAtZero: true,
+                    title: { display: true, text: 'Count' }
                 }
             }
         }
@@ -7207,20 +7220,21 @@ function renderClinicPerfTable(clinics) {
     const tbody = document.getElementById('clinicPerfTableBody');
     
     // Sort by booked descending
-    const sorted = clinics.filter(c => c.booked > 0 || c.clicks > 0).sort((a, b) => b.booked - a.booked);
+    const sorted = [...clinics].sort((a, b) => b.booked - a.booked);
     
     tbody.innerHTML = sorted.map(c => {
         const convRate = c.clicks > 0 ? ((c.booked / c.clicks) * 100).toFixed(1) : '-';
-        const convClass = c.clicks > 0 ? (c.booked / c.clicks >= 0.2 ? 'qs-good' : c.booked / c.clicks >= 0.1 ? 'qs-ok' : 'qs-low') : '';
+        const fulfillRate = c.booked > 0 ? ((c.fulfilled / c.booked) * 100).toFixed(1) : '-';
+        const convClass = c.clicks > 0 ? (c.booked / c.clicks >= 0.5 ? 'qs-good' : c.booked / c.clicks >= 0.3 ? 'qs-ok' : 'qs-low') : '';
         return `
             <tr>
                 <td><strong>${c.clinic}</strong></td>
-                <td>${c.impressions.toLocaleString()}</td>
                 <td>${c.clicks.toLocaleString()}</td>
                 <td><strong>${c.booked}</strong></td>
+                <td>${c.verified || 0}</td>
+                <td>${c.covered || 0}</td>
+                <td>${c.fulfilled || 0}</td>
                 <td class="${convClass}">${convRate}%</td>
-                <td>${c.ctr}%</td>
-                <td>${c.zipcodes}</td>
             </tr>
         `;
     }).join('');
