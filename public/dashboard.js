@@ -3721,23 +3721,37 @@ async function loadSummaryData() {
         const today = getESTDate();
         const dates = [];
         
-        // Determine number of days based on current range
-        let numDays = range.days || 14;
-        if (range.preset === 'today') numDays = 1;
-        if (range.preset === 'yesterday') numDays = 1;
+        let startDate, endDate;
         
-        // For today/yesterday, adjust the start date
-        let startOffset = 0;
-        if (range.preset === 'yesterday') startOffset = 1;
-        
-        for (let i = startOffset; i < numDays + startOffset; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            dates.push(formatDateEST(d));
+        // Handle custom date range
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+            // Generate dates array for custom range
+            const start = new Date(customStartDate + 'T12:00:00');
+            const end = new Date(customEndDate + 'T12:00:00');
+            for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
+                dates.push(formatDateEST(new Date(d)));
+            }
+        } else {
+            // Determine number of days based on current range
+            let numDays = range.days || 14;
+            if (range.preset === 'today') numDays = 1;
+            if (range.preset === 'yesterday') numDays = 1;
+            
+            // For today/yesterday, adjust the start date
+            let startOffset = 0;
+            if (range.preset === 'yesterday') startOffset = 1;
+            
+            for (let i = startOffset; i < numDays + startOffset; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                dates.push(formatDateEST(d));
+            }
+            
+            startDate = dates[dates.length - 1];
+            endDate = dates[0];
         }
-        
-        const startDate = dates[dates.length - 1];
-        const endDate = dates[0];
         
         // Fetch daily data from API (Google + Bing)
         const dailyResponse = await fetch('/api/summary/daily', {
