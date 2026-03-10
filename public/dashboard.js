@@ -443,6 +443,7 @@ function initializeDashboard() {
             document.getElementById('tiktokView').classList.toggle('hidden', currentView !== 'tiktok');
             document.getElementById('tiktokAdsView').classList.toggle('hidden', currentView !== 'tiktokAds');
             document.getElementById('oursPrivacyView').classList.toggle('hidden', currentView !== 'oursPrivacy');
+            document.getElementById('clinicPerformanceView').classList.toggle('hidden', currentView !== 'clinicPerformance');
             
             // Load data for the selected view
             if (currentView === 'heatmap' && !heatmapDataLoaded) {
@@ -501,6 +502,9 @@ function initializeDashboard() {
             }
             if (currentView === 'googleAdsCreative' && !googleAdsDataLoaded) {
                 loadGoogleAdsData();
+            }
+            if (currentView === 'clinicPerformance' && !clinicPerfDataLoaded) {
+                loadClinicPerformanceData();
             }
         });
     });
