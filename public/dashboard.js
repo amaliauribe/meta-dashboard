@@ -33,6 +33,7 @@ let bingKeywordsDataLoaded = false;
 let bingQsHistoryDataLoaded = false;
 let bingQsHistoryRawData = [];
 let bingQsHistorySearchText = '';
+let bingQsHistoryStatusFilter = 'all';
 let bingQsHistoryChart = null;
 let bingKeywordsRawData = [];
 let bingKeywordsSortColumn = 'clicks';
@@ -97,6 +98,7 @@ let googleKeywordsAdGroupFilter = '';
 
 // QS History search
 let qsHistorySearchText = '';
+let qsHistoryStatusFilter = 'all';
 let qsHistoryRawData = [];
 
 // Geographic state
@@ -651,6 +653,11 @@ function initializeDashboard() {
         renderQsHistoryTable();
     });
     
+    document.getElementById('qsHistoryStatusFilter').addEventListener('change', (e) => {
+        qsHistoryStatusFilter = e.target.value;
+        renderQsHistoryTable();
+    });
+    
     // Sortable column headers for Geographic table
     document.querySelectorAll('#geoTable th.sortable').forEach(th => {
         th.addEventListener('click', () => {
@@ -770,6 +777,11 @@ function initializeDashboard() {
     // Bing QS History search
     document.getElementById('bingQsHistorySearch').addEventListener('input', (e) => {
         bingQsHistorySearchText = e.target.value.toLowerCase();
+        renderBingQsHistoryTable();
+    });
+    
+    document.getElementById('bingQsHistoryStatusFilter').addEventListener('change', (e) => {
+        bingQsHistoryStatusFilter = e.target.value;
         renderBingQsHistoryTable();
     });
     
@@ -4552,9 +4564,21 @@ function renderQsHistoryTable() {
     // Filter by search text
     let filtered = qsHistoryRawData;
     if (qsHistorySearchText) {
-        filtered = qsHistoryRawData.filter(kw => 
+        filtered = filtered.filter(kw => 
             kw.keyword.toLowerCase().includes(qsHistorySearchText)
         );
+    }
+    
+    // Filter by status (improved/stable/declined)
+    if (qsHistoryStatusFilter !== 'all') {
+        filtered = filtered.filter(kw => {
+            const compareValue = kw.qs7dAgo || kw.qs30dAgo;
+            const change = kw.currentQs && compareValue ? kw.currentQs - compareValue : 0;
+            if (qsHistoryStatusFilter === 'improved') return change > 0;
+            if (qsHistoryStatusFilter === 'declined') return change < 0;
+            if (qsHistoryStatusFilter === 'stable') return change === 0;
+            return true;
+        });
     }
     
     // Build table
@@ -4595,7 +4619,7 @@ function renderQsHistoryTable() {
     }).join('');
     
     if (filtered.length === 0) {
-        document.getElementById('qsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the search</td></tr>';
+        document.getElementById('qsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the filters</td></tr>';
     }
 }
 
@@ -5223,6 +5247,18 @@ function renderBingQsHistoryTable() {
         filtered = filtered.filter(kw => kw.keyword.toLowerCase().includes(bingQsHistorySearchText));
     }
     
+    // Filter by status (improved/stable/declined)
+    if (bingQsHistoryStatusFilter !== 'all') {
+        filtered = filtered.filter(kw => {
+            const compareValue = kw.qs7dAgo || kw.qs30dAgo;
+            const change = kw.currentQs && compareValue ? kw.currentQs - compareValue : 0;
+            if (bingQsHistoryStatusFilter === 'improved') return change > 0;
+            if (bingQsHistoryStatusFilter === 'declined') return change < 0;
+            if (bingQsHistoryStatusFilter === 'stable') return change === 0;
+            return true;
+        });
+    }
+    
     document.getElementById('bingQsHistoryBody').innerHTML = filtered.map(kw => {
         const currentQs = kw.currentQs || '-';
         const qs7d = kw.qs7dAgo || '-';
@@ -5258,7 +5294,7 @@ function renderBingQsHistoryTable() {
     }).join('');
     
     if (filtered.length === 0) {
-        document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the search</td></tr>';
+        document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the filters</td></tr>';
     }
 }
 

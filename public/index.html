@@ -1108,8 +1108,14 @@
             </section>
             
             <!-- Filter -->
-            <div class="filter-row" style="margin-bottom: 15px;">
+            <div class="filter-row" style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
                 <input type="text" id="bingQsHistorySearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+                <select id="bingQsHistoryStatusFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="all">All Keywords</option>
+                    <option value="improved">🟢 Improved</option>
+                    <option value="stable">⚪ Stable</option>
+                    <option value="declined">🔴 Declined</option>
+                </select>
             </div>
             
             <!-- QS History Table -->
@@ -1576,8 +1582,14 @@
             <!-- QS History Table -->
             <section class="table-section">
                 <h2>🎯 Keyword Quality Score Trends</h2>
-                <div class="filter-row" style="margin-bottom: 15px;">
+                <div class="filter-row" style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
                     <input type="text" id="qsHistorySearch" placeholder="🔍 Search keywords..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+                    <select id="qsHistoryStatusFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="all">All Keywords</option>
+                        <option value="improved">🟢 Improved</option>
+                        <option value="stable">⚪ Stable</option>
+                        <option value="declined">🔴 Declined</option>
+                    </select>
                 </div>
                 <div class="table-wrapper">
                     <table id="qsHistoryTable">
