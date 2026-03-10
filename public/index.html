@@ -2101,7 +2101,7 @@
         <!-- Clinic Performance View -->
         <div id="clinicPerformanceView" class="view-content hidden">
             <h1>🏥 Clinic Performance Analysis</h1>
-            <p class="section-subtitle">Leads → Booked → Fulfilled funnel by clinic location</p>
+            <p class="section-subtitle">Predict clinic success: How many bookings per 100 leads?</p>
             
             <div id="clinicPerfLoading" class="loading">Loading clinic data...</div>
             
@@ -2112,7 +2112,7 @@
                     <div class="kpi-value" id="clinicPerfCorrelation">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Clinics with Data</div>
+                    <div class="kpi-label">Clinics</div>
                     <div class="kpi-value" id="clinicPerfClinicsCount">-</div>
                 </div>
                 <div class="kpi-card">
@@ -2124,14 +2124,14 @@
                     <div class="kpi-value" id="clinicPerfTotalBooked">-</div>
                 </div>
                 <div class="kpi-card highlight">
-                    <div class="kpi-label">Booked → Fulfilled %</div>
+                    <div class="kpi-label">Avg Booked/100 Leads</div>
                     <div class="kpi-value" id="clinicPerfAvgConversion">-</div>
                 </div>
             </div>
             
             <!-- Chart -->
             <section id="clinicPerfChartContainer" class="chart-section" style="display: none;">
-                <h2>📊 Funnel by Clinic (Top 15)</h2>
+                <h2>📊 Booked per 100 Leads by Clinic</h2>
                 <div class="chart-container">
                     <canvas id="clinicPerfChart"></canvas>
                 </div>
@@ -2139,7 +2139,8 @@
             
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
-                <h2>📋 All Clinics</h2>
+                <h2>📋 Clinic Conversion Ranking</h2>
+                <p class="table-subtitle">Sorted by Booked/100 Leads — higher = better conversion</p>
                 <div class="table-wrapper">
                     <table>
                         <thead>
@@ -2147,10 +2148,9 @@
                                 <th>Clinic</th>
                                 <th>Leads</th>
                                 <th>Booked</th>
-                                <th>Sent to Verif.</th>
-                                <th>Covered</th>
+                                <th class="highlight-col">Booked/100 Leads</th>
                                 <th>Fulfilled</th>
-                                <th>Lead→Booked %</th>
+                                <th>Fulfill Rate</th>
                             </tr>
                         </thead>
                         <tbody id="clinicPerfTableBody"></tbody>
