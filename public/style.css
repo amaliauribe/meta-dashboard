@@ -774,10 +774,12 @@ footer {
 .summary-table .total-row {
     background: #f8f9fa;
     border-top: 2px solid #ddd;
+    color: #333;
 }
 
 .summary-table .total-row td {
     font-weight: 600;
+    color: #333;
 }
 
 .summary-table tfoot tr {
