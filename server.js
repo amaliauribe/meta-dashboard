@@ -3382,6 +3382,103 @@ app.get("/api/ours-privacy/converted-visitors", (req, res) => {
 });
 
 // ==================== Clinic Performance ====================
+// Query Looker by location_lead (clinic)
+app.get('/api/looker/clinic-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, error: 'Missing startDate or endDate' });
+        }
+        
+        // Build date filter
+        let dateFilter = {};
+        if (startDate === endDate) {
+            dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = startDate;
+        } else {
+            dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = `${startDate} to ${endDate}`;
+        }
+        
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const fields = [`${v}.location_lead`, `${v}.count`];
+        const sorts = [`${v}.count desc`];
+        
+        // Run all queries in parallel - grouped by location_lead
+        const [totalLeads, isBooked, sentToVerification, isBookedCovered, initialFulfilled] = await Promise.all([
+            lookerQuery(v, fields, dateFilter, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.sent_to_verification`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked_covered`]: '1' }, sorts),
+            lookerQuery(v, fields, { ...dateFilter, [`${v}.initial_fulfilled`]: '1' }, sorts)
+        ]);
+        
+        // Helper to convert array to map by location
+        const toMap = (arr) => {
+            const map = {};
+            arr.forEach(item => {
+                const loc = item['fct_leads_funnel_marketing_phi_exclude.location_lead'] || 'Unknown';
+                map[loc] = item['fct_leads_funnel_marketing_phi_exclude.count'] || 0;
+            });
+            return map;
+        };
+        
+        const totalMap = toMap(totalLeads);
+        const bookedMap = toMap(isBooked);
+        const verificationMap = toMap(sentToVerification);
+        const coveredMap = toMap(isBookedCovered);
+        const fulfilledMap = toMap(initialFulfilled);
+        
+        // Build clinic data
+        const allClinics = new Set([
+            ...Object.keys(totalMap),
+            ...Object.keys(bookedMap),
+            ...Object.keys(fulfilledMap)
+        ]);
+        
+        const clinics = Array.from(allClinics)
+            .filter(c => c && c !== 'Unknown' && c !== '')
+            .map(clinic => ({
+                clinic,
+                leads: totalMap[clinic] || 0,
+                booked: bookedMap[clinic] || 0,
+                verified: verificationMap[clinic] || 0,
+                covered: coveredMap[clinic] || 0,
+                fulfilled: fulfilledMap[clinic] || 0
+            }))
+            .filter(c => c.leads > 0 || c.booked > 0);
+        
+        // Calculate totals
+        const totalLeadsCount = clinics.reduce((s, c) => s + c.leads, 0);
+        const totalBooked = clinics.reduce((s, c) => s + c.booked, 0);
+        const totalFulfilled = clinics.reduce((s, c) => s + c.fulfilled, 0);
+        
+        // Calculate correlation
+        let correlation = 'N/A';
+        const withData = clinics.filter(c => c.leads > 0 && c.booked > 0);
+        if (withData.length >= 3) {
+            const leads = withData.map(c => c.leads);
+            const booked = withData.map(c => c.booked);
+            correlation = calculateCorrelation(leads, booked).toFixed(2);
+        }
+        
+        res.json({
+            success: true,
+            clinics: clinics.sort((a, b) => b.booked - a.booked),
+            summary: {
+                clinicsWithData: clinics.length,
+                totalLeads: totalLeadsCount,
+                totalBooked,
+                totalFulfilled
+            },
+            correlation: { leads_vs_booked: correlation }
+        });
+        
+    } catch (error) {
+        console.error('Clinic performance Looker error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // VTC Clinic zipcode mappings
 const CLINIC_ZIPCODES = {
     'Astoria': ['11102', '11103', '11105', '11106', '11370', '11371', '11372', '11373'],

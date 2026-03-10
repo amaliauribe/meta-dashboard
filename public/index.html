@@ -98,7 +98,7 @@
             
                 <div class="nav-section">
                     <button class="nav-item nav-item-main" data-view="oursPrivacy">🔒 Ours Privacy</button>
-                    <button class="nav-item nav-item-main" data-view="clinicPerformance">📈 Platform Funnel</button>
+                    <button class="nav-item nav-item-main" data-view="clinicPerformance">🏥 Clinic Performance</button>
                 </div>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -2100,19 +2100,19 @@
 
         <!-- Clinic Performance View -->
         <div id="clinicPerformanceView" class="view-content hidden">
-            <h1>🏥 Platform Performance Analysis</h1>
-            <p class="section-subtitle">Leads → Booked → Fulfilled funnel by ad platform</p>
+            <h1>🏥 Clinic Performance Analysis</h1>
+            <p class="section-subtitle">Leads → Booked → Fulfilled funnel by clinic location</p>
             
-            <div id="clinicPerfLoading" class="loading">Loading performance data...</div>
+            <div id="clinicPerfLoading" class="loading">Loading clinic data...</div>
             
             <!-- KPI Cards -->
             <div id="clinicPerfKpis" class="kpi-cards" style="display: none;">
                 <div class="kpi-card">
-                    <div class="kpi-label">Lead → Booked Rate</div>
+                    <div class="kpi-label">Correlation (Leads↔Booked)</div>
                     <div class="kpi-value" id="clinicPerfCorrelation">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Platforms</div>
+                    <div class="kpi-label">Clinics with Data</div>
                     <div class="kpi-value" id="clinicPerfClinicsCount">-</div>
                 </div>
                 <div class="kpi-card">
@@ -2131,7 +2131,7 @@
             
             <!-- Chart -->
             <section id="clinicPerfChartContainer" class="chart-section" style="display: none;">
-                <h2>📊 Funnel by Platform</h2>
+                <h2>📊 Funnel by Clinic (Top 15)</h2>
                 <div class="chart-container">
                     <canvas id="clinicPerfChart"></canvas>
                 </div>
@@ -2139,13 +2139,13 @@
             
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
-                <h2>📋 Platform Breakdown</h2>
+                <h2>📋 All Clinics</h2>
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
-                                <th>Platform</th>
-                                <th>Leads (L_F_S)</th>
+                                <th>Clinic</th>
+                                <th>Leads</th>
                                 <th>Booked</th>
                                 <th>Sent to Verif.</th>
                                 <th>Covered</th>

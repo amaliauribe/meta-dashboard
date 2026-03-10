@@ -7105,39 +7105,32 @@ async function loadClinicPerformanceData() {
             endDate = formatDateEST(end);
         }
         
-        // Use the Looker funnel data instead
-        const response = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`);
+        // Use the Looker clinic-performance endpoint (queries by location_lead)
+        const response = await fetch(`/api/looker/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
         const result = await response.json();
         
         if (!result.success) {
             throw new Error(result.error || 'Failed to load data');
         }
         
-        const { funnel, totals } = result;
+        const { clinics, summary, correlation } = result;
         
-        // Transform funnel data for clinic view (by platform as proxy)
-        const platforms = Object.keys(funnel).filter(k => funnel[k].l_f_s > 0);
-        const platformNames = { mutm: 'Meta', outm: 'Organic', tutm: 'TikTok', g1utm: 'Google', butm: 'Bing', gbputm: 'GBP' };
-        
-        const clinicsData = platforms.map(p => ({
-            clinic: platformNames[p] || p,
-            clicks: funnel[p].l_f_s || 0,
-            booked: funnel[p].is_booked || 0,
-            verified: funnel[p].sent_to_verification || 0,
-            covered: funnel[p].is_booked_covered || 0,
-            fulfilled: funnel[p].initial_fulfilled || 0
+        // Map clinic data for display
+        const clinicsData = clinics.map(c => ({
+            clinic: c.clinic,
+            clicks: c.leads,
+            booked: c.booked,
+            verified: c.verified,
+            covered: c.covered,
+            fulfilled: c.fulfilled
         }));
         
         // Update KPIs
-        const totalLfs = clinicsData.reduce((s, c) => s + c.clicks, 0);
-        const totalBooked = clinicsData.reduce((s, c) => s + c.booked, 0);
-        const totalFulfilled = clinicsData.reduce((s, c) => s + c.fulfilled, 0);
-        
-        document.getElementById('clinicPerfCorrelation').textContent = totalLfs > 0 ? ((totalBooked / totalLfs) * 100).toFixed(1) + '%' : '-';
-        document.getElementById('clinicPerfClinicsCount').textContent = platforms.length;
-        document.getElementById('clinicPerfTotalClicks').textContent = totalLfs.toLocaleString();
-        document.getElementById('clinicPerfTotalBooked').textContent = totalBooked.toLocaleString();
-        const avgConv = totalBooked > 0 ? ((totalFulfilled / totalBooked) * 100).toFixed(1) : 0;
+        document.getElementById('clinicPerfCorrelation').textContent = correlation.leads_vs_booked || '-';
+        document.getElementById('clinicPerfClinicsCount').textContent = summary.clinicsWithData;
+        document.getElementById('clinicPerfTotalClicks').textContent = summary.totalLeads.toLocaleString();
+        document.getElementById('clinicPerfTotalBooked').textContent = summary.totalBooked.toLocaleString();
+        const avgConv = summary.totalBooked > 0 ? ((summary.totalFulfilled / summary.totalBooked) * 100).toFixed(1) : 0;
         document.getElementById('clinicPerfAvgConversion').textContent = avgConv + '%';
         
         // Render chart
@@ -7147,7 +7140,7 @@ async function loadClinicPerformanceData() {
         renderClinicPerfTable(clinicsData);
         
         // Generate insights
-        generateClinicPerfInsights(clinicsData, { clicks_vs_booked: (totalBooked / totalLfs).toFixed(2) });
+        generateClinicPerfInsights(clinicsData, correlation);
         
         loading.style.display = 'none';
         kpis.style.display = 'flex';
