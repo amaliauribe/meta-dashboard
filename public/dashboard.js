@@ -7245,15 +7245,36 @@ function renderClinicPerfChart(clinics) {
     });
 }
 
+let clinicPerfRawData = [];
+let clinicPerfSortColumn = 'bookedPer100Clicks';
+let clinicPerfSortDirection = 'desc';
+
 function renderClinicPerfTable(clinics) {
+    clinicPerfRawData = clinics;
+    sortAndRenderClinicPerfTable();
+    setupClinicPerfTableSorting();
+}
+
+function sortAndRenderClinicPerfTable() {
     const tbody = document.getElementById('clinicPerfTableBody');
     
-    // Sort by booked per 100 clicks (primary), then by booked per 100 leads
-    const sorted = [...clinics].sort((a, b) => {
-        const aRate = a.bookedPer100Clicks ?? -1;
-        const bRate = b.bookedPer100Clicks ?? -1;
-        if (bRate !== aRate) return bRate - aRate;
-        return (b.bookedPer100Leads || 0) - (a.bookedPer100Leads || 0);
+    const sorted = [...clinicPerfRawData].sort((a, b) => {
+        let aVal = a[clinicPerfSortColumn];
+        let bVal = b[clinicPerfSortColumn];
+        
+        // Handle null values - put them at the end
+        if (aVal === null || aVal === undefined) aVal = clinicPerfSortDirection === 'desc' ? -Infinity : Infinity;
+        if (bVal === null || bVal === undefined) bVal = clinicPerfSortDirection === 'desc' ? -Infinity : Infinity;
+        
+        // String comparison for clinic names
+        if (clinicPerfSortColumn === 'clinic') {
+            return clinicPerfSortDirection === 'asc' 
+                ? String(aVal).localeCompare(String(bVal))
+                : String(bVal).localeCompare(String(aVal));
+        }
+        
+        // Numeric comparison
+        return clinicPerfSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
     });
     
     tbody.innerHTML = sorted.map(c => {
@@ -7261,9 +7282,9 @@ function renderClinicPerfTable(clinics) {
         const leadRate = c.bookedPer100Leads;
         
         const clickRateClass = clickRate === null ? '' : 
-            clickRate >= 5 ? 'qs-good' : clickRate >= 2 ? 'qs-ok' : 'qs-low';
+            clickRate >= 10 ? 'qs-good' : clickRate >= 5 ? 'qs-good' : clickRate >= 2 ? 'qs-ok' : 'qs-low';
         const clickRateEmoji = clickRate === null ? '' :
-            clickRate >= 5 ? '⭐' : clickRate >= 2 ? '' : '⚠️';
+            clickRate >= 10 ? '🌟' : clickRate >= 5 ? '⭐' : clickRate >= 2 ? '' : '⚠️';
         
         return `
             <tr>
@@ -7272,10 +7293,39 @@ function renderClinicPerfTable(clinics) {
                 <td><strong>${c.booked}</strong></td>
                 <td class="${clickRateClass}"><strong>${clickRate !== null ? clickRate.toFixed(1) : '-'}</strong> ${clickRateEmoji}</td>
                 <td>${c.leads.toLocaleString()}</td>
-                <td>${leadRate !== null ? leadRate.toFixed(0) : '-'}</td>
+                <td>${leadRate !== null ? leadRate.toFixed(1) : '-'}</td>
             </tr>
         `;
     }).join('');
+}
+
+function setupClinicPerfTableSorting() {
+    const table = document.getElementById('clinicPerfTable');
+    if (!table) return;
+    
+    table.querySelectorAll('th.sortable').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.onclick = () => {
+            const column = th.dataset.sort;
+            
+            // Update sort direction
+            if (clinicPerfSortColumn === column) {
+                clinicPerfSortDirection = clinicPerfSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                clinicPerfSortColumn = column;
+                clinicPerfSortDirection = 'desc'; // Default to desc for new column
+            }
+            
+            // Update header styling
+            table.querySelectorAll('th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            th.classList.add(clinicPerfSortDirection);
+            
+            // Re-render
+            sortAndRenderClinicPerfTable();
+        };
+    });
 }
 
 function generateClinicPerfInsights(clinics, correlation) {

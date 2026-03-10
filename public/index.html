@@ -2141,17 +2141,17 @@
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
                 <h2>📋 Clinic Conversion Ranking</h2>
-                <p class="table-subtitle">Sorted by Booked/100 Clicks — higher = better conversion</p>
+                <p class="table-subtitle">Click column headers to sort</p>
                 <div class="table-wrapper">
-                    <table>
+                    <table id="clinicPerfTable">
                         <thead>
                             <tr>
-                                <th>Clinic</th>
-                                <th>Ad Clicks</th>
-                                <th>Booked</th>
-                                <th class="highlight-col">Booked/100 Clicks ⭐</th>
-                                <th>Leads</th>
-                                <th>Booked/100 Leads</th>
+                                <th class="sortable" data-sort="clinic">Clinic</th>
+                                <th class="sortable" data-sort="adClicks">Ad Clicks</th>
+                                <th class="sortable" data-sort="booked">Booked</th>
+                                <th class="sortable highlight-col desc" data-sort="bookedPer100Clicks">Booked/100 Clicks ⭐</th>
+                                <th class="sortable" data-sort="leads">Leads</th>
+                                <th class="sortable" data-sort="bookedPer100Leads">Booked/100 Leads</th>
                             </tr>
                         </thead>
                         <tbody id="clinicPerfTableBody"></tbody>
