@@ -3338,6 +3338,125 @@ app.get('/api/looker/monthly-cost-trends', async (req, res) => {
     }
 });
 
+// Weekly cost trends endpoint
+app.get('/api/looker/weekly-cost-trends', async (req, res) => {
+    try {
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+        
+        const { startDate, endDate } = req.query;
+        const weeks = [];
+        
+        if (startDate && endDate) {
+            // Generate weeks between start and end dates
+            const start = new Date(startDate + 'T12:00:00');
+            const end = new Date(endDate + 'T12:00:00');
+            
+            // Find the Monday of the start week
+            let current = new Date(start);
+            const dayOfWeek = current.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
+            current.setDate(current.getDate() + diff);
+            
+            while (current <= end) {
+                const weekStart = new Date(current);
+                const weekEnd = new Date(current);
+                weekEnd.setDate(weekEnd.getDate() + 6); // Sunday
+                
+                // Clamp to actual date range
+                const actualStart = weekStart < start ? start : weekStart;
+                const actualEnd = weekEnd > end ? end : weekEnd;
+                
+                // Format label as "Mon D - Mon D" (e.g., "Feb 3 - Feb 9")
+                const label = `${actualStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${actualEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                
+                weeks.push({
+                    label,
+                    start: actualStart.toISOString().split('T')[0],
+                    end: actualEnd.toISOString().split('T')[0]
+                });
+                
+                current.setDate(current.getDate() + 7); // Move to next week
+            }
+        } else {
+            // Default to last 8 weeks
+            const today = new Date();
+            for (let i = 7; i >= 0; i--) {
+                const weekEnd = new Date(today);
+                weekEnd.setDate(today.getDate() - (i * 7));
+                const weekStart = new Date(weekEnd);
+                weekStart.setDate(weekEnd.getDate() - 6);
+                
+                const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                
+                weeks.push({
+                    label,
+                    start: weekStart.toISOString().split('T')[0],
+                    end: weekEnd.toISOString().split('T')[0]
+                });
+            }
+        }
+        
+        const result = { weeks: weeks.map(w => w.label), data: {} };
+        
+        // Build queries
+        const allQueries = [];
+        const queryMeta = [];
+        const stages = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+        const stageFilters = {
+            l_f_s: {},
+            is_booked: { [`${v}.is_booked`]: '1' },
+            sent_to_verification: { [`${v}.sent_to_verification`]: '1' },
+            is_booked_covered: { [`${v}.is_booked_covered`]: '1' },
+            initial_fulfilled: { [`${v}.initial_fulfilled`]: '1' }
+        };
+        
+        for (const platform of platforms) {
+            for (let weekIdx = 0; weekIdx < weeks.length; weekIdx++) {
+                const week = weeks[weekIdx];
+                const dateFilter = { [`${v}.lead_created_date_est_date`]: `${week.start} to ${week.end}` };
+                const platformFilter = { ...dateFilter, [`${v}.tracking_type`]: platform };
+                
+                for (const stage of stages) {
+                    allQueries.push(lookerQuery(v, [`${v}.count`], { ...platformFilter, ...stageFilters[stage] }));
+                    queryMeta.push({ platform, weekIdx, stage });
+                }
+            }
+        }
+        
+        // Run all queries in parallel
+        const allResults = await Promise.all(allQueries);
+        
+        // Initialize result structure
+        for (const platform of platforms) {
+            result.data[platform] = { l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: [] };
+            for (let i = 0; i < weeks.length; i++) {
+                stages.forEach(s => result.data[platform][s].push(0));
+            }
+        }
+        
+        // Process results
+        allResults.forEach((res, idx) => {
+            const meta = queryMeta[idx];
+            const count = res[0]?.[`${v}.count`] || 0;
+            result.data[meta.platform][meta.stage][meta.weekIdx] = count;
+        });
+        
+        // Calculate totals across all platforms
+        result.data.all = { l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: [] };
+        for (let i = 0; i < weeks.length; i++) {
+            stages.forEach(stage => {
+                result.data.all[stage].push(platforms.reduce((sum, p) => sum + result.data[p][stage][i], 0));
+            });
+        }
+        
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Weekly cost trends error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 // Get visitor journey - all events for a specific visitor ID
 app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {

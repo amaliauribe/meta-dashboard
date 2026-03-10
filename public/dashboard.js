@@ -3048,8 +3048,11 @@ async function loadFunnelsData() {
 
 // Monthly Cost Per Stage Trends Chart
 let costTrendChart = null;
+let costTrendWeeklyChart = null;
 let costTrendData = null;
+let costTrendWeeklyData = null;
 let costTrendSpendData = null;
+let costTrendWeeklySpendData = null;
 let costTrendSource = 'all';
 let costTrendStage = 'all';
 let costTrendStartDate = null;
@@ -3058,6 +3061,7 @@ let costTrendFiltersInitialized = false;
 
 async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     const container = document.getElementById('costTrendChartContainer');
+    const weeklyContainer = document.getElementById('costTrendWeeklyContainer');
     const loading = document.getElementById('costTrendLoading');
     
     if (!container) return;
@@ -3066,76 +3070,138 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     if (startDate !== null) costTrendStartDate = startDate;
     if (endDate !== null) costTrendEndDate = endDate;
     
-    // Build API URL with date params
-    let apiUrl = '/api/looker/monthly-cost-trends';
+    // Build API URLs
+    let monthlyUrl = '/api/looker/monthly-cost-trends';
+    let weeklyUrl = '/api/looker/weekly-cost-trends';
     const params = [];
     if (costTrendStartDate) params.push(`startDate=${costTrendStartDate}`);
     if (costTrendEndDate) params.push(`endDate=${costTrendEndDate}`);
+    
     if (params.length > 0) {
-        apiUrl += '?' + params.join('&');
+        monthlyUrl += '?' + params.join('&');
+        weeklyUrl += '?' + params.join('&');
     } else {
-        // Default to 6 months if no dates specified
-        apiUrl += '?months=6';
+        // Default to last 30 days
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        costTrendStartDate = thirtyDaysAgo.toISOString().split('T')[0];
+        costTrendEndDate = today.toISOString().split('T')[0];
+        monthlyUrl += `?startDate=${costTrendStartDate}&endDate=${costTrendEndDate}`;
+        weeklyUrl += `?startDate=${costTrendStartDate}&endDate=${costTrendEndDate}`;
     }
     
     loading.style.display = 'block';
     container.style.opacity = '0.5';
+    if (weeklyContainer) weeklyContainer.style.opacity = '0.5';
     
     try {
-        // Fetch funnel data from Looker with date parameters
-        const funnelRes = await fetch(apiUrl);
-        const funnelData = await funnelRes.json();
+        // Fetch both monthly and weekly data in parallel
+        const [monthlyRes, weeklyRes] = await Promise.all([
+            fetch(monthlyUrl),
+            fetch(weeklyUrl)
+        ]);
         
-        if (!funnelData.success) {
-            throw new Error(funnelData.error || 'Failed to load funnel data');
+        const monthlyData = await monthlyRes.json();
+        const weeklyData = await weeklyRes.json();
+        
+        if (!monthlyData.success) {
+            throw new Error(monthlyData.error || 'Failed to load monthly data');
         }
         
-        costTrendData = funnelData;
+        costTrendData = monthlyData;
+        costTrendWeeklyData = weeklyData.success ? weeklyData : null;
         
-        // Fetch monthly spend data from each platform
-        const monthLabels = funnelData.months;
-        costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
-        
-        // For now, we'll use placeholder spend data
-        // In production, this would come from the ad platform APIs
-        // We'll estimate based on the l_f_s counts and typical CPLs
+        // Process monthly spend data
         const estimatedCPL = { mutm: 150, g1utm: 200, butm: 180, tutm: 120 };
         
+        costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
         for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
-            costTrendSpendData[platform] = funnelData.data[platform].l_f_s.map(
+            costTrendSpendData[platform] = monthlyData.data[platform].l_f_s.map(
                 count => count * estimatedCPL[platform]
             );
         }
-        
-        // Calculate all sources spend
-        for (let i = 0; i < monthLabels.length; i++) {
+        for (let i = 0; i < monthlyData.months.length; i++) {
             costTrendSpendData.all.push(
                 costTrendSpendData.mutm[i] + costTrendSpendData.g1utm[i] + 
                 costTrendSpendData.butm[i] + costTrendSpendData.tutm[i]
             );
         }
         
+        // Process weekly spend data
+        if (costTrendWeeklyData) {
+            costTrendWeeklySpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
+            for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
+                costTrendWeeklySpendData[platform] = weeklyData.data[platform].l_f_s.map(
+                    count => count * estimatedCPL[platform]
+                );
+            }
+            for (let i = 0; i < weeklyData.weeks.length; i++) {
+                costTrendWeeklySpendData.all.push(
+                    costTrendWeeklySpendData.mutm[i] + costTrendWeeklySpendData.g1utm[i] + 
+                    costTrendWeeklySpendData.butm[i] + costTrendWeeklySpendData.tutm[i]
+                );
+            }
+        }
+        
         renderCostTrendChart(costTrendSource, costTrendStage);
+        renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
         
         // Setup filters (only once)
         if (!costTrendFiltersInitialized) {
             document.getElementById('costTrendSourceFilter').addEventListener('change', (e) => {
                 costTrendSource = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
+                renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
             });
             
             document.getElementById('costTrendStageFilter').addEventListener('change', (e) => {
                 costTrendStage = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
+                renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
             });
             
-            // Initialize date pickers with default values (last 6 months)
+            // Initialize date pickers with default values (last 30 days)
             const today = new Date();
-            const sixMonthsAgo = new Date(today);
-            sixMonthsAgo.setMonth(today.getMonth() - 6);
+            const thirtyDaysAgo = new Date(today);
+            thirtyDaysAgo.setDate(today.getDate() - 30);
             
             document.getElementById('costTrendEndDate').value = today.toISOString().split('T')[0];
-            document.getElementById('costTrendStartDate').value = sixMonthsAgo.toISOString().split('T')[0];
+            document.getElementById('costTrendStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+            
+            // Preset buttons
+            document.querySelectorAll('.cost-trend-preset').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update active state
+                    document.querySelectorAll('.cost-trend-preset').forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'white';
+                        b.style.color = '#333';
+                    });
+                    btn.classList.add('active');
+                    btn.style.background = '#1877f2';
+                    btn.style.color = 'white';
+                    
+                    // Calculate date range
+                    const range = btn.dataset.range;
+                    const today = new Date();
+                    const start = new Date(today);
+                    
+                    if (range === '7d') start.setDate(today.getDate() - 7);
+                    else if (range === '14d') start.setDate(today.getDate() - 14);
+                    else if (range === '30d') start.setDate(today.getDate() - 30);
+                    else if (range === '90d') start.setDate(today.getDate() - 90);
+                    
+                    const startStr = start.toISOString().split('T')[0];
+                    const endStr = today.toISOString().split('T')[0];
+                    
+                    // Update date inputs
+                    document.getElementById('costTrendStartDate').value = startStr;
+                    document.getElementById('costTrendEndDate').value = endStr;
+                    
+                    loadMonthlyCostTrends(startStr, endStr);
+                });
+            });
             
             document.getElementById('costTrendApplyDate').addEventListener('click', () => {
                 const start = document.getElementById('costTrendStartDate').value;
@@ -3150,6 +3216,13 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                     return;
                 }
                 
+                // Clear preset active states
+                document.querySelectorAll('.cost-trend-preset').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'white';
+                    b.style.color = '#333';
+                });
+                
                 loadMonthlyCostTrends(start, end);
             });
             
@@ -3158,10 +3231,12 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         
         loading.style.display = 'none';
         container.style.opacity = '1';
+        if (weeklyContainer) weeklyContainer.style.opacity = '1';
     } catch (error) {
         console.error('Cost trend error:', error);
         loading.innerHTML = `<div class="error">Error loading trend data: ${error.message}</div>`;
         container.style.opacity = '1';
+        if (weeklyContainer) weeklyContainer.style.opacity = '1';
     }
 }
 
@@ -3253,6 +3328,127 @@ function renderCostTrendChart(source, stage = 'all') {
         type: 'line',
         data: {
             labels: costTrendData.months,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: titleText,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCostTrendWeeklyChart(source, stage = 'all') {
+    if (!costTrendWeeklyData || !costTrendWeeklySpendData) return;
+    
+    const canvas = document.getElementById('costTrendWeeklyChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const data = costTrendWeeklyData.data[source];
+    const spend = costTrendWeeklySpendData[source];
+    
+    // Calculate cost per stage for each week
+    const stageConfig = {
+        l_f_s: {
+            label: 'Cost per l_f_s',
+            data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)'
+        },
+        is_booked: {
+            label: 'Cost per Is Booked',
+            data: data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)'
+        },
+        sent_to_verification: {
+            label: 'Cost per Sent to Verif.',
+            data: data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)'
+        },
+        is_booked_covered: {
+            label: 'Cost per Booked Covered',
+            data: data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+        },
+        initial_fulfilled: {
+            label: 'Cost per Fulfilled',
+            data: data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)'
+        }
+    };
+    
+    // Build datasets based on stage filter
+    let datasets;
+    if (stage === 'all') {
+        datasets = Object.keys(stageConfig).map(key => ({
+            label: stageConfig[key].label,
+            data: stageConfig[key].data,
+            borderColor: stageConfig[key].borderColor,
+            backgroundColor: stageConfig[key].backgroundColor,
+            tension: 0.3,
+            fill: false
+        }));
+    } else {
+        const cfg = stageConfig[stage];
+        datasets = [{
+            label: cfg.label,
+            data: cfg.data,
+            borderColor: cfg.borderColor,
+            backgroundColor: cfg.backgroundColor,
+            tension: 0.3,
+            fill: true
+        }];
+    }
+    
+    if (costTrendWeeklyChart) {
+        costTrendWeeklyChart.destroy();
+    }
+    
+    const sourceNames = { all: 'All Sources', mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok' };
+    const stageNames = { 
+        all: 'All Stages',
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    const titleText = stage === 'all' 
+        ? `Weekly Trends - ${sourceNames[source]}`
+        : `${stageNames[stage]} by Week - ${sourceNames[source]}`;
+    
+    costTrendWeeklyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costTrendWeeklyData.weeks,
             datasets: datasets
         },
         options: {
