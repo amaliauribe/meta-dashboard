@@ -4071,7 +4071,16 @@ async function loadStateSpend(startDate, endDate) {
             
             if (googleData.locations) {
                 googleData.locations.forEach(row => {
-                    const state = row.state || row.location || 'Unknown';
+                    // Parse state from canonicalName (format: "zipcode,State,Country")
+                    let state = 'Unknown';
+                    if (row.canonicalName) {
+                        const parts = row.canonicalName.split(',');
+                        if (parts.length >= 2) {
+                            state = parts[1].trim(); // State is second part
+                        }
+                    } else {
+                        state = row.state || row.location || 'Unknown';
+                    }
                     const spend = parseFloat(row.cost) || 0;
                     
                     const matchedState = vtcStates.find(s => 
