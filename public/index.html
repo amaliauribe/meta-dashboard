@@ -337,15 +337,25 @@
                 <h2>📈 Monthly Cost Per Stage Trends</h2>
                 <p class="section-subtitle">Track cost efficiency through each funnel stage over time</p>
                 
-                <div class="filter-row" style="margin: 15px 0; display: flex; gap: 15px; align-items: center;">
-                    <label for="costTrendSourceFilter" style="font-weight: 500;">Source:</label>
-                    <select id="costTrendSourceFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
-                        <option value="all">All Sources</option>
-                        <option value="mutm">Meta</option>
-                        <option value="g1utm">Google</option>
-                        <option value="butm">Bing</option>
-                        <option value="tutm">TikTok</option>
-                    </select>
+                <div class="filter-row" style="margin: 15px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label for="costTrendSourceFilter" style="font-weight: 500;">Source:</label>
+                        <select id="costTrendSourceFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option value="all">All Sources</option>
+                            <option value="mutm">Meta</option>
+                            <option value="g1utm">Google</option>
+                            <option value="butm">Bing</option>
+                            <option value="tutm">TikTok</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label for="costTrendMonthsFilter" style="font-weight: 500;">Time Range:</label>
+                        <select id="costTrendMonthsFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option value="3">Last 3 Months</option>
+                            <option value="6" selected>Last 6 Months</option>
+                            <option value="12">Last 12 Months</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div id="costTrendChartContainer" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">

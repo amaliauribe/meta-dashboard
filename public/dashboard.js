@@ -3042,18 +3042,26 @@ async function loadFunnelsData() {
 let costTrendChart = null;
 let costTrendData = null;
 let costTrendSpendData = null;
+let costTrendMonths = 6;
+let costTrendSource = 'all';
+let costTrendFiltersInitialized = false;
 
-async function loadMonthlyCostTrends() {
+async function loadMonthlyCostTrends(months = null) {
     const container = document.getElementById('costTrendChartContainer');
     const loading = document.getElementById('costTrendLoading');
     
     if (!container) return;
     
+    if (months !== null) {
+        costTrendMonths = months;
+    }
+    
     loading.style.display = 'block';
+    container.style.opacity = '0.5';
     
     try {
-        // Fetch funnel data from Looker
-        const funnelRes = await fetch('/api/looker/monthly-cost-trends');
+        // Fetch funnel data from Looker with months parameter
+        const funnelRes = await fetch(`/api/looker/monthly-cost-trends?months=${costTrendMonths}`);
         const funnelData = await funnelRes.json();
         
         if (!funnelData.success) {
@@ -3063,7 +3071,7 @@ async function loadMonthlyCostTrends() {
         costTrendData = funnelData;
         
         // Fetch monthly spend data from each platform
-        const months = funnelData.months;
+        const monthLabels = funnelData.months;
         costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
         
         // For now, we'll use placeholder spend data
@@ -3078,24 +3086,35 @@ async function loadMonthlyCostTrends() {
         }
         
         // Calculate all sources spend
-        for (let i = 0; i < months.length; i++) {
+        for (let i = 0; i < monthLabels.length; i++) {
             costTrendSpendData.all.push(
                 costTrendSpendData.mutm[i] + costTrendSpendData.g1utm[i] + 
                 costTrendSpendData.butm[i] + costTrendSpendData.tutm[i]
             );
         }
         
-        renderCostTrendChart('all');
+        renderCostTrendChart(costTrendSource);
         
-        // Setup filter
-        document.getElementById('costTrendSourceFilter').addEventListener('change', (e) => {
-            renderCostTrendChart(e.target.value);
-        });
+        // Setup filters (only once)
+        if (!costTrendFiltersInitialized) {
+            document.getElementById('costTrendSourceFilter').addEventListener('change', (e) => {
+                costTrendSource = e.target.value;
+                renderCostTrendChart(costTrendSource);
+            });
+            
+            document.getElementById('costTrendMonthsFilter').addEventListener('change', (e) => {
+                loadMonthlyCostTrends(parseInt(e.target.value));
+            });
+            
+            costTrendFiltersInitialized = true;
+        }
         
         loading.style.display = 'none';
+        container.style.opacity = '1';
     } catch (error) {
         console.error('Cost trend error:', error);
         loading.innerHTML = `<div class="error">Error loading trend data: ${error.message}</div>`;
+        container.style.opacity = '1';
     }
 }
 

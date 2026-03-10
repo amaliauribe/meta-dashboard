@@ -3235,11 +3235,12 @@ app.get('/api/looker/monthly-cost-trends', async (req, res) => {
     try {
         const v = 'fct_leads_funnel_marketing_phi_exclude';
         const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+        const numMonths = parseInt(req.query.months) || 6;
         
-        // Get last 6 months of data
+        // Get last N months of data
         const months = [];
         const today = new Date();
-        for (let i = 5; i >= 0; i--) {
+        for (let i = numMonths - 1; i >= 0; i--) {
             const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
             const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
             months.push({
