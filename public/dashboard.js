@@ -4506,12 +4506,14 @@ async function loadGoogleQsHistoryData() {
                 currentQsSum += kw.currentQs;
                 currentQsCount++;
             }
-            if (kw.qs30dAgo) {
-                oldQsSum += kw.qs30dAgo;
+            // Use 7D ago for comparison, fall back to 30D ago
+            const compareQs = kw.qs7dAgo || kw.qs30dAgo;
+            if (compareQs) {
+                oldQsSum += compareQs;
                 oldQsCount++;
             }
             
-            const change = (kw.currentQs || 0) - (kw.qs30dAgo || kw.currentQs || 0);
+            const change = (kw.currentQs || 0) - (compareQs || kw.currentQs || 0);
             if (change > 0) improved++;
             else if (change < 0) declined++;
             else stable++;
@@ -5178,8 +5180,10 @@ async function loadBingQsHistoryData() {
                 currentQsSum += kw.currentQs;
                 currentQsCount++;
             }
-            if (kw.qs30dAgo) {
-                oldQsSum += kw.qs30dAgo;
+            // Use 7D ago for comparison, fall back to 30D ago
+            const compareQs = kw.qs7dAgo || kw.qs30dAgo;
+            if (compareQs) {
+                oldQsSum += compareQs;
                 oldQsCount++;
             }
             
