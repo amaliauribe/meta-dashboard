@@ -3382,7 +3382,7 @@ app.get("/api/ours-privacy/converted-visitors", (req, res) => {
 });
 
 // ==================== Clinic Performance ====================
-// Query Looker by location_lead (clinic)
+// Combines: Ad Clicks (by zipcode) + Bookings (from Looker) = Booked per 100 Clicks
 app.get('/api/looker/clinic-performance', async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -3391,7 +3391,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing startDate or endDate' });
         }
         
-        // Build date filter
+        // 1. Get bookings by clinic from Looker
         let dateFilter = {};
         if (startDate === endDate) {
             dateFilter['fct_leads_funnel_marketing_phi_exclude.lead_created_date_est_date'] = startDate;
@@ -3403,16 +3403,14 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         const fields = [`${v}.location_lead`, `${v}.count`];
         const sorts = [`${v}.count desc`];
         
-        // Run all queries in parallel - grouped by location_lead
-        const [totalLeads, isBooked, sentToVerification, isBookedCovered, initialFulfilled] = await Promise.all([
+        // Run Looker queries in parallel
+        const [totalLeads, isBooked, initialFulfilled] = await Promise.all([
             lookerQuery(v, fields, dateFilter, sorts),
             lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked`]: '1' }, sorts),
-            lookerQuery(v, fields, { ...dateFilter, [`${v}.sent_to_verification`]: '1' }, sorts),
-            lookerQuery(v, fields, { ...dateFilter, [`${v}.is_booked_covered`]: '1' }, sorts),
             lookerQuery(v, fields, { ...dateFilter, [`${v}.initial_fulfilled`]: '1' }, sorts)
         ]);
         
-        // Helper to convert array to map by location
+        // Convert to maps
         const toMap = (arr) => {
             const map = {};
             arr.forEach(item => {
@@ -3422,62 +3420,144 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             return map;
         };
         
-        const totalMap = toMap(totalLeads);
+        const leadsMap = toMap(totalLeads);
         const bookedMap = toMap(isBooked);
-        const verificationMap = toMap(sentToVerification);
-        const coveredMap = toMap(isBookedCovered);
         const fulfilledMap = toMap(initialFulfilled);
         
-        // Build clinic data
-        const allClinics = new Set([
-            ...Object.keys(totalMap),
-            ...Object.keys(bookedMap),
-            ...Object.keys(fulfilledMap)
-        ]);
+        // 2. Get ad clicks by zipcode from Bing
+        let adClicksByZip = {};
+        if (isBingConfigured()) {
+            try {
+                const bingData = await getBingGeographicReport(startDate, endDate);
+                bingData.forEach(row => {
+                    const zip = row.PostalCode;
+                    if (zip && /^\d{5}$/.test(zip)) {
+                        if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0 };
+                        adClicksByZip[zip].clicks += parseInt(row.Clicks) || 0;
+                        adClicksByZip[zip].impressions += parseInt(row.Impressions) || 0;
+                        adClicksByZip[zip].spend += parseFloat(row.Spend) || 0;
+                    }
+                });
+            } catch (e) {
+                console.log('Bing geo for clinic perf:', e.message);
+            }
+        }
         
-        const clinics = Array.from(allClinics)
-            .filter(c => c && c !== 'Unknown' && c !== '')
-            .map(clinic => ({
-                clinic,
-                leads: totalMap[clinic] || 0,
-                booked: bookedMap[clinic] || 0,
-                verified: verificationMap[clinic] || 0,
-                covered: coveredMap[clinic] || 0,
-                fulfilled: fulfilledMap[clinic] || 0
-            }))
-            .filter(c => c.leads > 0 || c.booked > 0);
+        // 3. Map ad clicks to clinics using CLINIC_ZIPCODES
+        const clinicAdData = {};
+        Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
+            clinicAdData[clinic] = { clicks: 0, impressions: 0, spend: 0 };
+            CLINIC_ZIPCODES[clinic].forEach(zip => {
+                if (adClicksByZip[zip]) {
+                    clinicAdData[clinic].clicks += adClicksByZip[zip].clicks;
+                    clinicAdData[clinic].impressions += adClicksByZip[zip].impressions;
+                    clinicAdData[clinic].spend += adClicksByZip[zip].spend;
+                }
+            });
+        });
+        
+        // 4. Match Looker clinic names to our clinic keys (fuzzy match)
+        const matchClinic = (lookerName) => {
+            const lower = lookerName.toLowerCase();
+            for (const clinic of Object.keys(CLINIC_ZIPCODES)) {
+                if (lower.includes(clinic.toLowerCase()) || 
+                    clinic.toLowerCase().includes(lower.split(' - ').pop()?.toLowerCase() || '')) {
+                    return clinic;
+                }
+            }
+            return null;
+        };
+        
+        // 5. Build combined clinic data
+        const allLookerClinics = new Set([...Object.keys(leadsMap), ...Object.keys(bookedMap)]);
+        const clinicResults = [];
+        
+        allLookerClinics.forEach(lookerClinic => {
+            if (!lookerClinic || lookerClinic === 'Unknown' || lookerClinic === '') return;
+            
+            const leads = leadsMap[lookerClinic] || 0;
+            const booked = bookedMap[lookerClinic] || 0;
+            const fulfilled = fulfilledMap[lookerClinic] || 0;
+            
+            // Try to match to our zipcode-mapped clinic for ad data
+            const matchedClinic = matchClinic(lookerClinic);
+            const adData = matchedClinic ? clinicAdData[matchedClinic] : { clicks: 0, impressions: 0, spend: 0 };
+            
+            if (leads > 0 || booked > 0) {
+                clinicResults.push({
+                    clinic: lookerClinic,
+                    adClicks: adData.clicks,
+                    adImpressions: adData.impressions,
+                    adSpend: adData.spend,
+                    leads,
+                    booked,
+                    fulfilled,
+                    bookedPer100Clicks: adData.clicks > 0 ? (booked / adData.clicks * 100) : null,
+                    bookedPer100Leads: leads > 0 ? (booked / leads * 100) : null
+                });
+            }
+        });
         
         // Calculate totals
-        const totalLeadsCount = clinics.reduce((s, c) => s + c.leads, 0);
-        const totalBooked = clinics.reduce((s, c) => s + c.booked, 0);
-        const totalFulfilled = clinics.reduce((s, c) => s + c.fulfilled, 0);
+        const totals = clinicResults.reduce((acc, c) => ({
+            clicks: acc.clicks + c.adClicks,
+            leads: acc.leads + c.leads,
+            booked: acc.booked + c.booked,
+            fulfilled: acc.fulfilled + c.fulfilled
+        }), { clicks: 0, leads: 0, booked: 0, fulfilled: 0 });
         
-        // Calculate correlation
-        let correlation = 'N/A';
-        const withData = clinics.filter(c => c.leads > 0 && c.booked > 0);
-        if (withData.length >= 3) {
-            const leads = withData.map(c => c.leads);
-            const booked = withData.map(c => c.booked);
-            correlation = calculateCorrelation(leads, booked).toFixed(2);
+        // Calculate correlations
+        const withClicks = clinicResults.filter(c => c.adClicks > 0 && c.booked > 0);
+        const withLeads = clinicResults.filter(c => c.leads > 0 && c.booked > 0);
+        
+        let clicksCorr = 'N/A', leadsCorr = 'N/A';
+        if (withClicks.length >= 3) {
+            clicksCorr = calculateCorrelation(withClicks.map(c => c.adClicks), withClicks.map(c => c.booked)).toFixed(2);
+        }
+        if (withLeads.length >= 3) {
+            leadsCorr = calculateCorrelation(withLeads.map(c => c.leads), withLeads.map(c => c.booked)).toFixed(2);
         }
         
         res.json({
             success: true,
-            clinics: clinics.sort((a, b) => b.booked - a.booked),
+            clinics: clinicResults.sort((a, b) => b.booked - a.booked),
             summary: {
-                clinicsWithData: clinics.length,
-                totalLeads: totalLeadsCount,
-                totalBooked,
-                totalFulfilled
+                clinicsWithData: clinicResults.length,
+                totalClicks: totals.clicks,
+                totalLeads: totals.leads,
+                totalBooked: totals.booked,
+                totalFulfilled: totals.fulfilled,
+                avgBookedPer100Clicks: totals.clicks > 0 ? (totals.booked / totals.clicks * 100).toFixed(1) : null,
+                avgBookedPer100Leads: totals.leads > 0 ? (totals.booked / totals.leads * 100).toFixed(1) : null
             },
-            correlation: { leads_vs_booked: correlation }
+            correlation: { 
+                clicks_vs_booked: clicksCorr,
+                leads_vs_booked: leadsCorr 
+            }
         });
         
     } catch (error) {
-        console.error('Clinic performance Looker error:', error);
+        console.error('Clinic performance error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// Helper: Get Bing geographic report
+async function getBingGeographicReport(startDate, endDate) {
+    if (!isBingConfigured()) return [];
+    
+    const columns = ['PostalCode', 'Impressions', 'Clicks', 'Spend', 'Conversions'];
+    const reportRequest = buildGeographicReportRequest(startDate, endDate, columns);
+    
+    try {
+        const reportId = await submitBingReport(reportRequest);
+        const csvData = await pollAndDownloadBingReport(reportId);
+        return parseBingCsv(csvData);
+    } catch (e) {
+        console.log('Bing geo report error:', e.message);
+        return [];
+    }
+}
 
 // VTC Clinic zipcode mappings
 const CLINIC_ZIPCODES = {

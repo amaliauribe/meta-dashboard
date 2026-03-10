@@ -7105,7 +7105,7 @@ async function loadClinicPerformanceData() {
             endDate = formatDateEST(end);
         }
         
-        // Use the Looker clinic-performance endpoint (queries by location_lead)
+        // Use the Looker clinic-performance endpoint (Ad Clicks + Bookings)
         const response = await fetch(`/api/looker/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
         const result = await response.json();
         
@@ -7118,20 +7118,20 @@ async function loadClinicPerformanceData() {
         // Map clinic data for display
         const clinicsData = clinics.map(c => ({
             clinic: c.clinic,
-            clicks: c.leads,
-            booked: c.booked,
-            verified: c.verified,
-            covered: c.covered,
-            fulfilled: c.fulfilled
+            adClicks: c.adClicks || 0,
+            leads: c.leads || 0,
+            booked: c.booked || 0,
+            fulfilled: c.fulfilled || 0,
+            bookedPer100Clicks: c.bookedPer100Clicks,
+            bookedPer100Leads: c.bookedPer100Leads
         }));
         
         // Update KPIs
-        document.getElementById('clinicPerfCorrelation').textContent = correlation.leads_vs_booked || '-';
         document.getElementById('clinicPerfClinicsCount').textContent = summary.clinicsWithData;
-        document.getElementById('clinicPerfTotalClicks').textContent = summary.totalLeads.toLocaleString();
+        document.getElementById('clinicPerfTotalClicks').textContent = summary.totalClicks?.toLocaleString() || '0';
         document.getElementById('clinicPerfTotalBooked').textContent = summary.totalBooked.toLocaleString();
-        const avgBookedPer100 = summary.totalLeads > 0 ? ((summary.totalBooked / summary.totalLeads) * 100).toFixed(0) : 0;
-        document.getElementById('clinicPerfAvgConversion').textContent = avgBookedPer100;
+        document.getElementById('clinicPerfAvgConversion').textContent = summary.avgBookedPer100Clicks || '-';
+        document.getElementById('clinicPerfCorrelation').textContent = correlation.clicks_vs_booked || '-';
         
         // Render chart
         renderClinicPerfChart(clinicsData);
@@ -7158,36 +7158,39 @@ async function loadClinicPerformanceData() {
 function renderClinicPerfChart(clinics) {
     const ctx = document.getElementById('clinicPerfChart').getContext('2d');
     
-    // Calculate booked per 100 leads and sort by that (descending)
-    const withRate = clinics.map(c => ({
-        ...c,
-        bookedPer100: c.clicks > 0 ? (c.booked / c.clicks * 100) : 0
-    })).filter(c => c.clicks >= 5); // Only show clinics with at least 5 leads
-    
-    const sorted = withRate.sort((a, b) => b.bookedPer100 - a.bookedPer100).slice(0, 15);
+    // Filter clinics with ad click data and sort by booked per 100 clicks
+    const withRate = clinics
+        .filter(c => c.adClicks >= 10 && c.bookedPer100Clicks !== null) // At least 10 clicks
+        .sort((a, b) => (b.bookedPer100Clicks || 0) - (a.bookedPer100Clicks || 0))
+        .slice(0, 15);
     
     if (clinicPerfChart) {
         clinicPerfChart.destroy();
     }
     
+    if (withRate.length === 0) {
+        document.getElementById('clinicPerfChartContainer').innerHTML = '<p style="padding: 20px; color: #666;">Not enough ad click data to show chart. Try a longer date range.</p>';
+        return;
+    }
+    
     clinicPerfChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: sorted.map(c => c.clinic),
+            labels: withRate.map(c => c.clinic),
             datasets: [
                 {
-                    label: 'Booked per 100 Leads',
-                    data: sorted.map(c => c.bookedPer100.toFixed(0)),
-                    backgroundColor: sorted.map(c => 
-                        c.bookedPer100 >= 30 ? 'rgba(34, 197, 94, 0.8)' :
-                        c.bookedPer100 >= 15 ? 'rgba(250, 204, 21, 0.8)' :
-                        'rgba(239, 68, 68, 0.8)'
-                    ),
-                    borderColor: sorted.map(c => 
-                        c.bookedPer100 >= 30 ? '#22c55e' :
-                        c.bookedPer100 >= 15 ? '#facc15' :
-                        '#ef4444'
-                    ),
+                    label: 'Booked per 100 Ad Clicks',
+                    data: withRate.map(c => c.bookedPer100Clicks?.toFixed(1) || 0),
+                    backgroundColor: withRate.map(c => {
+                        const rate = c.bookedPer100Clicks || 0;
+                        return rate >= 5 ? 'rgba(34, 197, 94, 0.8)' :
+                               rate >= 2 ? 'rgba(250, 204, 21, 0.8)' :
+                               'rgba(239, 68, 68, 0.8)';
+                    }),
+                    borderColor: withRate.map(c => {
+                        const rate = c.bookedPer100Clicks || 0;
+                        return rate >= 5 ? '#22c55e' : rate >= 2 ? '#facc15' : '#ef4444';
+                    }),
                     borderWidth: 1
                 }
             ]
@@ -7201,8 +7204,8 @@ function renderClinicPerfChart(clinics) {
                 tooltip: {
                     callbacks: {
                         label: (ctx) => {
-                            const c = sorted[ctx.dataIndex];
-                            return `${ctx.raw} booked per 100 leads (${c.booked}/${c.clicks})`;
+                            const c = withRate[ctx.dataIndex];
+                            return `${ctx.raw} booked per 100 clicks (${c.booked} booked / ${c.adClicks} clicks)`;
                         }
                     }
                 }
@@ -7210,7 +7213,7 @@ function renderClinicPerfChart(clinics) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Booked per 100 Leads' }
+                    title: { display: true, text: 'Booked per 100 Ad Clicks' }
                 }
             }
         }
@@ -7220,26 +7223,31 @@ function renderClinicPerfChart(clinics) {
 function renderClinicPerfTable(clinics) {
     const tbody = document.getElementById('clinicPerfTableBody');
     
-    // Calculate booked per 100 leads and sort by that (descending)
-    const withRate = clinics.map(c => ({
-        ...c,
-        bookedPer100: c.clicks > 0 ? (c.booked / c.clicks * 100) : 0,
-        fulfillRate: c.booked > 0 ? (c.fulfilled / c.booked * 100) : 0
-    }));
-    
-    const sorted = withRate.sort((a, b) => b.bookedPer100 - a.bookedPer100);
+    // Sort by booked per 100 clicks (primary), then by booked per 100 leads
+    const sorted = [...clinics].sort((a, b) => {
+        const aRate = a.bookedPer100Clicks ?? -1;
+        const bRate = b.bookedPer100Clicks ?? -1;
+        if (bRate !== aRate) return bRate - aRate;
+        return (b.bookedPer100Leads || 0) - (a.bookedPer100Leads || 0);
+    });
     
     tbody.innerHTML = sorted.map(c => {
-        const rateClass = c.bookedPer100 >= 30 ? 'qs-good' : c.bookedPer100 >= 15 ? 'qs-ok' : 'qs-low';
-        const rateEmoji = c.bookedPer100 >= 30 ? '⭐' : c.bookedPer100 >= 15 ? '' : '⚠️';
+        const clickRate = c.bookedPer100Clicks;
+        const leadRate = c.bookedPer100Leads;
+        
+        const clickRateClass = clickRate === null ? '' : 
+            clickRate >= 5 ? 'qs-good' : clickRate >= 2 ? 'qs-ok' : 'qs-low';
+        const clickRateEmoji = clickRate === null ? '' :
+            clickRate >= 5 ? '⭐' : clickRate >= 2 ? '' : '⚠️';
+        
         return `
             <tr>
                 <td><strong>${c.clinic}</strong></td>
-                <td>${c.clicks.toLocaleString()}</td>
+                <td>${c.adClicks > 0 ? c.adClicks.toLocaleString() : '-'}</td>
                 <td><strong>${c.booked}</strong></td>
-                <td class="${rateClass}"><strong>${c.bookedPer100.toFixed(0)}</strong> ${rateEmoji}</td>
-                <td>${c.fulfilled || 0}</td>
-                <td>${c.fulfillRate.toFixed(0)}%</td>
+                <td class="${clickRateClass}"><strong>${clickRate !== null ? clickRate.toFixed(1) : '-'}</strong> ${clickRateEmoji}</td>
+                <td>${c.leads.toLocaleString()}</td>
+                <td>${leadRate !== null ? leadRate.toFixed(0) : '-'}</td>
             </tr>
         `;
     }).join('');
@@ -7248,59 +7256,50 @@ function renderClinicPerfTable(clinics) {
 function generateClinicPerfInsights(clinics, correlation) {
     const insights = [];
     
-    // Calculate rates for all clinics with sufficient data
-    const withData = clinics.filter(c => c.clicks >= 5 && c.booked > 0).map(c => ({
-        ...c,
-        bookedPer100: c.clicks > 0 ? (c.booked / c.clicks * 100) : 0
-    }));
+    // Filter clinics with ad click data
+    const withClicks = clinics.filter(c => c.adClicks >= 10 && c.bookedPer100Clicks !== null);
+    const withLeads = clinics.filter(c => c.leads >= 5 && c.bookedPer100Leads !== null);
     
-    if (withData.length === 0) {
-        document.getElementById('clinicPerfInsightsList').innerHTML = '<p>Not enough data for insights.</p>';
-        return;
+    if (withClicks.length > 0) {
+        // Sort by click conversion rate
+        const byClickRate = [...withClicks].sort((a, b) => b.bookedPer100Clicks - a.bookedPer100Clicks);
+        
+        // Calculate average
+        const avgClickRate = withClicks.reduce((s, c) => s + c.bookedPer100Clicks, 0) / withClicks.length;
+        
+        // Top performers
+        const top = byClickRate.filter(c => c.bookedPer100Clicks >= 5);
+        if (top.length > 0) {
+            insights.push(`⭐ <strong>Best converters (≥5/100 clicks):</strong><br>${top.slice(0, 5).map(c => 
+                `• ${c.clinic}: <strong>${c.bookedPer100Clicks.toFixed(1)}</strong> booked per 100 clicks`
+            ).join('<br>')}`);
+        }
+        
+        // Prediction guide
+        insights.push(`🎯 <strong>Prediction benchmark:</strong><br>
+            Average = <strong>${avgClickRate.toFixed(1)}</strong> booked per 100 ad clicks<br>
+            <em>If your test campaign gets 100 clicks, expect ~${Math.round(avgClickRate)} bookings</em>`);
+        
+        // Correlation
+        const corr = parseFloat(correlation.clicks_vs_booked);
+        if (!isNaN(corr) && corr !== 0) {
+            insights.push(`📈 <strong>Correlation (Clicks↔Booked):</strong> ${corr} — ${
+                corr > 0.5 ? 'Strong predictor! More clicks = more bookings' :
+                corr > 0.3 ? 'Moderate predictor' :
+                'Weak predictor — conversion efficiency varies a lot by clinic'
+            }`);
+        }
+    } else {
+        insights.push(`⚠️ <strong>No ad click data available</strong> for the selected date range. Try selecting a longer period or check if Bing geo reports are configured.`);
+        
+        // Fall back to leads-based insights
+        if (withLeads.length > 0) {
+            const avgLeadRate = withLeads.reduce((s, c) => s + c.bookedPer100Leads, 0) / withLeads.length;
+            insights.push(`📊 <strong>Leads-based benchmark:</strong> ${avgLeadRate.toFixed(0)} booked per 100 leads`);
+        }
     }
     
-    // Sort by conversion rate
-    const byRate = [...withData].sort((a, b) => b.bookedPer100 - a.bookedPer100);
-    
-    // Top performers (>=30 booked per 100)
-    const top = byRate.filter(c => c.bookedPer100 >= 30);
-    if (top.length > 0) {
-        insights.push(`⭐ <strong>Top converters (≥30/100):</strong> ${top.slice(0, 5).map(c => 
-            `${c.clinic} (<strong>${c.bookedPer100.toFixed(0)}</strong>)`
-        ).join(', ')}`);
-    }
-    
-    // Average performers
-    const avg = byRate.filter(c => c.bookedPer100 >= 15 && c.bookedPer100 < 30);
-    if (avg.length > 0) {
-        insights.push(`📊 <strong>Average converters (15-30/100):</strong> ${avg.slice(0, 5).map(c => 
-            `${c.clinic} (${c.bookedPer100.toFixed(0)})`
-        ).join(', ')}`);
-    }
-    
-    // Bottom performers
-    const bottom = byRate.filter(c => c.bookedPer100 < 15);
-    if (bottom.length > 0) {
-        insights.push(`⚠️ <strong>Low converters (<15/100):</strong> ${bottom.slice(-5).reverse().map(c => 
-            `${c.clinic} (${c.bookedPer100.toFixed(0)})`
-        ).join(', ')}`);
-    }
-    
-    // Correlation insight
-    const corr = parseFloat(correlation.leads_vs_booked);
-    if (!isNaN(corr)) {
-        const corrText = corr > 0.5 ? 'strong' : corr > 0.3 ? 'moderate' : 'weak';
-        insights.push(`📈 <strong>Correlation:</strong> ${corr.toFixed(2)} (${corrText}) — ${
-            corr > 0.5 ? 'More leads generally = more bookings' : 
-            'Conversion efficiency matters more than volume'
-        }`);
-    }
-    
-    // Benchmark for new locations
-    const avgRate = withData.reduce((s, c) => s + c.bookedPer100, 0) / withData.length;
-    insights.push(`🎯 <strong>Benchmark:</strong> Average is ${avgRate.toFixed(0)} booked per 100 leads. New test locations should aim for ≥${Math.round(avgRate)} to be on par.`);
-    
-    document.getElementById('clinicPerfInsightsList').innerHTML = insights.map(i => `<p style="margin: 10px 0;">${i}</p>`).join('');
+    document.getElementById('clinicPerfInsightsList').innerHTML = insights.map(i => `<p style="margin: 12px 0; line-height: 1.6;">${i}</p>`).join('');
 }
 
 // Hook into view switching

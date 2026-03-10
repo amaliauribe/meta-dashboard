@@ -2101,22 +2101,18 @@
         <!-- Clinic Performance View -->
         <div id="clinicPerformanceView" class="view-content hidden">
             <h1>🏥 Clinic Performance Analysis</h1>
-            <p class="section-subtitle">Predict clinic success: How many bookings per 100 leads?</p>
+            <p class="section-subtitle">Predict new location success: Ad Clicks → Bookings conversion by clinic</p>
             
             <div id="clinicPerfLoading" class="loading">Loading clinic data...</div>
             
             <!-- KPI Cards -->
             <div id="clinicPerfKpis" class="kpi-cards" style="display: none;">
                 <div class="kpi-card">
-                    <div class="kpi-label">Correlation (Leads↔Booked)</div>
-                    <div class="kpi-value" id="clinicPerfCorrelation">-</div>
-                </div>
-                <div class="kpi-card">
                     <div class="kpi-label">Clinics</div>
                     <div class="kpi-value" id="clinicPerfClinicsCount">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Total Leads</div>
+                    <div class="kpi-label">Total Ad Clicks</div>
                     <div class="kpi-value" id="clinicPerfTotalClicks">-</div>
                 </div>
                 <div class="kpi-card">
@@ -2124,14 +2120,19 @@
                     <div class="kpi-value" id="clinicPerfTotalBooked">-</div>
                 </div>
                 <div class="kpi-card highlight">
-                    <div class="kpi-label">Avg Booked/100 Leads</div>
+                    <div class="kpi-label">Avg Booked/100 Clicks</div>
                     <div class="kpi-value" id="clinicPerfAvgConversion">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Correlation</div>
+                    <div class="kpi-value" id="clinicPerfCorrelation">-</div>
                 </div>
             </div>
             
             <!-- Chart -->
             <section id="clinicPerfChartContainer" class="chart-section" style="display: none;">
-                <h2>📊 Booked per 100 Leads by Clinic</h2>
+                <h2>📊 Booked per 100 Ad Clicks by Clinic</h2>
+                <p class="section-subtitle">Use as benchmark for new test locations</p>
                 <div class="chart-container">
                     <canvas id="clinicPerfChart"></canvas>
                 </div>
@@ -2140,17 +2141,17 @@
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
                 <h2>📋 Clinic Conversion Ranking</h2>
-                <p class="table-subtitle">Sorted by Booked/100 Leads — higher = better conversion</p>
+                <p class="table-subtitle">Sorted by Booked/100 Clicks — higher = better conversion</p>
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
                                 <th>Clinic</th>
-                                <th>Leads</th>
+                                <th>Ad Clicks</th>
                                 <th>Booked</th>
-                                <th class="highlight-col">Booked/100 Leads</th>
-                                <th>Fulfilled</th>
-                                <th>Fulfill Rate</th>
+                                <th class="highlight-col">Booked/100 Clicks ⭐</th>
+                                <th>Leads</th>
+                                <th>Booked/100 Leads</th>
                             </tr>
                         </thead>
                         <tbody id="clinicPerfTableBody"></tbody>
@@ -2160,7 +2161,7 @@
             
             <!-- Insights -->
             <section id="clinicPerfInsights" class="table-section" style="display: none;">
-                <h2>💡 Insights</h2>
+                <h2>💡 Prediction Guide</h2>
                 <div id="clinicPerfInsightsList"></div>
             </section>
         </div><!-- End Clinic Performance View -->
