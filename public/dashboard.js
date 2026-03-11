@@ -2920,12 +2920,12 @@ async function loadFunnelsData() {
                 }
                 
                 const stages = [];
-                const eventOrder = ['e1s', 'e5s', 'e15s', 'e30s', 'e45s', 'e60s', 'l_f_s'];
+                // Engagement events from Ours Privacy (excluding l_f_s - we'll get that from Looker)
+                const eventOrder = ['e1s', 'e5s', 'e15s', 'e30s', 'e45s', 'e60s'];
                 eventOrder.forEach(evt => {
                     const eventData = platformData.events?.find(e => e.event === evt);
                     if (eventData) {
-                        const label = evt === 'l_f_s' ? '🎯 l_f_s (Lead)' : 
-                                     evt === 'e1s' ? '👁️ 1s view' :
+                        const label = evt === 'e1s' ? '👁️ 1s view' :
                                      evt === 'e5s' ? '⏱️ 5s engaged' :
                                      evt === 'e15s' ? '⏱️ 15s engaged' :
                                      evt === 'e30s' ? '⏱️ 30s engaged' :
@@ -2935,7 +2935,9 @@ async function loadFunnelsData() {
                     }
                 });
                 
+                // l_f_s and downstream from Looker (consistent with Medwork Funnel)
                 if (medworkData.l_f_s > 0) {
+                    stages.push({ label: '🎯 l_f_s (Lead)', count: medworkData.l_f_s, type: 'medwork', key: 'l_f_s' });
                     stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork', key: 'is_booked' });
                     stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork', key: 'sent_to_verification' });
                     stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork', key: 'is_booked_covered' });
