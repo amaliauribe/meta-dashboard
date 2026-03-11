@@ -2304,9 +2304,19 @@ app.post('/api/summary/daily', async (req, res) => {
 app.post('/api/summary/aggregated', async (req, res) => {
     const { periods } = req.body; // Array of {name, startDate, endDate}
     
+    if (!periods || !Array.isArray(periods)) {
+        return res.json([]);
+    }
+    
     const results = [];
     
     for (const period of periods) {
+        // Skip periods with missing dates
+        if (!period.startDate || !period.endDate) {
+            console.log('Skipping period with missing dates:', period.name);
+            continue;
+        }
+        
         const periodData = {
             name: period.name,
             meta: 0,
