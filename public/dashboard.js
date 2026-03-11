@@ -3914,6 +3914,8 @@ async function loadSummaryData() {
         // Fetch Meta aggregated data for each period
         const allPeriods = [...weeklyPeriods, ...monthlyPeriods];
         for (let i = 0; i < allPeriods.length; i++) {
+            // Skip if aggregatedData doesn't have this index (server may have skipped periods)
+            if (!aggregatedData[i]) continue;
             try {
                 const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${allPeriods[i].startDate}","until":"${allPeriods[i].endDate}"}&access_token=${ACCESS_TOKEN}`;
                 const metaResponse = await fetch(metaUrl);
