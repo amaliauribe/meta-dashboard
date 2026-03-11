@@ -3705,8 +3705,32 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         });
         
         // 4. Match Looker clinic names to our clinic keys (fuzzy match)
+        const CLINIC_ALIASES = {
+            'Financial District': ['fidi', 'financial district', 'fidi manhattan'],
+            'Midtown Manhattan': ['midtown'],
+            'Downtown Brooklyn': ['downtown brooklyn', 'dtbk'],
+            'Upper East Side': ['upper east', 'ues'],
+            'Scotch Plains': ['scotch plains'],
+            'Woodland Park': ['woodland'],
+            'West Orange': ['west orange'],
+            'Maple Lawn': ['maple lawn', 'fulton'],
+            'Cedar Park': ['cedar park'],
+            'Fort Worth': ['fort worth'],
+            'National City': ['national city'],
+            'Huntington Beach': ['huntington beach', 'huntington'],
+            'Newport Beach': ['newport beach', 'newport'],
+            'Brighton Beach': ['brighton beach', 'brighton']
+        };
+        
         const matchClinic = (lookerName) => {
             const lower = lookerName.toLowerCase();
+            // Check aliases first
+            for (const [clinic, aliases] of Object.entries(CLINIC_ALIASES)) {
+                if (CLINIC_ZIPCODES[clinic] && aliases.some(a => lower.includes(a))) {
+                    return clinic;
+                }
+            }
+            // Then standard fuzzy match
             for (const clinic of Object.keys(CLINIC_ZIPCODES)) {
                 if (lower.includes(clinic.toLowerCase()) || 
                     clinic.toLowerCase().includes(lower.split(' - ').pop()?.toLowerCase() || '')) {
