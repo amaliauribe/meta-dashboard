@@ -2728,7 +2728,7 @@ async function loadMedworkFunnel() {
                 <div class="funnel-card" style="flex: 1; min-width: 200px; max-width: 250px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
                     <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.emoji} ${info.name}</h3>
                     <div class="mini-funnel">
-                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span></div>
+                        <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span>${d.l_f_s.toLocaleString()}</span></div>
                         <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span></div>
                         <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span></div>
                         <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span></div>
@@ -2742,7 +2742,7 @@ async function loadMedworkFunnel() {
         
         // Build total funnel visualization
         const stages = [
-            { label: 'l_f_s', value: totals.l_f_s, color: '#6366f1' },
+            { label: 'l_f_s (LookerML)', value: totals.l_f_s, color: '#6366f1' },
             { label: 'Is Booked', value: totals.is_booked, color: '#8b5cf6' },
             { label: 'Sent to Verif.', value: totals.sent_to_verification, color: '#a855f7' },
             { label: 'Booked Covered', value: totals.is_booked_covered, color: '#d946ef' },
@@ -2948,7 +2948,7 @@ async function loadFunnelsData() {
                 
                 // l_f_s and downstream from Looker (consistent with Medwork Funnel)
                 if (medworkData.l_f_s > 0) {
-                    stages.push({ label: '🎯 l_f_s (Lead)', count: medworkData.l_f_s, type: 'medwork', key: 'l_f_s' });
+                    stages.push({ label: '🎯 l_f_s (LookerML)', count: medworkData.l_f_s, type: 'medwork', key: 'l_f_s' });
                     stages.push({ label: '📅 Is Booked', count: medworkData.is_booked || 0, type: 'medwork', key: 'is_booked' });
                     stages.push({ label: '✅ Sent to Verif.', count: medworkData.sent_to_verification || 0, type: 'medwork', key: 'sent_to_verification' });
                     stages.push({ label: '💳 Booked Covered', count: medworkData.is_booked_covered || 0, type: 'medwork', key: 'is_booked_covered' });
@@ -3360,7 +3360,7 @@ function renderCostTrendChart(source, stage = 'all') {
     // Calculate cost per stage for each month
     const stageConfig = {
         l_f_s: {
-            label: 'Cost per l_f_s',
+            label: 'Cost per l_f_s (LookerML)',
             data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.1)'
@@ -3510,7 +3510,7 @@ function renderCostTrendWeeklyChart(source, stage = 'all') {
     // Calculate cost per stage for each week
     const stageConfig = {
         l_f_s: {
-            label: 'Cost per l_f_s',
+            label: 'Cost per l_f_s (LookerML)',
             data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.1)'
@@ -3669,7 +3669,7 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
                 <div class="funnel-card" style="flex: 1; min-width: 220px; max-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid ${info.color};">
                     <h3 style="margin: 0 0 15px 0; color: ${info.color};">${info.icon} ${info.name}</h3>
                     <div class="mini-funnel">
-                        <div class="mini-funnel-row highlight"><span>l_f_s</span><span>${d.l_f_s.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.l_f_s)}</span></div>
+                        <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span>${d.l_f_s.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.l_f_s)}</span></div>
                         <div class="mini-funnel-row"><span>Is Booked</span><span>${d.is_booked.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.is_booked)}</span></div>
                         <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${d.sent_to_verification.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.sent_to_verification)}</span></div>
                         <div class="mini-funnel-row"><span>Booked Covered</span><span>${d.is_booked_covered.toLocaleString()}</span><span class="cost-badge">${formatCost(spend, d.is_booked_covered)}</span></div>
@@ -3687,7 +3687,7 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
         
         // Build total funnel visualization with cost per stage
         const stages = [
-            { label: 'l_f_s', value: totals.l_f_s, color: '#6366f1' },
+            { label: 'l_f_s (LookerML)', value: totals.l_f_s, color: '#6366f1' },
             { label: 'Is Booked', value: totals.is_booked, color: '#8b5cf6' },
             { label: 'Sent to Verif.', value: totals.sent_to_verification, color: '#a855f7' },
             { label: 'Booked Covered', value: totals.is_booked_covered, color: '#d946ef' },
@@ -3751,7 +3751,7 @@ function renderFunnelsComparisonChart(data) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { position: 'top' },
-                title: { display: true, text: 'Results vs l_f_s by Platform' }
+                title: { display: true, text: 'Results vs l_f_s (LookerML) by Platform' }
             },
             scales: {
                 y: { beginAtZero: true }
@@ -7557,7 +7557,7 @@ async function loadOursPrivacyData() {
         // Build l_f_s card
         const lfsBody = document.getElementById("oursLfsBody");
         if (lfsData.sources.length === 0) {
-            lfsBody.innerHTML = "<tr><td colspan=\"2\" style=\"padding:15px;color:#888;\">No l_f_s events</td></tr>";
+            lfsBody.innerHTML = "<tr><td colspan=\"2\" style=\"padding:15px;color:#888;\">No l_f_s (LookerML) events</td></tr>";
         } else {
             let lfsHtml = "";
             lfsData.sources.forEach(src => {
