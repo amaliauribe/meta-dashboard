@@ -7865,6 +7865,13 @@ async function loadClinicPerformanceData() {
             endDate = formatDateEST(end);
         }
         
+        // Show delay note if date range includes today
+        const delayNote = document.getElementById('clinicPerfDelayNote');
+        if (delayNote) {
+            const todayStr = formatDateEST(getESTDate());
+            delayNote.style.display = (endDate >= todayStr) ? 'block' : 'none';
+        }
+        
         // Use the Looker clinic-performance endpoint (Ad Clicks + Bookings)
         const response = await fetch(`/api/looker/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
         const result = await response.json();
