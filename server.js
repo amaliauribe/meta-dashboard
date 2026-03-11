@@ -2243,8 +2243,17 @@ app.post('/api/summary/daily', async (req, res) => {
     
     // Fetch Meta daily data
     try {
-        // Meta API would go here - for now return empty
-        // This would need the Meta API integration
+        const metaUrl = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v19.0'}/act_${process.env.META_ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${process.env.META_ACCESS_TOKEN}`;
+        const metaResponse = await fetch(metaUrl);
+        const metaData = await metaResponse.json();
+        
+        if (metaData.data) {
+            results.meta = metaData.data.map(row => ({
+                date: row.date_start,
+                spend: parseFloat(row.spend) || 0,
+                conversions: row.actions?.filter(a => a.action_type?.includes('offsite_conversion.fb_pixel_custom')).reduce((s, a) => s + parseInt(a.value || 0), 0) || 0
+            }));
+        }
     } catch (e) {
         console.error('Meta summary error:', e.message);
     }
