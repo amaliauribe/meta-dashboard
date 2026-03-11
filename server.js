@@ -2506,7 +2506,7 @@ app.get("/api/ours-privacy/by-source", (req, res) => {
     }
     
     // Known source prefixes
-    const sourcePrefixes = ["mutm", "tutm", "butm", "g1utm", "outm"];
+    const sourcePrefixes = ["mutm", "tutm", "butm", "g1utm", "outm", "gbputm"];
     
     // Group by visitor first
     const visitorData = {};
@@ -2531,6 +2531,18 @@ app.get("/api/ours-privacy/by-source", (req, res) => {
         // If no known prefix, keep full event name as eventType
         if (prefix === "unknown") {
             eventType = fullEvent;
+            
+            // Handle Invoca call events
+            if (fullEvent === "google_gmb_invoca_call") {
+                prefix = "gbputm";
+                eventType = "invoca_call";
+            } else if (fullEvent === "bing_invoca_call") {
+                prefix = "butm";
+                eventType = "invoca_call";
+            } else if (fullEvent.includes("invoca_call")) {
+                // Generic invoca call - try to detect source from event name
+                eventType = "invoca_call";
+            }
         }
         
         if (!visitorData[vid]) {
@@ -2541,7 +2553,7 @@ app.get("/api/ours-privacy/by-source", (req, res) => {
     });
     
     // Priority order for sources
-    const sourcePriority = ["mutm", "tutm", "butm", "g1utm", "outm", "unknown"];
+    const sourcePriority = ["mutm", "tutm", "butm", "g1utm", "gbputm", "outm", "unknown"];
     
     // Determine primary source per visitor and count ALL events under that source
     const sourceGroups = {};
