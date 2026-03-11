@@ -268,64 +268,84 @@
                 <p class="summary-subtitle">Full journey from ad impression to conversion, by platform</p>
             </div>
 
-            <!-- Platform Ad Funnels -->
+            <!-- Unified Platform Funnels -->
             <section class="table-section">
-                <h2>📊 Ad Platform Funnels</h2>
-                <p class="section-subtitle">Cost → Impressions → Clicks → Results → l_f_s</p>
-                <div id="funnelsPlatformContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                <h2>📊 Full Platform Funnels</h2>
+                <p class="section-subtitle">Complete funnel: Cost → Impressions → Clicks → Results → l_f_s → Is Booked → Sent to Verif → Booked Covered → Fulfilled</p>
+                <div id="unifiedFunnelContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
                     
                     <!-- Meta Funnel -->
-                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #4267B2;">
+                    <div class="funnel-card" style="flex: 1; min-width: 300px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #4267B2;">
                         <h3 style="margin: 0 0 15px 0; color: #4267B2;"><img src="images/meta-icon.png" style="width: 18px; height: 18px; vertical-align: middle;"> Meta</h3>
                         <div class="mini-funnel">
-                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelMetaCost">$0</span></div>
-                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelMetaImpressions">0</span></div>
-                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelMetaClicks">0</span></div>
-                            <div class="mini-funnel-row"><span>Results</span><span id="funnelMetaResults">0</span></div>
-                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelMetaLfs">0</span></div>
-                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelMetaCostLfs">-</span></div>
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="unifiedMetaCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="unifiedMetaImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="unifiedMetaClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="unifiedMetaResults">0</span> <span id="unifiedMetaCostPerResult" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="unifiedMetaLfs">0</span> <span id="unifiedMetaCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Is Booked</span><span id="unifiedMetaBooked">0</span> <span id="unifiedMetaCostPerBooked" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Sent to Verif.</span><span id="unifiedMetaVerif">0</span> <span id="unifiedMetaCostPerVerif" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Booked Covered</span><span id="unifiedMetaCovered">0</span> <span id="unifiedMetaCostPerCovered" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Fulfilled</span><span id="unifiedMetaFulfilled">0</span> <span id="unifiedMetaCostPerFulfilled" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row cost" style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;"><span>Cost/l_f_s</span><span id="unifiedMetaCostLfs">-</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/Fulfilled</span><span id="unifiedMetaCostFulfilled">-</span></div>
                         </div>
                     </div>
                     
                     <!-- Google Funnel -->
-                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #EA4335;">
+                    <div class="funnel-card" style="flex: 1; min-width: 300px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #EA4335;">
                         <h3 style="margin: 0 0 15px 0; color: #EA4335;">🔴 Google</h3>
                         <div class="mini-funnel">
-                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelGoogleCost">$0</span></div>
-                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelGoogleImpressions">0</span></div>
-                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelGoogleClicks">0</span></div>
-                            <div class="mini-funnel-row"><span>Results</span><span id="funnelGoogleResults">0</span></div>
-                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelGoogleLfs">0</span></div>
-                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelGoogleCostLfs">-</span></div>
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="unifiedGoogleCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="unifiedGoogleImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="unifiedGoogleClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="unifiedGoogleResults">0</span> <span id="unifiedGoogleCostPerResult" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="unifiedGoogleLfs">0</span> <span id="unifiedGoogleCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Is Booked</span><span id="unifiedGoogleBooked">0</span> <span id="unifiedGoogleCostPerBooked" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Sent to Verif.</span><span id="unifiedGoogleVerif">0</span> <span id="unifiedGoogleCostPerVerif" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Booked Covered</span><span id="unifiedGoogleCovered">0</span> <span id="unifiedGoogleCostPerCovered" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Fulfilled</span><span id="unifiedGoogleFulfilled">0</span> <span id="unifiedGoogleCostPerFulfilled" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row cost" style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;"><span>Cost/l_f_s</span><span id="unifiedGoogleCostLfs">-</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/Fulfilled</span><span id="unifiedGoogleCostFulfilled">-</span></div>
                         </div>
                     </div>
                     
                     <!-- Bing Funnel -->
-                    <div class="funnel-card" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #00A4EF;">
+                    <div class="funnel-card" style="flex: 1; min-width: 300px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #00A4EF;">
                         <h3 style="margin: 0 0 15px 0; color: #00A4EF;">🔷 Bing</h3>
                         <div class="mini-funnel">
-                            <div class="mini-funnel-row spend"><span>Cost</span><span id="funnelBingCost">$0</span></div>
-                            <div class="mini-funnel-row"><span>Impressions</span><span id="funnelBingImpressions">0</span></div>
-                            <div class="mini-funnel-row"><span>Clicks</span><span id="funnelBingClicks">0</span></div>
-                            <div class="mini-funnel-row"><span>Results</span><span id="funnelBingResults">0</span></div>
-                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="funnelBingLfs">0</span></div>
-                            <div class="mini-funnel-row cost"><span>Cost/l_f_s</span><span id="funnelBingCostLfs">-</span></div>
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="unifiedBingCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="unifiedBingImpressions">0</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="unifiedBingClicks">0</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="unifiedBingResults">0</span> <span id="unifiedBingCostPerResult" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="unifiedBingLfs">0</span> <span id="unifiedBingCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Is Booked</span><span id="unifiedBingBooked">0</span> <span id="unifiedBingCostPerBooked" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Sent to Verif.</span><span id="unifiedBingVerif">0</span> <span id="unifiedBingCostPerVerif" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Booked Covered</span><span id="unifiedBingCovered">0</span> <span id="unifiedBingCostPerCovered" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Fulfilled</span><span id="unifiedBingFulfilled">0</span> <span id="unifiedBingCostPerFulfilled" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row cost" style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;"><span>Cost/l_f_s</span><span id="unifiedBingCostLfs">-</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/Fulfilled</span><span id="unifiedBingCostFulfilled">-</span></div>
                         </div>
                     </div>
                     
-                </div>
-            </section>
-
-            <!-- Medwork Leads Funnel -->
-            <section class="table-section">
-                <h2>📊 Medwork Leads Funnel</h2>
-                <p class="section-subtitle">Full funnel from l_f_s to fulfilled, by tracking source (from Looker). Date filter applies to lead_created_date_est_date.</p>
-                <div id="funnelsMedworkContainer" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
-                    <div class="loading" id="funnelsMedworkLoading">Loading Medwork funnel data...</div>
-                </div>
-                <div id="funnelsMedworkTotals" style="margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px;">📈 Total Funnel</h3>
-                    <div class="funnel-bars" id="funnelsTotalFunnel" style="display: flex; gap: 10px; align-items: flex-end; height: 200px; padding: 20px; background: #f8f9fa; border-radius: 12px;"></div>
+                    <!-- TikTok Funnel -->
+                    <div class="funnel-card" style="flex: 1; min-width: 300px; background: #f8f9fa; border-radius: 12px; padding: 15px; border-top: 4px solid #000000;">
+                        <h3 style="margin: 0 0 15px 0; color: #000000;">🎵 TikTok</h3>
+                        <div class="mini-funnel">
+                            <div class="mini-funnel-row spend"><span>Cost</span><span id="unifiedTiktokCost">$0</span></div>
+                            <div class="mini-funnel-row"><span>Impressions</span><span id="unifiedTiktokImpressions">-</span></div>
+                            <div class="mini-funnel-row"><span>Clicks</span><span id="unifiedTiktokClicks">-</span></div>
+                            <div class="mini-funnel-row"><span>Results</span><span id="unifiedTiktokResults">-</span></div>
+                            <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="unifiedTiktokLfs">0</span> <span id="unifiedTiktokCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Is Booked</span><span id="unifiedTiktokBooked">0</span> <span id="unifiedTiktokCostPerBooked" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Sent to Verif.</span><span id="unifiedTiktokVerif">0</span> <span id="unifiedTiktokCostPerVerif" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Booked Covered</span><span id="unifiedTiktokCovered">0</span> <span id="unifiedTiktokCostPerCovered" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row"><span>Fulfilled</span><span id="unifiedTiktokFulfilled">0</span> <span id="unifiedTiktokCostPerFulfilled" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            <div class="mini-funnel-row cost" style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;"><span>Cost/l_f_s</span><span id="unifiedTiktokCostLfs">-</span></div>
+                            <div class="mini-funnel-row cost"><span>Cost/Fulfilled</span><span id="unifiedTiktokCostFulfilled">-</span></div>
+                        </div>
+                    </div>
+                    
                 </div>
             </section>
 
@@ -401,7 +421,7 @@
                     <button id="costTrendApplyDate" style="padding: 6px 12px; background: #1877f2; color: white; border: none; border-radius: 6px; cursor: pointer;">Apply</button>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 15px;">
                     <div id="costTrendChartContainer" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 320px;">
                         <h3 style="margin: 0 0 10px 0; font-size: 13px; color: #666;">📅 By Month</h3>
                         <div style="height: 270px;"><canvas id="costTrendChart"></canvas></div>
@@ -413,6 +433,54 @@
                 </div>
                 
                 <div id="costTrendLoading" class="loading" style="display: none;">Loading trend data...</div>
+            </section>
+
+            <!-- Cost Per Stage by Source -->
+            <section style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-top: 30px;">
+                <h2>📊 Cost Per Stage by Source</h2>
+                <p style="color: #666; margin-bottom: 15px;">Compare platform efficiency for each funnel stage</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label for="costBySourceStageFilter" style="font-weight: 500;">Stage:</label>
+                        <select id="costBySourceStageFilter" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option value="l_f_s">Cost per l_f_s</option>
+                            <option value="is_booked">Cost per Is Booked</option>
+                            <option value="sent_to_verification">Cost per Sent to Verif.</option>
+                            <option value="is_booked_covered">Cost per Booked Covered</option>
+                            <option value="initial_fulfilled">Cost per Fulfilled</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="font-weight: 500;">Quick Range:</span>
+                        <button class="cost-by-source-preset" data-range="7d" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #1877f2; color: white;">Last 7 Days</button>
+                        <button class="cost-by-source-preset" data-range="14d" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: white;">Last 14 Days</button>
+                        <button class="cost-by-source-preset" data-range="30d" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: white;">Last 30 Days</button>
+                        <button class="cost-by-source-preset" data-range="90d" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: white;">Last 90 Days</button>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="font-weight: 500;">Custom:</span>
+                        <input type="date" id="costBySourceStartDate" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <span>to</span>
+                        <input type="date" id="costBySourceEndDate" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <button id="costBySourceApplyDate" style="padding: 6px 12px; background: #1877f2; color: white; border: none; border-radius: 6px; cursor: pointer;">Apply</button>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 15px;">
+                    <div id="costBySourceChartContainer" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 320px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 13px; color: #666;">📅 By Month</h3>
+                        <div style="height: 270px;"><canvas id="costBySourceChart"></canvas></div>
+                    </div>
+                    <div id="costBySourceWeeklyContainer" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 320px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 13px; color: #666;">📆 By Week</h3>
+                        <div style="height: 270px;"><canvas id="costBySourceWeeklyChart"></canvas></div>
+                    </div>
+                </div>
+                
+                <div id="costBySourceLoading" class="loading" style="display: none;">Loading data...</div>
             </section>
 
         </div><!-- End Funnels View -->
@@ -453,6 +521,56 @@
                         <div class="kpi-value" id="insuranceHmoRate">0%</div>
                     </div>
                 </section>
+
+                <!-- Insurance by Platform Cards -->
+                <div id="insurancePlatformCards" style="display: none; margin: 20px 0;">
+                    <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h3 style="margin-bottom: 5px;">📊 Insurance Breakdown by Platform</h3>
+                        <p style="color: #64748b; font-size: 13px; margin-bottom: 15px;">l_f_s breakdown: PPO → HMO → Medicare → Unknown (with cost per lead)</p>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                            <!-- Meta Insurance Card -->
+                            <div class="mini-funnel-card" style="border-left: 4px solid #1877f2;">
+                                <h4 style="color: #1877f2; margin-bottom: 10px;">📘 Meta</h4>
+                                <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="insMetaLfs">0</span> <span id="insMetaCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>PPO</span><span id="insMetaPpo">0</span> <span id="insMetaCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>HMO</span><span id="insMetaHmo">0</span> <span id="insMetaCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Medicare</span><span id="insMetaMedicare">0</span> <span id="insMetaCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Unknown</span><span id="insMetaUnknown">0</span> <span id="insMetaCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            </div>
+                            
+                            <!-- Google Insurance Card -->
+                            <div class="mini-funnel-card" style="border-left: 4px solid #ea4335;">
+                                <h4 style="color: #ea4335; margin-bottom: 10px;">🔴 Google</h4>
+                                <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="insGoogleLfs">0</span> <span id="insGoogleCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>PPO</span><span id="insGooglePpo">0</span> <span id="insGoogleCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>HMO</span><span id="insGoogleHmo">0</span> <span id="insGoogleCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Medicare</span><span id="insGoogleMedicare">0</span> <span id="insGoogleCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Unknown</span><span id="insGoogleUnknown">0</span> <span id="insGoogleCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            </div>
+                            
+                            <!-- Bing Insurance Card -->
+                            <div class="mini-funnel-card" style="border-left: 4px solid #00a1f1;">
+                                <h4 style="color: #00a1f1; margin-bottom: 10px;">💎 Bing</h4>
+                                <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="insBingLfs">0</span> <span id="insBingCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>PPO</span><span id="insBingPpo">0</span> <span id="insBingCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>HMO</span><span id="insBingHmo">0</span> <span id="insBingCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Medicare</span><span id="insBingMedicare">0</span> <span id="insBingCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Unknown</span><span id="insBingUnknown">0</span> <span id="insBingCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            </div>
+                            
+                            <!-- TikTok Insurance Card -->
+                            <div class="mini-funnel-card" style="border-left: 4px solid #ff0050;">
+                                <h4 style="color: #ff0050; margin-bottom: 10px;">🎵 TikTok</h4>
+                                <div class="mini-funnel-row highlight"><span>l_f_s</span><span id="insTiktokLfs">0</span> <span id="insTiktokCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>PPO</span><span id="insTiktokPpo">0</span> <span id="insTiktokCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>HMO</span><span id="insTiktokHmo">0</span> <span id="insTiktokCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Medicare</span><span id="insTiktokMedicare">0</span> <span id="insTiktokCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                                <div class="mini-funnel-row"><span>Unknown</span><span id="insTiktokUnknown">0</span> <span id="insTiktokCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Charts Row -->
                 <div id="insuranceCharts" style="display: none; margin: 20px 0;">
@@ -2229,6 +2347,6 @@
             </footer>
         </main><!-- End Main Content -->
     </div>
-    <script src="dashboard.js?v=1772716620"></script>
+    <script src="dashboard.js?v=1773237626"></script>
 </body>
 </html>

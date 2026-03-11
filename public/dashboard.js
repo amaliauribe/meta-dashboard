@@ -2817,12 +2817,12 @@ async function loadFunnelsData() {
         const metaResults = getResults(meta.actions);
         const metaLfsCount = metaLfs.total || 0;
         
-        document.getElementById('funnelMetaCost').textContent = '$' + metaSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('funnelMetaImpressions').textContent = metaImpressions.toLocaleString();
-        document.getElementById('funnelMetaClicks').textContent = metaClicks.toLocaleString();
-        document.getElementById('funnelMetaResults').textContent = metaResults.toLocaleString();
-        document.getElementById('funnelMetaLfs').textContent = metaLfsCount.toLocaleString();
-        document.getElementById('funnelMetaCostLfs').textContent = metaLfsCount > 0 ? '$' + (metaSpend / metaLfsCount).toFixed(2) : '-';
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaCost').textContent = '$' + metaSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaImpressions').textContent = metaImpressions.toLocaleString();
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaClicks').textContent = metaClicks.toLocaleString();
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaResults').textContent = metaResults.toLocaleString();
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaLfs').textContent = metaLfsCount.toLocaleString();
+        // document.getElementById('funnelMeta')?.textContent; // OLD: // document.getElementById('funnelMetaCostLfs').textContent = metaLfsCount > 0 ? '$' + (metaSpend / metaLfsCount).toFixed(2) : '-';
         
         // Process Google data
         const googleSpend = parseFloat(googleData.spend || 0);
@@ -2831,12 +2831,12 @@ async function loadFunnelsData() {
         const googleResults = parseFloat(googleData.conversions || 0);
         const googleLfsCount = googleLfs.total || 0;
         
-        document.getElementById('funnelGoogleCost').textContent = '$' + googleSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('funnelGoogleImpressions').textContent = googleImpressions.toLocaleString();
-        document.getElementById('funnelGoogleClicks').textContent = googleClicks.toLocaleString();
-        document.getElementById('funnelGoogleResults').textContent = Math.round(googleResults).toLocaleString();
-        document.getElementById('funnelGoogleLfs').textContent = googleLfsCount.toLocaleString();
-        document.getElementById('funnelGoogleCostLfs').textContent = googleLfsCount > 0 ? '$' + (googleSpend / googleLfsCount).toFixed(2) : '-';
+        // document.getElementById('funnelGoogleCost').textContent = '$' + googleSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        // document.getElementById('funnelGoogleImpressions').textContent = googleImpressions.toLocaleString();
+        // document.getElementById('funnelGoogleClicks').textContent = googleClicks.toLocaleString();
+        // document.getElementById('funnelGoogleResults').textContent = Math.round(googleResults).toLocaleString();
+        // document.getElementById('funnelGoogleLfs').textContent = googleLfsCount.toLocaleString();
+        // document.getElementById('funnelGoogleCostLfs').textContent = googleLfsCount > 0 ? '$' + (googleSpend / googleLfsCount).toFixed(2) : '-';
         
         // Process Bing data (bingApiCall returns data directly, not nested)
         const bingSpend = parseFloat(bingData.spend || 0);
@@ -2845,12 +2845,12 @@ async function loadFunnelsData() {
         const bingResults = parseFloat(bingData.conversions || 0);
         const bingLfsCount = bingLfs.total || 0;
         
-        document.getElementById('funnelBingCost').textContent = '$' + bingSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('funnelBingImpressions').textContent = bingImpressions.toLocaleString();
-        document.getElementById('funnelBingClicks').textContent = bingClicks.toLocaleString();
-        document.getElementById('funnelBingResults').textContent = Math.round(bingResults).toLocaleString();
-        document.getElementById('funnelBingLfs').textContent = bingLfsCount.toLocaleString();
-        document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
+        // document.getElementById('funnelBingCost').textContent = '$' + bingSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        // document.getElementById('funnelBingImpressions').textContent = bingImpressions.toLocaleString();
+        // document.getElementById('funnelBingClicks').textContent = bingClicks.toLocaleString();
+        // document.getElementById('funnelBingResults').textContent = Math.round(bingResults).toLocaleString();
+        // document.getElementById('funnelBingLfs').textContent = bingLfsCount.toLocaleString();
+        // document.getElementById('funnelBingCostLfs').textContent = bingLfsCount > 0 ? '$' + (bingSpend / bingLfsCount).toFixed(2) : '-';
         
         // Load Medwork funnel for Funnels view with spend data for cost per stage
         const spendByPlatform = {
@@ -2863,6 +2863,8 @@ async function loadFunnelsData() {
             gbutm: 0              // GBP (no spend)
         };
         await loadFunnelsMedworkData(startDate, endDate, spendByPlatform);
+        // Load Unified Platform Funnels
+        await loadUnifiedFunnels(startDate, endDate);
         
         // Render comparison chart
         renderFunnelsComparisonChart({
@@ -3053,6 +3055,7 @@ async function loadFunnelsData() {
         
         // Load monthly cost trend chart
         loadMonthlyCostTrends();
+        loadCostBySourceTrends();
         
     } catch (e) {
         console.error('Error loading funnels data:', e);
@@ -3300,6 +3303,9 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                     document.getElementById('costTrendStartDate').value = startStr;
                     document.getElementById('costTrendEndDate').value = endStr;
                     
+                    // Sync filter variables with current dropdown values
+                    costTrendSource = document.getElementById("costTrendSourceFilter").value;
+                    costTrendStage = document.getElementById("costTrendStageFilter").value;
                     loadMonthlyCostTrends(startStr, endStr);
                 });
             });
@@ -3324,6 +3330,9 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                     b.style.color = '#333';
                 });
                 
+                // Sync filter variables with current dropdown values
+                costTrendSource = document.getElementById("costTrendSourceFilter").value;
+                costTrendStage = document.getElementById("costTrendStageFilter").value;
                 loadMonthlyCostTrends(start, end);
             });
             
@@ -5488,9 +5497,33 @@ async function loadInsuranceFunnel() {
     
     try {
         const range = dateRanges[currentRange];
+        
+        // Calculate actual dates from range
+        let startDate, endDate;
+        if (range.custom && customStartDate && customEndDate) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+        } else if (range.days) {
+            const today = getESTDate();
+            const since = new Date(today);
+            since.setDate(today.getDate() - range.days + 1);
+            endDate = formatDateEST(today);
+            startDate = formatDateEST(since);
+        } else if (range.preset === 'today') {
+            const today = getESTDate();
+            startDate = formatDateEST(today);
+            endDate = formatDateEST(today);
+        } else if (range.preset === 'yesterday') {
+            const today = getESTDate();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            startDate = formatDateEST(yesterday);
+            endDate = formatDateEST(yesterday);
+        }
+        
         let url = '/api/looker/insurance-funnel';
-        if (range.startDate && range.endDate) {
-            url += `?startDate=${range.startDate}&endDate=${range.endDate}`;
+        if (startDate && endDate) {
+            url += `?startDate=${startDate}&endDate=${endDate}`;
         }
         
         const response = await fetch(url);
@@ -5708,7 +5741,74 @@ async function loadInsuranceFunnel() {
         charts.style.display = 'block';
         tableContainer.style.display = 'block';
         insights.style.display = 'block';
-        
+        // ===== Insurance Platform Cards =====
+        const insurancePlatformCards = document.getElementById('insurancePlatformCards');
+        if (insurancePlatformCards) {
+            try {
+                // Fetch spend data from ad platforms (only if we have dates)
+                let metaSpend = 0, googleSpend = 0, bingSpend = 0;
+                if (startDate && endDate) {
+                    const [metaSpendData, googleSpendData, bingSpendData] = await Promise.all([
+                        apiCall(`${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}`).catch(() => null),
+                        fetch('/api/google/account-performance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ startDate, endDate })
+                        }).then(r => r.json()).catch(() => null),
+                        fetch('/api/bing/account-performance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ startDate, endDate })
+                        }).then(r => r.json()).catch(() => null)
+                    ]);
+                    metaSpend = metaSpendData?.data?.[0]?.spend ? parseFloat(metaSpendData.data[0].spend) : 0;
+                    googleSpend = googleSpendData?.spend ? parseFloat(googleSpendData.spend) : 0;
+                    bingSpend = bingSpendData?.spend ? parseFloat(bingSpendData.spend) : 0;
+                }
+                
+                const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+                const fmt = n => n.toLocaleString('en-US');
+                const fmtMoney = n => '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                // Use the data object already fetched by insurance-funnel API
+                const platformConfigs = [
+                    { prefix: 'insMeta', platform: 'mutm', spend: metaSpend },
+                    { prefix: 'insGoogle', platform: 'g1utm', spend: googleSpend },
+                    { prefix: 'insBing', platform: 'butm', spend: bingSpend },
+                    { prefix: 'insTiktok', platform: 'tutm', spend: 0 }
+                ];
+                
+                for (const cfg of platformConfigs) {
+                    const platformData = data[cfg.platform];
+                    if (!platformData) continue;
+                    
+                    const totalLfs = platformData.total || 0;
+                    const ppo = platformData.insurance?.PPO?.leads || 0;
+                    const hmo = platformData.insurance?.HMO?.leads || 0;
+                    const medicare = platformData.insurance?.Medicare?.leads || 0;
+                    const unknown = platformData.insurance?.Unknown?.leads || 0;
+                    
+                    el(`${cfg.prefix}Lfs`, fmt(totalLfs));
+                    el(`${cfg.prefix}Ppo`, fmt(ppo));
+                    el(`${cfg.prefix}Hmo`, fmt(hmo));
+                    el(`${cfg.prefix}Medicare`, fmt(medicare));
+                    el(`${cfg.prefix}Unknown`, fmt(unknown));
+                    
+                    // Cost per insurance type
+                    if (cfg.spend > 0) {
+                        el(`${cfg.prefix}CostPerLfs`, totalLfs > 0 ? fmtMoney(cfg.spend / totalLfs) : '');
+                        el(`${cfg.prefix}CostPerPpo`, ppo > 0 ? fmtMoney(cfg.spend / ppo) : '');
+                        el(`${cfg.prefix}CostPerHmo`, hmo > 0 ? fmtMoney(cfg.spend / hmo) : '');
+                        el(`${cfg.prefix}CostPerMedicare`, medicare > 0 ? fmtMoney(cfg.spend / medicare) : '');
+                        el(`${cfg.prefix}CostPerUnknown`, unknown > 0 ? fmtMoney(cfg.spend / unknown) : '');
+                    }
+                }
+                
+                insurancePlatformCards.style.display = 'block';
+            } catch (err) {
+                console.error('Error loading insurance platform cards:', err);
+            }
+        }
         insuranceDataLoaded = true;
         
     } catch (error) {
@@ -8028,4 +8128,515 @@ if (originalSwitchView) {
             }
         });
     });
+}
+
+// ========== Cost Per Stage by Source Section ==========
+let costBySourceChart = null;
+let costBySourceWeeklyChart = null;
+let costBySourceStage = 'l_f_s';
+let costBySourceStartDate = null;
+let costBySourceEndDate = null;
+let costBySourceData = null;
+let costBySourceWeeklyData = null;
+let costBySourceSpendData = null;
+let costBySourceWeeklySpendData = null;
+let costBySourceFiltersInitialized = false;
+
+async function loadCostBySourceTrends(startDate = null, endDate = null) {
+    const container = document.getElementById('costBySourceChartContainer');
+    const weeklyContainer = document.getElementById('costBySourceWeeklyContainer');
+    const loading = document.getElementById('costBySourceLoading');
+    
+    if (!container) return;
+    
+    if (startDate !== null) costBySourceStartDate = startDate;
+    if (endDate !== null) costBySourceEndDate = endDate;
+    
+    let monthlyUrl = '/api/looker/monthly-cost-trends';
+    let weeklyUrl = '/api/looker/weekly-cost-trends';
+    const params = [];
+    if (costBySourceStartDate) params.push(`startDate=${costBySourceStartDate}`);
+    if (costBySourceEndDate) params.push(`endDate=${costBySourceEndDate}`);
+    
+    if (params.length > 0) {
+        monthlyUrl += '?' + params.join('&');
+        weeklyUrl += '?' + params.join('&');
+    } else {
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        costBySourceStartDate = sevenDaysAgo.toISOString().split('T')[0];
+        costBySourceEndDate = today.toISOString().split('T')[0];
+        monthlyUrl += `?startDate=${costBySourceStartDate}&endDate=${costBySourceEndDate}`;
+        weeklyUrl += `?startDate=${costBySourceStartDate}&endDate=${costBySourceEndDate}`;
+    }
+    
+    loading.style.display = 'block';
+    container.style.opacity = '0.5';
+    if (weeklyContainer) weeklyContainer.style.opacity = '0.5';
+    
+    try {
+        const [monthlyRes, weeklyRes] = await Promise.all([
+            fetch(monthlyUrl),
+            fetch(weeklyUrl)
+        ]);
+        
+        const monthlyData = await monthlyRes.json();
+        const weeklyData = await weeklyRes.json();
+        
+        if (!monthlyData.success) {
+            throw new Error(monthlyData.error || 'Failed to load data');
+        }
+        
+        costBySourceData = monthlyData;
+        costBySourceWeeklyData = weeklyData.success ? weeklyData : null;
+        
+        // Fetch spend for monthly periods
+        costBySourceSpendData = { mutm: [], g1utm: [], butm: [], tutm: [] };
+        for (let i = 0; i < monthlyData.months.length; i++) {
+            costBySourceSpendData.mutm.push(0);
+            costBySourceSpendData.g1utm.push(0);
+            costBySourceSpendData.butm.push(0);
+            costBySourceSpendData.tutm.push(0);
+        }
+        
+        const monthlySpendPromises = [];
+        for (let i = 0; i < monthlyData.months.length; i++) {
+            const period = monthlyData.periods[i];
+            monthlySpendPromises.push(fetchPlatformSpend(period.start, period.end, i));
+        }
+        
+        const monthlySpendResults = await Promise.all(monthlySpendPromises);
+        monthlySpendResults.forEach((spend, idx) => {
+            costBySourceSpendData.mutm[idx] = spend.meta;
+            costBySourceSpendData.g1utm[idx] = spend.google;
+            costBySourceSpendData.butm[idx] = spend.bing;
+            costBySourceSpendData.tutm[idx] = spend.tiktok;
+        });
+        
+        // Fetch spend for weekly periods
+        if (costBySourceWeeklyData) {
+            costBySourceWeeklySpendData = { mutm: [], g1utm: [], butm: [], tutm: [] };
+            for (let i = 0; i < weeklyData.weeks.length; i++) {
+                costBySourceWeeklySpendData.mutm.push(0);
+                costBySourceWeeklySpendData.g1utm.push(0);
+                costBySourceWeeklySpendData.butm.push(0);
+                costBySourceWeeklySpendData.tutm.push(0);
+            }
+            
+            const weeklySpendPromises = [];
+            for (let i = 0; i < weeklyData.weeks.length; i++) {
+                const period = weeklyData.periods[i];
+                weeklySpendPromises.push(fetchPlatformSpend(period.start, period.end, i));
+            }
+            
+            const weeklySpendResults = await Promise.all(weeklySpendPromises);
+            weeklySpendResults.forEach((spend, idx) => {
+                costBySourceWeeklySpendData.mutm[idx] = spend.meta;
+                costBySourceWeeklySpendData.g1utm[idx] = spend.google;
+                costBySourceWeeklySpendData.butm[idx] = spend.bing;
+                costBySourceWeeklySpendData.tutm[idx] = spend.tiktok;
+            });
+        }
+        
+        // Sync stage filter
+        costBySourceStage = document.getElementById('costBySourceStageFilter').value;
+        
+        renderCostBySourceChart(costBySourceStage);
+        renderCostBySourceWeeklyChart(costBySourceStage);
+        
+        // Setup filters
+        if (!costBySourceFiltersInitialized) {
+            document.getElementById('costBySourceStageFilter').addEventListener('change', (e) => {
+                costBySourceStage = e.target.value;
+                renderCostBySourceChart(costBySourceStage);
+                renderCostBySourceWeeklyChart(costBySourceStage);
+            });
+            
+            const today = new Date();
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 7);
+            document.getElementById('costBySourceEndDate').value = today.toISOString().split('T')[0];
+            document.getElementById('costBySourceStartDate').value = sevenDaysAgo.toISOString().split('T')[0];
+            
+            document.querySelectorAll('.cost-by-source-preset').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.cost-by-source-preset').forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'white';
+                        b.style.color = '#333';
+                    });
+                    btn.classList.add('active');
+                    btn.style.background = '#1877f2';
+                    btn.style.color = 'white';
+                    
+                    const range = btn.dataset.range;
+                    const today = new Date();
+                    const start = new Date(today);
+                    
+                    if (range === '7d') start.setDate(today.getDate() - 7);
+                    else if (range === '14d') start.setDate(today.getDate() - 14);
+                    else if (range === '30d') start.setDate(today.getDate() - 30);
+                    else if (range === '90d') start.setDate(today.getDate() - 90);
+                    
+                    const startStr = start.toISOString().split('T')[0];
+                    const endStr = today.toISOString().split('T')[0];
+                    
+                    document.getElementById('costBySourceStartDate').value = startStr;
+                    document.getElementById('costBySourceEndDate').value = endStr;
+                    
+                    costBySourceStage = document.getElementById('costBySourceStageFilter').value;
+                    loadCostBySourceTrends(startStr, endStr);
+                });
+            });
+            
+            document.getElementById('costBySourceApplyDate').addEventListener('click', () => {
+                const start = document.getElementById('costBySourceStartDate').value;
+                const end = document.getElementById('costBySourceEndDate').value;
+                
+                if (!start || !end) {
+                    alert('Please select both start and end dates');
+                    return;
+                }
+                
+                document.querySelectorAll('.cost-by-source-preset').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'white';
+                    b.style.color = '#333';
+                });
+                
+                costBySourceStage = document.getElementById('costBySourceStageFilter').value;
+                loadCostBySourceTrends(start, end);
+            });
+            
+            costBySourceFiltersInitialized = true;
+        }
+        
+        loading.style.display = 'none';
+        container.style.opacity = '1';
+        if (weeklyContainer) weeklyContainer.style.opacity = '1';
+        
+    } catch (error) {
+        console.error('Cost by source error:', error);
+        loading.innerHTML = 'Error loading data: ' + error.message;
+    }
+}
+
+function renderCostBySourceChart(stage) {
+    if (!costBySourceData || !costBySourceSpendData) return;
+    
+    const canvas = document.getElementById('costBySourceChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    const sourceConfig = {
+        mutm: { label: 'Meta', borderColor: '#1877f2', backgroundColor: 'rgba(24, 119, 242, 0.1)' },
+        g1utm: { label: 'Google', borderColor: '#34a853', backgroundColor: 'rgba(52, 168, 83, 0.1)' },
+        butm: { label: 'Bing', borderColor: '#00a4ef', backgroundColor: 'rgba(0, 164, 239, 0.1)' },
+        tutm: { label: 'TikTok', borderColor: '#000000', backgroundColor: 'rgba(0, 0, 0, 0.1)' }
+    };
+    
+    const datasets = Object.keys(sourceConfig).map(source => {
+        const stageData = costBySourceData.data[source][stage];
+        const spendData = costBySourceSpendData[source];
+        const costPerStage = stageData.map((v, i) => v > 0 ? spendData[i] / v : null);
+        
+        return {
+            label: sourceConfig[source].label,
+            data: costPerStage,
+            borderColor: sourceConfig[source].borderColor,
+            backgroundColor: sourceConfig[source].backgroundColor,
+            tension: 0.3,
+            fill: false
+        };
+    });
+    
+    if (costBySourceChart) {
+        costBySourceChart.destroy();
+    }
+    
+    const stageNames = {
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    costBySourceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costBySourceData.months,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Cost Per ${stageNames[stage]} - By Source`,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCostBySourceWeeklyChart(stage) {
+    if (!costBySourceWeeklyData || !costBySourceWeeklySpendData) return;
+    
+    const canvas = document.getElementById('costBySourceWeeklyChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    const sourceConfig = {
+        mutm: { label: 'Meta', borderColor: '#1877f2', backgroundColor: 'rgba(24, 119, 242, 0.1)' },
+        g1utm: { label: 'Google', borderColor: '#34a853', backgroundColor: 'rgba(52, 168, 83, 0.1)' },
+        butm: { label: 'Bing', borderColor: '#00a4ef', backgroundColor: 'rgba(0, 164, 239, 0.1)' },
+        tutm: { label: 'TikTok', borderColor: '#000000', backgroundColor: 'rgba(0, 0, 0, 0.1)' }
+    };
+    
+    const datasets = Object.keys(sourceConfig).map(source => {
+        const stageData = costBySourceWeeklyData.data[source][stage];
+        const spendData = costBySourceWeeklySpendData[source];
+        const costPerStage = stageData.map((v, i) => v > 0 ? spendData[i] / v : null);
+        
+        return {
+            label: sourceConfig[source].label,
+            data: costPerStage,
+            borderColor: sourceConfig[source].borderColor,
+            backgroundColor: sourceConfig[source].backgroundColor,
+            tension: 0.3,
+            fill: false
+        };
+    });
+    
+    if (costBySourceWeeklyChart) {
+        costBySourceWeeklyChart.destroy();
+    }
+    
+    const stageNames = {
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    costBySourceWeeklyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costBySourceWeeklyData.weeks,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Cost Per ${stageNames[stage]} by Week - By Source`,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Initialize when Funnels tab is shown
+document.addEventListener('DOMContentLoaded', () => {
+    // Add to existing tab click handler or call directly
+    const existingTabHandler = document.querySelector('[data-view="funnels"]');
+    if (existingTabHandler) {
+        existingTabHandler.addEventListener('click', () => {
+            setTimeout(() => loadCostBySourceTrends(), 100);
+        });
+    }
+});
+
+// ========== Unified Platform Funnels ==========
+async function loadUnifiedFunnels(startDate, endDate) {
+    try {
+        // Fetch ad platform data in parallel
+        const [metaData, googleData, bingData] = await Promise.all([
+            apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${startDate}","until":"${endDate}"}`).catch(() => null),
+            fetch('/api/google/account-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            }).then(r => r.json()).catch(() => null),
+            fetch('/api/bing/account-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            }).then(r => r.json()).catch(() => null)
+        ]);
+        
+        // Fetch Looker funnel data
+        const lookerData = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => null);
+        
+        // Process Meta
+        let metaSpend = 0, metaImpressions = 0, metaClicks = 0, metaResults = 0;
+        if (metaData?.data?.[0]) {
+            const m = metaData.data[0];
+            metaSpend = parseFloat(m.spend) || 0;
+            metaImpressions = parseInt(m.impressions) || 0;
+            metaClicks = parseInt(m.clicks) || 0;
+            // Use getResults function for proper counting
+            metaResults = getResults(m.actions);
+        }
+        
+        // Process Google
+        let googleSpend = 0, googleImpressions = 0, googleClicks = 0, googleResults = 0;
+        if (googleData && !googleData.error) {
+            googleSpend = parseFloat(googleData.spend) || 0;
+            googleImpressions = parseInt(googleData.impressions) || 0;
+            googleClicks = parseInt(googleData.clicks) || 0;
+            googleResults = parseInt(googleData.conversions) || 0;
+        }
+        
+        // Process Bing
+        let bingSpend = 0, bingImpressions = 0, bingClicks = 0, bingResults = 0;
+        if (bingData && !bingData.error) {
+            bingSpend = parseFloat(bingData.spend) || 0;
+            bingImpressions = parseInt(bingData.impressions) || 0;
+            bingClicks = parseInt(bingData.clicks) || 0;
+            bingResults = parseInt(bingData.conversions) || 0;
+        }
+        
+        // Process Looker data
+        const looker = {
+            mutm: { lfs: 0, booked: 0, verif: 0, covered: 0, fulfilled: 0 },
+            g1utm: { lfs: 0, booked: 0, verif: 0, covered: 0, fulfilled: 0 },
+            butm: { lfs: 0, booked: 0, verif: 0, covered: 0, fulfilled: 0 },
+            tutm: { lfs: 0, booked: 0, verif: 0, covered: 0, fulfilled: 0 }
+        };
+        
+        if (lookerData?.data) {
+            for (const platform of ['mutm', 'g1utm', 'butm', 'tutm']) {
+                if (lookerData.data[platform]) {
+                    const p = lookerData.data[platform];
+                    looker[platform] = {
+                        lfs: p.l_f_s || p.lfs || 0,
+                        booked: p.is_booked || p.booked || 0,
+                        verif: p.sent_to_verification || p.verif || 0,
+                        covered: p.is_booked_covered || p.covered || 0,
+                        fulfilled: p.initial_fulfilled || p.fulfilled || 0
+                    };
+                }
+            }
+        }
+        
+        // Update Meta card
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        const fmt = n => n.toLocaleString('en-US');
+        const fmtMoney = n => '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        el('unifiedMetaCost', fmtMoney(metaSpend));
+        el('unifiedMetaImpressions', fmt(metaImpressions));
+        el('unifiedMetaClicks', fmt(metaClicks));
+        el('unifiedMetaResults', fmt(metaResults));
+        el('unifiedMetaCostPerResult', metaResults > 0 ? fmtMoney(metaSpend / metaResults) : '');
+        el('unifiedMetaLfs', fmt(looker.mutm.lfs));
+        el('unifiedMetaBooked', fmt(looker.mutm.booked));
+        el('unifiedMetaVerif', fmt(looker.mutm.verif));
+        el('unifiedMetaCovered', fmt(looker.mutm.covered));
+        el('unifiedMetaFulfilled', fmt(looker.mutm.fulfilled));
+        el('unifiedMetaCostLfs', looker.mutm.lfs > 0 ? fmtMoney(metaSpend / looker.mutm.lfs) : '-');
+        el('unifiedMetaCostFulfilled', looker.mutm.fulfilled > 0 ? fmtMoney(metaSpend / looker.mutm.fulfilled) : '-');
+        // Cost per stage for Meta
+        el("unifiedMetaCostPerLfs", looker.mutm.lfs > 0 ? fmtMoney(metaSpend / looker.mutm.lfs) : "");
+        el("unifiedMetaCostPerBooked", looker.mutm.booked > 0 ? fmtMoney(metaSpend / looker.mutm.booked) : "");
+        el("unifiedMetaCostPerVerif", looker.mutm.verif > 0 ? fmtMoney(metaSpend / looker.mutm.verif) : "");
+        el("unifiedMetaCostPerCovered", looker.mutm.covered > 0 ? fmtMoney(metaSpend / looker.mutm.covered) : "");
+        el("unifiedMetaCostPerFulfilled", looker.mutm.fulfilled > 0 ? fmtMoney(metaSpend / looker.mutm.fulfilled) : "");
+        
+        // Update Google card
+        el('unifiedGoogleCost', fmtMoney(googleSpend));
+        el('unifiedGoogleImpressions', fmt(googleImpressions));
+        el('unifiedGoogleClicks', fmt(googleClicks));
+        el('unifiedGoogleResults', fmt(googleResults));
+        el('unifiedGoogleCostPerResult', googleResults > 0 ? fmtMoney(googleSpend / googleResults) : '');
+        el('unifiedGoogleLfs', fmt(looker.g1utm.lfs));
+        el('unifiedGoogleBooked', fmt(looker.g1utm.booked));
+        el('unifiedGoogleVerif', fmt(looker.g1utm.verif));
+        el('unifiedGoogleCovered', fmt(looker.g1utm.covered));
+        el('unifiedGoogleFulfilled', fmt(looker.g1utm.fulfilled));
+        el('unifiedGoogleCostLfs', looker.g1utm.lfs > 0 ? fmtMoney(googleSpend / looker.g1utm.lfs) : '-');
+        el('unifiedGoogleCostFulfilled', looker.g1utm.fulfilled > 0 ? fmtMoney(googleSpend / looker.g1utm.fulfilled) : '-');
+        // Cost per stage for Google
+        el("unifiedGoogleCostPerLfs", looker.g1utm.lfs > 0 ? fmtMoney(googleSpend / looker.g1utm.lfs) : "");
+        el("unifiedGoogleCostPerBooked", looker.g1utm.booked > 0 ? fmtMoney(googleSpend / looker.g1utm.booked) : "");
+        el("unifiedGoogleCostPerVerif", looker.g1utm.verif > 0 ? fmtMoney(googleSpend / looker.g1utm.verif) : "");
+        el("unifiedGoogleCostPerCovered", looker.g1utm.covered > 0 ? fmtMoney(googleSpend / looker.g1utm.covered) : "");
+        el("unifiedGoogleCostPerFulfilled", looker.g1utm.fulfilled > 0 ? fmtMoney(googleSpend / looker.g1utm.fulfilled) : "");
+        
+        // Update Bing card
+        el('unifiedBingCost', fmtMoney(bingSpend));
+        el('unifiedBingImpressions', fmt(bingImpressions));
+        el('unifiedBingClicks', fmt(bingClicks));
+        el('unifiedBingResults', fmt(bingResults));
+        el('unifiedBingCostPerResult', bingResults > 0 ? fmtMoney(bingSpend / bingResults) : '');
+        el('unifiedBingLfs', fmt(looker.butm.lfs));
+        el('unifiedBingBooked', fmt(looker.butm.booked));
+        el('unifiedBingVerif', fmt(looker.butm.verif));
+        el('unifiedBingCovered', fmt(looker.butm.covered));
+        el('unifiedBingFulfilled', fmt(looker.butm.fulfilled));
+        el('unifiedBingCostLfs', looker.butm.lfs > 0 ? fmtMoney(bingSpend / looker.butm.lfs) : '-');
+        el('unifiedBingCostFulfilled', looker.butm.fulfilled > 0 ? fmtMoney(bingSpend / looker.butm.fulfilled) : '-');
+        // Cost per stage for Bing
+        el("unifiedBingCostPerLfs", looker.butm.lfs > 0 ? fmtMoney(bingSpend / looker.butm.lfs) : "");
+        el("unifiedBingCostPerBooked", looker.butm.booked > 0 ? fmtMoney(bingSpend / looker.butm.booked) : "");
+        el("unifiedBingCostPerVerif", looker.butm.verif > 0 ? fmtMoney(bingSpend / looker.butm.verif) : "");
+        el("unifiedBingCostPerCovered", looker.butm.covered > 0 ? fmtMoney(bingSpend / looker.butm.covered) : "");
+        el("unifiedBingCostPerFulfilled", looker.butm.fulfilled > 0 ? fmtMoney(bingSpend / looker.butm.fulfilled) : "");
+        
+        // Update TikTok card (no API data yet, just Looker)
+        el('unifiedTiktokCost', '-');
+        el('unifiedTiktokLfs', fmt(looker.tutm.lfs));
+        el('unifiedTiktokBooked', fmt(looker.tutm.booked));
+        el('unifiedTiktokVerif', fmt(looker.tutm.verif));
+        el('unifiedTiktokCovered', fmt(looker.tutm.covered));
+        el('unifiedTiktokFulfilled', fmt(looker.tutm.fulfilled));
+        el('unifiedTiktokCostLfs', '-');
+        el('unifiedTiktokCostFulfilled', '-');
+        
+    } catch (error) {
+        console.error('Error loading unified funnels:', error);
+    }
 }
