@@ -2706,7 +2706,8 @@ async function loadMedworkFunnel() {
             'tutm': { name: 'TikTok', color: '#00f2ea', emoji: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', emoji: '🔴' },
             'butm': { name: 'Bing', color: '#00A4EF', emoji: '🔷' },
-            'gbputm': { name: 'GBP', color: '#F4B400', emoji: '📍' }
+            'gbputm': { name: 'GBP', color: '#F4B400', emoji: '📍' },
+            'gbutm': { name: 'GBP', color: '#F4B400', emoji: '📍' }
         };
         
         // Build funnel cards for each tracking type
@@ -2849,7 +2850,8 @@ async function loadFunnelsData() {
             butm: bingSpend,      // Bing
             outm: 0,              // Organic (no spend)
             tutm: 0,              // TikTok (not integrated yet)
-            gbputm: 0             // GBP (no spend)
+            gbputm: 0,            // GBP (no spend)
+            gbutm: 0              // GBP (no spend)
         };
         await loadFunnelsMedworkData(startDate, endDate, spendByPlatform);
         
@@ -3602,7 +3604,8 @@ async function loadFunnelsMedworkData(startDate, endDate, spendByPlatform = {}) 
             'tutm': { name: 'TikTok', color: '#00f2ea', icon: '🎵' },
             'g1utm': { name: 'Google', color: '#EA4335', icon: '🔴' },
             'butm': { name: 'Bing', color: '#00A4EF', icon: '🔷' },
-            'gbputm': { name: 'GBP', color: '#F4B400', icon: '📍' }
+            'gbputm': { name: 'GBP', color: '#F4B400', icon: '📍' },
+            'gbutm': { name: 'GBP', color: '#F4B400', icon: '📍' }
         };
         
         // Helper to format cost with commas (e.g., $12,222.00)
@@ -5442,7 +5445,7 @@ async function loadInsuranceFunnel() {
         const tbody = document.getElementById('insuranceTableBody');
         let tableHtml = '';
         
-        const platformOrder = ['mutm', 'tutm', 'g1utm', 'butm', 'gbputm', 'outm'];
+        const platformOrder = ['mutm', 'tutm', 'g1utm', 'butm', 'gbputm', 'gbutm', 'outm'];
         const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
         
         for (const platformKey of platformOrder) {

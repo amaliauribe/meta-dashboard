@@ -3013,7 +3013,7 @@ app.get('/api/looker/leads-funnel', async (req, res) => {
         };
         
         // Build response
-        const trackingTypes = ['mutm', 'outm', 'tutm', 'g1utm', 'butm', 'gbputm'];
+        const trackingTypes = ['mutm', 'outm', 'tutm', 'g1utm', 'butm', 'gbputm', 'gbutm'];
         const funnelData = {};
         
         const totalMap = toMap(totalLeads);
@@ -3133,7 +3133,7 @@ app.get('/api/looker/insurance-funnel', async (req, res) => {
         }
         
         const v = 'fct_leads_funnel_marketing_phi_exclude';
-        const platforms = ['mutm', 'g1utm', 'butm', 'tutm', 'gbputm', 'outm'];
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm', 'gbputm', 'gbutm', 'outm'];
         const insuranceTypes = ['PPO', 'HMO', 'Medicare'];
         const stages = ['leads', 'booked', 'verified', 'covered', 'fulfilled'];
         const stageFilters = {
@@ -3222,7 +3222,7 @@ app.get('/api/looker/insurance-funnel', async (req, res) => {
         }
         
         res.json({ success: true, data: result, totals, platforms: {
-            mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok', gbputm: 'GBP', outm: 'Organic'
+            mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok', gbputm: 'GBP', gbutm: 'GBP', outm: 'Organic'
         }});
     } catch (error) {
         console.error('Looker insurance funnel error:', error);
