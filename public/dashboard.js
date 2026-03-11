@@ -3401,7 +3401,8 @@ function renderCostTrendChart(source, stage = 'all') {
             borderColor: stageConfig[key].borderColor,
             backgroundColor: stageConfig[key].backgroundColor,
             tension: 0.3,
-            fill: false
+            fill: false,
+            yAxisID: 'y'
         }));
     } else {
         // Show only selected stage
@@ -3412,9 +3413,22 @@ function renderCostTrendChart(source, stage = 'all') {
             borderColor: cfg.borderColor,
             backgroundColor: cfg.backgroundColor,
             tension: 0.3,
-            fill: true
+            fill: true,
+            yAxisID: 'y'
         }];
     }
+    
+    // Add l_f_s count as bar graph on secondary axis
+    datasets.push({
+        label: 'l_f_s Count',
+        data: data.l_f_s,
+        type: 'bar',
+        backgroundColor: 'rgba(99, 102, 241, 0.3)',
+        borderColor: '#6366f1',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        order: 1
+    });
     
     if (costTrendChart) {
         costTrendChart.destroy();
@@ -3459,10 +3473,23 @@ function renderCostTrendChart(source, stage = 'all') {
             },
             scales: {
                 y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
                     beginAtZero: true,
                     title: { display: true, text: 'Cost ($)' },
                     ticks: {
                         callback: function(value) { return '$' + value; }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    title: { display: true, text: 'l_f_s Count' },
+                    grid: {
+                        drawOnChartArea: false
                     }
                 }
             }
