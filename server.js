@@ -2823,14 +2823,14 @@ app.get("/api/ours-privacy/invoca-by-platform", (req, res) => {
         invocaData = invocaData.filter(d => new Date(d.timestamp) <= end);
     }
     
-    // Group by platform
+    // Group by platform based on event prefix
     const byPlatform = { meta: 0, google: 0, bing: 0, tiktok: 0, other: 0 };
     invocaData.forEach(d => {
         const event = (d.body?.event?.event || "").toLowerCase();
-        if (event.includes("google") || event.includes("gmb")) byPlatform.google++;
-        else if (event.includes("bing")) byPlatform.bing++;
-        else if (event.includes("meta") || event.includes("facebook")) byPlatform.meta++;
-        else if (event.includes("tiktok")) byPlatform.tiktok++;
+        if (event.startsWith("fb_") || event.startsWith("meta_") || event.includes("facebook")) byPlatform.meta++;
+        else if (event.startsWith("google_") || event.includes("gmb") || event.startsWith("g1utm")) byPlatform.google++;
+        else if (event.startsWith("bing_") || event.startsWith("butm")) byPlatform.bing++;
+        else if (event.startsWith("tiktok_") || event.startsWith("tutm")) byPlatform.tiktok++;
         else byPlatform.other++;
     });
     
