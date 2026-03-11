@@ -2591,90 +2591,64 @@ app.get("/api/ours-privacy/by-source", (req, res) => {
 
 
 // Get l_f_s events by platform (meta, google, bing, tiktok)
-app.get("/api/ours-privacy/lfs-by-platform", (req, res) => {
-    const data = global.webhookData || [];
-    const platform = (req.query.platform || "").toLowerCase();
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    // Define source patterns for each platform
-    const platformSources = {
-        meta: ["facebook", "fb", "instagram", "meta"],
-        google: ["google", "gclid"],
-        bing: ["bing", "msclkid"],
-        tiktok: ["tiktok", "tt"]
-    };
-    
-    const sourcesToMatch = platformSources[platform] || [];
-    
-    let oursData = data.filter(d => 
-        d.headers && d.headers["user-agent"] && 
-        d.headers["user-agent"].includes("ours-privacy") &&
-        d.body && d.body.event && d.body.event.event === "l_f_s"
-    );
-    
-    // Apply date filtering
-    if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
-    }
-    if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
-    }
-    
-    // Get all visitor IDs that had platform-specific events
-    const allData = data.filter(d => 
-        d.headers && d.headers["user-agent"] && 
-        d.headers["user-agent"].includes("ours-privacy")
-    );
-    
-    // Build set of visitor IDs by platform based on their events
-    const metaVisitors = new Set();
-    const googleVisitors = new Set();
-    const bingVisitors = new Set();
-    const tiktokVisitors = new Set();
-    
-    allData.forEach(d => {
-        const event = d.body?.event?.event || "";
-        const visitorId = d.body?.visitor?.visitor_id;
-        if (!visitorId) return;
+// l_f_s by platform - NOW USING LOOKER as source of truth
+app.get("/api/ours-privacy/lfs-by-platform", async (req, res) => {
+    try {
+        const platform = (req.query.platform || "").toLowerCase();
+        const startDate = req.query.startDate;
+        const endDate = req.query.endDate;
         
-        if (event.startsWith("mutm_")) metaVisitors.add(visitorId);
-        if (event.startsWith("g1utm_")) googleVisitors.add(visitorId);
-        if (event.startsWith("butm_")) bingVisitors.add(visitorId);
-        if (event.startsWith("tutm_")) tiktokVisitors.add(visitorId);
-    });
-    
-    // Filter l_f_s by platform - check if visitor had platform events
-    const filtered = oursData.filter(d => {
-        const visitorId = d.body?.visitor?.visitor_id;
-        const source = (d.body.visitor?.utm_source || "").toLowerCase();
-        
-        if (platform === "meta") {
-            return metaVisitors.has(visitorId) || source === "facebook" || source === "fb";
-        } else if (platform === "google") {
-            return googleVisitors.has(visitorId) || source === "google";
-        } else if (platform === "bing") {
-            return bingVisitors.has(visitorId) || source === "bing";
-        } else if (platform === "tiktok") {
-            return tiktokVisitors.has(visitorId) || source === "tiktok";
+        if (!startDate || !endDate) {
+            return res.json({ platform, total: 0, sources: [], events: [] });
         }
-        return sourcesToMatch.some(s => source.includes(s));
-    });
-    
-    res.json({
-        platform,
-        total: filtered.length,
-        sources: sourcesToMatch,
-        events: filtered.slice(0, 50).map(d => ({
-            timestamp: d.timestamp,
-            source: d.body.visitor?.utm_source,
-            campaign: d.body.visitor?.utm_campaign
-        }))
-    });
+        
+        // Map platform to tracking types
+        const platformToTrackingTypes = {
+            meta: ['mutm'],
+            google: ['g1utm', 'gbutm', 'gbputm'],
+            bing: ['butm'],
+            tiktok: ['tutm']
+        };
+        
+        const trackingTypes = platformToTrackingTypes[platform] || [];
+        if (trackingTypes.length === 0) {
+            return res.json({ platform, total: 0, sources: [], events: [] });
+        }
+        
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const dateField = `${v}.lead_created_date_est_date`;
+        const trackingField = `${v}.tracking_type`;
+        const countField = `${v}.count`;
+        
+        // Build date filter
+        let dateFilter = {};
+        if (startDate === endDate) {
+            dateFilter[dateField] = startDate;
+        } else {
+            dateFilter[dateField] = `${startDate} to ${endDate}`;
+        }
+        
+        // Query each tracking type and sum
+        let total = 0;
+        for (const trackingType of trackingTypes) {
+            const filter = { ...dateFilter, [trackingField]: trackingType };
+            const results = await lookerQuery(v, [countField], filter, [], 10);
+            if (results && results[0]) {
+                total += results[0][countField] || 0;
+            }
+        }
+        
+        res.json({
+            platform,
+            total,
+            sources: trackingTypes,
+            source: 'looker',
+            events: [] // Events not available from Looker
+        });
+    } catch (error) {
+        console.error('Looker lfs-by-platform error:', error);
+        res.json({ platform: req.query.platform, total: 0, sources: [], events: [], error: error.message });
+    }
 });
 
 // Get l_f_s daily breakdown with platform counts
@@ -2742,64 +2716,62 @@ app.get("/api/ours-privacy/lfs-daily-breakdown", (req, res) => {
 });
 
 // Get l_f_s events by platform grouped by date
-app.get("/api/ours-privacy/lfs-by-date", (req, res) => {
-    const data = global.webhookData || [];
-    const platform = (req.query.platform || "").toLowerCase();
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    const allData = data.filter(d => 
-        d.headers && d.headers["user-agent"] && 
-        d.headers["user-agent"].includes("ours-privacy")
-    );
-    
-    // Build set of visitor IDs by platform
-    const platformVisitors = new Set();
-    allData.forEach(d => {
-        const event = d.body?.event?.event || "";
-        const visitorId = d.body?.visitor?.visitor_id;
-        if (!visitorId) return;
+// l_f_s by date - NOW USING LOOKER as source of truth
+app.get("/api/ours-privacy/lfs-by-date", async (req, res) => {
+    try {
+        const platform = (req.query.platform || "").toLowerCase();
+        const startDate = req.query.startDate;
+        const endDate = req.query.endDate;
         
-        if (platform === "meta" && event.startsWith("mutm_")) platformVisitors.add(visitorId);
-        if (platform === "google" && event.startsWith("g1utm_")) platformVisitors.add(visitorId);
-        if (platform === "bing" && event.startsWith("butm_")) platformVisitors.add(visitorId);
-        if (platform === "tiktok" && event.startsWith("tutm_")) platformVisitors.add(visitorId);
-    });
-    
-    // Filter l_f_s events
-    let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
-    
-    if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) >= start);
-    }
-    if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) <= end);
-    }
-    
-    // Filter by platform
-    const filtered = lfsData.filter(d => {
-        const visitorId = d.body?.visitor?.visitor_id;
-        const source = (d.body?.visitor?.utm_source || "").toLowerCase();
+        if (!startDate || !endDate) {
+            return res.json({ platform, byDate: {} });
+        }
         
-        if (platform === "meta") return platformVisitors.has(visitorId) || source === "facebook" || source === "fb";
-        if (platform === "google") return platformVisitors.has(visitorId) || source === "google";
-        if (platform === "bing") return platformVisitors.has(visitorId) || source === "bing";
-        if (platform === "tiktok") return platformVisitors.has(visitorId) || source === "tiktok";
-        return true;
-    });
-    
-    // Group by date
-    const byDate = {};
-    filtered.forEach(d => {
-        const date = d.timestamp.split("T")[0];
-        byDate[date] = (byDate[date] || 0) + 1;
-    });
-    
-    res.json({ platform, byDate });
+        // Map platform to tracking types
+        const platformToTrackingTypes = {
+            meta: ['mutm'],
+            google: ['g1utm', 'gbutm', 'gbputm'],
+            bing: ['butm'],
+            tiktok: ['tutm']
+        };
+        
+        const trackingTypes = platformToTrackingTypes[platform] || [];
+        if (trackingTypes.length === 0) {
+            return res.json({ platform, byDate: {} });
+        }
+        
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const dateField = `${v}.lead_created_date_est_date`;
+        const trackingField = `${v}.tracking_type`;
+        const countField = `${v}.count`;
+        
+        // Build date filter
+        let dateFilter = {};
+        if (startDate === endDate) {
+            dateFilter[dateField] = startDate;
+        } else {
+            dateFilter[dateField] = `${startDate} to ${endDate}`;
+        }
+        
+        // Query for each tracking type
+        const byDate = {};
+        
+        for (const trackingType of trackingTypes) {
+            const filter = { ...dateFilter, [trackingField]: trackingType };
+            const results = await lookerQuery(v, [dateField, countField], filter, [`${dateField} desc`], 100);
+            
+            results.forEach(row => {
+                const date = row[dateField];
+                const count = row[countField] || 0;
+                byDate[date] = (byDate[date] || 0) + count;
+            });
+        }
+        
+        res.json({ platform, byDate, source: 'looker' });
+    } catch (error) {
+        console.error('Looker lfs-by-date error:', error);
+        res.json({ platform: req.query.platform, byDate: {}, error: error.message });
+    }
 });
 
 // Get l_f_s events grouped by source
@@ -3850,6 +3822,104 @@ const CLINIC_ZIPCODES = {
     'San Diego': ['91902', '91910', '91914', '91941', '91942', '91945', '91950', '91977', '91978', '92003', '92007', '92008', '92009', '92010', '92011', '92014', '92019', '92020', '92021', '92024', '92037', '92040', '92054', '92056', '92057', '92058', '92067', '92071', '92075', '92081', '92083', '92091', '92101', '92102', '92103', '92104', '92105', '92106', '92107', '92108', '92109', '92110', '92111', '92113', '92114', '92115', '92116', '92117', '92118', '92119', '92120', '92121', '92122', '92123', '92124', '92130', '92139'],
     'National City': ['91902', '91910', '91911', '91950', '91977', '92113', '92114', '92139']
 };
+
+// Looker: l_f_s by date and tracking type (replaces Ours Privacy webhooks)
+app.get('/api/looker/lfs-by-date', async (req, res) => {
+    try {
+        const { startDate, endDate, trackingType } = req.query;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, error: 'Missing startDate or endDate' });
+        }
+        
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const dateField = `${v}.lead_created_date_est_date`;
+        const trackingField = `${v}.tracking_type`;
+        const countField = `${v}.count`;
+        
+        // Build date filter
+        let dateFilter = {};
+        if (startDate === endDate) {
+            dateFilter[dateField] = startDate;
+        } else {
+            dateFilter[dateField] = `${startDate} to ${endDate}`;
+        }
+        
+        // Add tracking type filter if specified
+        if (trackingType) {
+            dateFilter[trackingField] = trackingType;
+        }
+        
+        // Query Looker for l_f_s counts by date and tracking type
+        const fields = [dateField, trackingField, countField];
+        const sorts = [`${dateField} desc`];
+        
+        const results = await lookerQuery(v, fields, dateFilter, sorts, 1000);
+        
+        // Group by date and tracking type
+        const byDate = {};
+        const byTrackingType = {};
+        
+        // Tracking type to platform mapping
+        const platformMap = {
+            'mutm': 'meta',
+            'g1utm': 'google',
+            'gbutm': 'google',
+            'gbputm': 'google',
+            'butm': 'bing',
+            'tutm': 'tiktok',
+            'outm': 'organic'
+        };
+        
+        results.forEach(row => {
+            const date = row[dateField];
+            const type = row[trackingField] || 'unknown';
+            const count = row[countField] || 0;
+            
+            // By date (all tracking types)
+            if (!byDate[date]) byDate[date] = {};
+            byDate[date][type] = (byDate[date][type] || 0) + count;
+            
+            // By tracking type (all dates)
+            if (!byTrackingType[type]) byTrackingType[type] = 0;
+            byTrackingType[type] += count;
+        });
+        
+        // Also group by platform
+        const byPlatform = {};
+        const byDateByPlatform = {};
+        
+        results.forEach(row => {
+            const date = row[dateField];
+            const type = row[trackingField] || 'unknown';
+            const platform = platformMap[type] || 'other';
+            const count = row[countField] || 0;
+            
+            // Total by platform
+            if (!byPlatform[platform]) byPlatform[platform] = 0;
+            byPlatform[platform] += count;
+            
+            // By date by platform
+            if (!byDateByPlatform[date]) byDateByPlatform[date] = {};
+            if (!byDateByPlatform[date][platform]) byDateByPlatform[date][platform] = 0;
+            byDateByPlatform[date][platform] += count;
+        });
+        
+        res.json({
+            success: true,
+            startDate,
+            endDate,
+            byDate,
+            byTrackingType,
+            byPlatform,
+            byDateByPlatform
+        });
+        
+    } catch (error) {
+        console.error('Looker lfs-by-date error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 app.get('/api/clinic-performance', async (req, res) => {
     try {
