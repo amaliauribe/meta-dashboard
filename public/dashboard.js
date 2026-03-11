@@ -321,6 +321,8 @@ function initializeDashboard() {
                 loadOursPrivacyData();
             } else if (currentView === 'googleAdsCreative') {
                 loadGoogleAdsData();
+            } else if (currentView === 'clinicPerformance') {
+                loadClinicPerformanceData();
             }
         });
     });
