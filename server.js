@@ -4,18 +4,114 @@ const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
 const { GoogleAdsApi } = require('google-ads-api');
+const Database = require('better-sqlite3');
 
 const app = express();
 app.use(express.json());
 
-// ==================== Persistent Webhook Storage ====================
-const WEBHOOK_FILE = "/var/www/ranchi/dashboard/data/webhooks.json";
+// ==================== SQLite Persistent Webhook Storage ====================
+const DATA_DIR = "/var/www/ranchi/dashboard/data";
+const WEBHOOK_FILE = path.join(DATA_DIR, "webhooks.json");
+const DB_FILE = path.join(DATA_DIR, "webhooks.db");
 
 // Ensure data directory exists
-const dataDir = path.dirname(WEBHOOK_FILE);
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+// Initialize SQLite database
+const db = new Database(DB_FILE);
+db.pragma('journal_mode = WAL'); // Better concurrent performance
+db.pragma('synchronous = NORMAL'); // Good balance of speed and safety
+
+// Create table if not exists
+db.exec(`
+    CREATE TABLE IF NOT EXISTS webhooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        source TEXT DEFAULT 'unknown',
+        event_name TEXT DEFAULT '',
+        visitor_id TEXT DEFAULT '',
+        utm_source TEXT DEFAULT '',
+        body TEXT NOT NULL,
+        headers TEXT DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhooks_timestamp ON webhooks(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_webhooks_event ON webhooks(event_name);
+    CREATE INDEX IF NOT EXISTS idx_webhooks_source ON webhooks(source);
+    CREATE INDEX IF NOT EXISTS idx_webhooks_visitor ON webhooks(visitor_id);
+`);
+
+// Prepared statements for performance
+const insertStmt = db.prepare(`
+    INSERT INTO webhooks (timestamp, source, event_name, visitor_id, utm_source, body, headers)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+const countStmt = db.prepare('SELECT COUNT(*) as count FROM webhooks');
+
+// Save webhook to SQLite
+function saveWebhookToDb(entry) {
+    try {
+        const eventName = entry.body?.event?.event || '';
+        const visitorId = entry.body?.visitor?.visitor_id || '';
+        const utmSource = entry.body?.visitor?.utm_source || '';
+        insertStmt.run(
+            entry.timestamp,
+            entry.source || 'unknown',
+            eventName,
+            visitorId,
+            utmSource,
+            JSON.stringify(entry.body || {}),
+            JSON.stringify(entry.headers || {})
+        );
+    } catch (e) {
+        console.error("[DB] Error saving webhook:", e.message);
+    }
+}
+
+// Migrate existing JSON data to SQLite (one-time)
+function migrateJsonToDb() {
+    const dbCount = countStmt.get().count;
+    if (dbCount > 0) {
+        console.log(`[DB] Already has ${dbCount} events, skipping migration`);
+        return;
+    }
+    
+    try {
+        if (!fs.existsSync(WEBHOOK_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(WEBHOOK_FILE, "utf8"));
+        console.log(`[DB] Migrating ${data.length} events from JSON to SQLite...`);
+        
+        const insertMany = db.transaction((entries) => {
+            for (const entry of entries) {
+                const eventName = entry.body?.event?.event || '';
+                const visitorId = entry.body?.visitor?.visitor_id || '';
+                const utmSource = entry.body?.visitor?.utm_source || '';
+                insertStmt.run(
+                    entry.timestamp || new Date().toISOString(),
+                    entry.source || 'unknown',
+                    eventName,
+                    visitorId,
+                    utmSource,
+                    JSON.stringify(entry.body || {}),
+                    JSON.stringify(entry.headers || {})
+                );
+            }
+        });
+        
+        insertMany(data);
+        console.log(`[DB] Migration complete! ${countStmt.get().count} events in database`);
+    } catch (e) {
+        console.error("[DB] Migration error:", e.message);
+    }
+}
+
+// Run migration
+migrateJsonToDb();
+
+// ==================== Legacy JSON Storage (kept for compatibility) ====================
 
 // Load existing data on startup
 function loadWebhookData() {
@@ -30,7 +126,7 @@ function loadWebhookData() {
     return [];
 }
 
-// Save data to file
+// Save data to file (legacy)
 function saveWebhookData(data) {
     try {
         fs.writeFileSync(WEBHOOK_FILE, JSON.stringify(data, null, 2));
@@ -41,7 +137,8 @@ function saveWebhookData(data) {
 
 // Initialize global webhook data from file
 global.webhookData = loadWebhookData();
-console.log("[WEBHOOK] Loaded", global.webhookData.length, "historical events from storage");
+console.log("[WEBHOOK] Loaded", global.webhookData.length, "historical events from JSON storage");
+console.log("[DB] SQLite database:", DB_FILE, "- Events:", countStmt.get().count);
 
 // Override webhook handler to persist data
 app.post("/webhook", express.json(), (req, res) => {
@@ -57,9 +154,10 @@ app.post("/webhook", express.json(), (req, res) => {
     
     global.webhookData.push(entry);
     
-    // No limit - keep all historical data
+    // Save to SQLite (permanent storage)
+    saveWebhookToDb(entry);
     
-    // Save to file (async to not block response)
+    // Save to JSON file (legacy, async to not block response)
     setImmediate(() => saveWebhookData(global.webhookData));
     
     res.json({ success: true, message: "Data received", timestamp });
@@ -79,13 +177,32 @@ app.post("/", express.json(), (req, res) => {
     
     global.webhookData.push(entry);
     
-    // No limit - keep all historical data
+    // Save to SQLite (permanent storage)
+    saveWebhookToDb(entry);
     
+    // Save to JSON file (legacy)
     setImmediate(() => saveWebhookData(global.webhookData));
     
     res.json({ success: true, message: "Data received", timestamp });
 });
 
+
+// Database stats endpoint
+app.get("/api/db/stats", (req, res) => {
+    const total = countStmt.get().count;
+    const firstEvent = db.prepare('SELECT timestamp FROM webhooks ORDER BY timestamp ASC LIMIT 1').get();
+    const lastEvent = db.prepare('SELECT timestamp FROM webhooks ORDER BY timestamp DESC LIMIT 1').get();
+    const eventCounts = db.prepare('SELECT event_name, COUNT(*) as count FROM webhooks GROUP BY event_name ORDER BY count DESC LIMIT 20').all();
+    const dbSize = fs.existsSync(DB_FILE) ? (fs.statSync(DB_FILE).size / 1024 / 1024).toFixed(1) + 'MB' : '0MB';
+    
+    res.json({
+        totalEvents: total,
+        firstEvent: firstEvent?.timestamp,
+        lastEvent: lastEvent?.timestamp,
+        dbSize,
+        topEvents: eventCounts
+    });
+});
 
 app.use(express.static('public'));
 
