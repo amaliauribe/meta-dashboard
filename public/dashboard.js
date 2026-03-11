@@ -4036,8 +4036,6 @@ async function loadStateSpend(startDate, endDate) {
     try {
         // VTC states we care about
         const vtcStates = ['New York', 'New Jersey', 'California', 'Texas', 'Maryland', 'Connecticut'];
-        // DMV states (DC/Virginia) that count towards Maryland
-        const dmvStates = ['Virginia', 'Washington, District of Columbia'];
         const stateAbbrev = {
             'New York': 'NY', 'New Jersey': 'NJ', 'California': 'CA', 
             'Texas': 'TX', 'Maryland': 'MD', 'Connecticut': 'CT'
@@ -4063,8 +4061,6 @@ async function loadStateSpend(startDate, endDate) {
                     
                     if (vtcStates.includes(region)) {
                         stateData[region].meta += spend;
-                    } else if (dmvStates.includes(region)) {
-                        stateData['Maryland'].meta += spend;
                     } else {
                         stateData['Other'].meta += spend;
                     }
@@ -4096,8 +4092,6 @@ async function loadStateSpend(startDate, endDate) {
                     
                     if (matchedState) {
                         stateData[matchedState].bing += spend;
-                    } else if (state.includes('Virginia') || state.includes('District of Columbia') || state === 'VA' || state === 'DC') {
-                        stateData['Maryland'].bing += spend;
                     } else {
                         stateData['Other'].bing += spend;
                     }
@@ -4137,8 +4131,6 @@ async function loadStateSpend(startDate, endDate) {
                     
                     if (matchedState) {
                         stateData[matchedState].google += spend;
-                    } else if (state.includes('Virginia') || state.includes('District of Columbia') || state === 'VA' || state === 'DC') {
-                        stateData['Maryland'].google += spend;
                     } else {
                         stateData['Other'].google += spend;
                     }
