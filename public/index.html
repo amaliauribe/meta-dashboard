@@ -2280,7 +2280,7 @@
         <!-- Clinic Performance View -->
         <div id="clinicPerformanceView" class="view-content hidden">
             <h1>🏥 Clinic Performance Analysis</h1>
-            <p class="section-subtitle">Predict new location success: Ad Clicks → Bookings conversion by clinic</p>
+            <p class="section-subtitle">Ad Clicks (Google Ads) → l_f_s & Booked (LookerML) by clinic</p>
             
             <div id="clinicPerfLoading" class="loading">Loading clinic data...</div>
             
@@ -2291,11 +2291,11 @@
                     <div class="kpi-value" id="clinicPerfClinicsCount">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Total Ad Clicks</div>
+                    <div class="kpi-label">Ad Clicks (Google Ads)</div>
                     <div class="kpi-value" id="clinicPerfTotalClicks">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Total Booked</div>
+                    <div class="kpi-label">Booked (LookerML)</div>
                     <div class="kpi-value" id="clinicPerfTotalBooked">-</div>
                 </div>
                 <div class="kpi-card highlight">
@@ -2310,7 +2310,7 @@
             
             <!-- Chart -->
             <section id="clinicPerfChartContainer" class="chart-section" style="display: none;">
-                <h2>📊 Booked per 100 Ad Clicks by Clinic</h2>
+                <h2>📊 Booked (LookerML) per 100 Ad Clicks (Google Ads) by Clinic</h2>
                 <p class="section-subtitle">Use as benchmark for new test locations</p>
                 <div class="chart-container">
                     <canvas id="clinicPerfChart"></canvas>
@@ -2326,9 +2326,9 @@
                         <thead>
                             <tr>
                                 <th class="sortable" data-sort="clinic">Clinic</th>
-                                <th class="sortable" data-sort="adClicks">Ad Clicks</th>
-                                <th class="sortable" data-sort="leads">Leads</th>
-                                <th class="sortable" data-sort="booked">Booked</th>
+                                <th class="sortable" data-sort="adClicks">Ad Clicks (Google Ads)</th>
+                                <th class="sortable" data-sort="leads">l_f_s (LookerML)</th>
+                                <th class="sortable" data-sort="booked">Booked (LookerML)</th>
                                 <th class="sortable highlight-col desc" data-sort="bookedPer100Clicks">Booked/100 Clicks ⭐</th>
                                 <th class="sortable" data-sort="bookedPer100Leads">Booked/100 Leads</th>
                             </tr>

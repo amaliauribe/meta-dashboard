@@ -3587,28 +3587,8 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         const bookedMap = toMap(isBooked);
         const fulfilledMap = toMap(initialFulfilled);
         
-        // 2. Get ad clicks by zipcode from Bing + Google
+        // 2. Get ad clicks by zipcode from Google Ads only
         let adClicksByZip = {};
-        
-        // Bing geo data
-        if (isBingConfigured()) {
-            try {
-                const bingData = await getBingGeographicReport(startDate, endDate);
-                bingData.forEach(row => {
-                    const zip = row.PostalCode;
-                    if (zip && /^\d{5}$/.test(zip)) {
-                        if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0, sources: [] };
-                        adClicksByZip[zip].clicks += parseInt(row.Clicks) || 0;
-                        adClicksByZip[zip].impressions += parseInt(row.Impressions) || 0;
-                        adClicksByZip[zip].spend += parseFloat(row.Spend) || 0;
-                        if (!adClicksByZip[zip].sources.includes('Bing')) adClicksByZip[zip].sources.push('Bing');
-                    }
-                });
-                console.log('Clinic perf: Bing geo loaded, zips:', Object.keys(adClicksByZip).length);
-            } catch (e) {
-                console.log('Bing geo for clinic perf:', e.message);
-            }
-        }
         
         // Google Ads geo data
         if (isGoogleAdsConfigured()) {
