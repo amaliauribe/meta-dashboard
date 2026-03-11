@@ -8651,11 +8651,11 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Fetch Looker funnel data
         const lookerData = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => null);
         
-        // Fetch Ours Privacy l_f_s data
+        // Fetch Ours Privacy l_f_s data from RAW WEBHOOKS (not Looker)
         const [metaOursLfs, googleOursLfs, bingOursLfs] = await Promise.all([
-            fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
-            fetch(`/api/ours-privacy/lfs-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
-            fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
+            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
+            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
+            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
         ]);
         
         // Process Meta

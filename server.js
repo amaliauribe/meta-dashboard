@@ -2802,6 +2802,50 @@ app.get("/api/ours-privacy/lfs-by-date", async (req, res) => {
 });
 
 // Get l_f_s events grouped by source
+// Ours Privacy l_f_s from RAW WEBHOOKS (not Looker) - for the "Ours P" rows
+app.get("/api/ours-privacy/lfs-raw-by-platform", (req, res) => {
+    const data = global.webhookData || [];
+    const platform = (req.query.platform || "").toLowerCase();
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    // Map platform to utm_source patterns
+    const platformPatterns = {
+        meta: ['facebook', 'fb', 'meta', 'ig', 'instagram'],
+        google: ['google', 'gclid'],
+        bing: ['bing', 'msclkid', 'microsoft'],
+        tiktok: ['tiktok', 'tt']
+    };
+    
+    let oursData = data.filter(d => 
+        d.headers?.["user-agent"]?.includes("ours-privacy") &&
+        d.body?.event?.event === "l_f_s"
+    );
+    
+    // Date filter
+    if (startDate) {
+        const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Platform filter
+    if (platform && platformPatterns[platform]) {
+        const patterns = platformPatterns[platform];
+        oursData = oursData.filter(d => {
+            const source = (d.body.visitor?.utm_source || "").toLowerCase();
+            const medium = (d.body.visitor?.utm_medium || "").toLowerCase();
+            const url = (d.body.event?.url || "").toLowerCase();
+            return patterns.some(p => source.includes(p) || medium.includes(p) || url.includes(p));
+        });
+    }
+    
+    res.json({ platform, total: oursData.length, source: "webhooks" });
+});
+
 app.get("/api/ours-privacy/lfs", (req, res) => {
     const data = global.webhookData || [];
     const startDate = req.query.startDate;
