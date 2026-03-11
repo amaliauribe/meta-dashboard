@@ -421,6 +421,81 @@ body {
     border-color: #bcc0c4;
 }
 
+/* Multi-select dropdown with checkboxes */
+.multi-select-dropdown {
+    position: relative;
+    display: inline-block;
+    min-width: 180px;
+}
+
+.multi-select-btn {
+    width: 100%;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.multi-select-btn:hover {
+    border-color: #bcc0c4;
+}
+
+.multi-select-btn .dropdown-arrow {
+    font-size: 10px;
+    color: #666;
+}
+
+.multi-select-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    margin-top: 4px;
+}
+
+.multi-select-dropdown.open .multi-select-options {
+    display: block;
+}
+
+.multi-select-option {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.multi-select-option:hover {
+    background: #f5f6f7;
+}
+
+.multi-select-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.multi-select-option.select-all {
+    border-bottom: 1px solid #eee;
+    font-weight: 600;
+}
+
 .clear-filters-btn {
     padding: 10px 16px;
     background: #e4e6eb;

@@ -94,7 +94,7 @@ let keywordsSortColumn = 'clicks';
 let keywordsSortDirection = 'desc';
 let keywordsSearchText = '';
 let googleKeywordsCampaignFilter = '';
-let googleKeywordsAdGroupFilter = '';
+let googleKeywordsAdGroupFilter = []; // Array for multi-select
 
 // QS History search
 let qsHistorySearchText = '';
@@ -632,24 +632,33 @@ function initializeDashboard() {
     // Google Keywords campaign filter
     document.getElementById('googleKeywordsCampaignFilter').addEventListener('change', (e) => {
         googleKeywordsCampaignFilter = e.target.value;
-        googleKeywordsAdGroupFilter = ''; // Reset ad group when campaign changes
+        googleKeywordsAdGroupFilter = []; // Reset ad group when campaign changes
         populateGoogleKeywordsAdGroupDropdown();
         renderKeywordsTable();
     });
     
-    // Google Keywords ad group filter
-    document.getElementById('googleKeywordsAdGroupFilter').addEventListener('change', (e) => {
-        googleKeywordsAdGroupFilter = e.target.value;
-        renderKeywordsTable();
+    // Google Keywords ad group multi-select dropdown
+    const adGroupDropdown = document.getElementById('googleKeywordsAdGroupDropdown');
+    const adGroupBtn = document.getElementById('googleKeywordsAdGroupBtn');
+    
+    adGroupBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        adGroupDropdown.classList.toggle('open');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!adGroupDropdown.contains(e.target)) {
+            adGroupDropdown.classList.remove('open');
+        }
     });
     
     // Google Keywords clear filters
     document.getElementById('googleKeywordsClearFilters').addEventListener('click', () => {
         googleKeywordsCampaignFilter = '';
-        googleKeywordsAdGroupFilter = '';
+        googleKeywordsAdGroupFilter = [];
         keywordsSearchText = '';
         document.getElementById('googleKeywordsCampaignFilter').value = '';
-        document.getElementById('googleKeywordsAdGroupFilter').value = '';
         document.getElementById('keywordsSearch').value = '';
         populateGoogleKeywordsAdGroupDropdown();
         renderKeywordsTable();
@@ -5098,7 +5107,7 @@ async function loadGoogleKeywordsData() {
 
         // Reset filters and populate dropdowns
         googleKeywordsCampaignFilter = '';
-        googleKeywordsAdGroupFilter = '';
+        googleKeywordsAdGroupFilter = [];
         populateGoogleKeywordsFilterDropdowns();
 
         // Render table with current sort
@@ -5125,8 +5134,8 @@ function renderKeywordsTable() {
     }
     
     // Ad group filter
-    if (googleKeywordsAdGroupFilter) {
-        filtered = filtered.filter(kw => kw.adGroup === googleKeywordsAdGroupFilter);
+    if (googleKeywordsAdGroupFilter.length > 0) {
+        filtered = filtered.filter(kw => googleKeywordsAdGroupFilter.includes(kw.adGroup));
     }
     
     // Search filter
@@ -5211,14 +5220,76 @@ function populateGoogleKeywordsAdGroupDropdown() {
     }
     
     const adGroups = [...new Set(filteredData.map(kw => kw.adGroup))].filter(a => a && a !== 'Unknown').sort();
-    const adGroupSelect = document.getElementById('googleKeywordsAdGroupFilter');
-    adGroupSelect.innerHTML = '<option value="">All Ad Groups</option>' + 
-        adGroups.map(a => `<option value="${a}">${a}</option>`).join('');
+    const optionsContainer = document.getElementById('googleKeywordsAdGroupOptions');
+    const labelEl = document.getElementById('googleKeywordsAdGroupLabel');
     
-    // Reset filter if current selection not in list
-    if (googleKeywordsAdGroupFilter && !adGroups.includes(googleKeywordsAdGroupFilter)) {
-        googleKeywordsAdGroupFilter = '';
-        adGroupSelect.value = '';
+    // Build checkbox options
+    let html = `
+        <label class="multi-select-option select-all">
+            <input type="checkbox" id="adGroupSelectAll" ${googleKeywordsAdGroupFilter.length === 0 ? 'checked' : ''}>
+            <span>All Ad Groups</span>
+        </label>
+    `;
+    
+    adGroups.forEach(adGroup => {
+        const checked = googleKeywordsAdGroupFilter.includes(adGroup) ? 'checked' : '';
+        html += `
+            <label class="multi-select-option">
+                <input type="checkbox" value="${adGroup}" ${checked} class="adgroup-checkbox">
+                <span>${adGroup}</span>
+            </label>
+        `;
+    });
+    
+    optionsContainer.innerHTML = html;
+    
+    // Update label
+    updateAdGroupLabel();
+    
+    // Add event listeners
+    document.getElementById('adGroupSelectAll').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            googleKeywordsAdGroupFilter = [];
+            document.querySelectorAll('.adgroup-checkbox').forEach(cb => cb.checked = false);
+        }
+        updateAdGroupLabel();
+        renderKeywordsTable();
+    });
+    
+    document.querySelectorAll('.adgroup-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const selectAll = document.getElementById('adGroupSelectAll');
+            
+            if (e.target.checked) {
+                if (!googleKeywordsAdGroupFilter.includes(e.target.value)) {
+                    googleKeywordsAdGroupFilter.push(e.target.value);
+                }
+                selectAll.checked = false;
+            } else {
+                googleKeywordsAdGroupFilter = googleKeywordsAdGroupFilter.filter(v => v !== e.target.value);
+                if (googleKeywordsAdGroupFilter.length === 0) {
+                    selectAll.checked = true;
+                }
+            }
+            updateAdGroupLabel();
+            renderKeywordsTable();
+        });
+    });
+    
+    // Reset filter if current selections not in list
+    googleKeywordsAdGroupFilter = googleKeywordsAdGroupFilter.filter(ag => adGroups.includes(ag));
+}
+
+function updateAdGroupLabel() {
+    const labelEl = document.getElementById('googleKeywordsAdGroupLabel');
+    if (googleKeywordsAdGroupFilter.length === 0) {
+        labelEl.textContent = 'All Ad Groups';
+    } else if (googleKeywordsAdGroupFilter.length === 1) {
+        labelEl.textContent = googleKeywordsAdGroupFilter[0].length > 25 
+            ? googleKeywordsAdGroupFilter[0].substring(0, 25) + '...' 
+            : googleKeywordsAdGroupFilter[0];
+    } else {
+        labelEl.textContent = `${googleKeywordsAdGroupFilter.length} Ad Groups`;
     }
 }
 
