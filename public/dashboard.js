@@ -8753,6 +8753,7 @@ async function loadUnifiedFunnels(startDate, endDate) {
         const googleOursLfsVal = googleOursLfs?.total || 0;
         el('unifiedGoogleLfsOurs', fmt(googleOursLfsVal));
         el('unifiedGoogleInvoca', fmt(invocaData?.byPlatform?.google || 0));
+        el('unifiedGoogleGmbInvoca', fmt(invocaData?.byPlatform?.google_gmb || 0));
         el('unifiedGoogleCostPerLfsOurs', googleOursLfsVal > 0 ? fmtMoney(googleSpend / googleOursLfsVal) : '');
         el('unifiedGoogleBooked', fmt(looker.g1utm.booked));
         el('unifiedGoogleVerif', fmt(looker.g1utm.verif));
