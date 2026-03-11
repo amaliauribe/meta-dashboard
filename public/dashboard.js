@@ -3726,6 +3726,9 @@ async function loadSummaryData() {
         
         let startDate, endDate;
         
+        // Determine number of days based on current range
+        let numDays = range.days || 14;
+        
         // Handle custom date range
         if (range.custom && customStartDate && customEndDate) {
             startDate = customStartDate;
@@ -3736,9 +3739,8 @@ async function loadSummaryData() {
             for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
                 dates.push(formatDateEST(new Date(d)));
             }
+            numDays = dates.length;
         } else {
-            // Determine number of days based on current range
-            let numDays = range.days || 14;
             if (range.preset === 'today') numDays = 1;
             if (range.preset === 'yesterday') numDays = 1;
             
