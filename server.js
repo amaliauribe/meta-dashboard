@@ -3546,9 +3546,34 @@ app.get("/api/ours-privacy/converted-visitors", (req, res) => {
 
 // ==================== Clinic Performance ====================
 // Combines: Ad Clicks (by zipcode) + Bookings (from Looker) = Booked per 100 Clicks
+// Get Google Ads campaigns list for clinic performance filter
+app.get('/api/google/campaigns-list', async (req, res) => {
+    if (!isGoogleAdsConfigured()) {
+        return res.json({ campaigns: [] });
+    }
+    try {
+        const { startDate, endDate } = req.query;
+        const query = `
+            SELECT campaign.id, campaign.name, campaign.status
+            FROM campaign
+            WHERE campaign.status = 'ENABLED'
+            ${startDate && endDate ? `AND segments.date BETWEEN '${startDate}' AND '${endDate}' AND metrics.impressions > 0` : ''}
+            ORDER BY campaign.name ASC
+        `;
+        const results = await googleAdsApiRequest(query);
+        const campaigns = [...new Map(results.map(r => [r.campaign?.id, { id: r.campaign?.id, name: r.campaign?.name }])).values()];
+        campaigns.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        res.json({ campaigns });
+    } catch (e) {
+        console.error('Google campaigns list error:', e.message);
+        res.json({ campaigns: [] });
+    }
+});
+
 app.get('/api/looker/clinic-performance', async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
+        const campaignIds = req.query.campaignIds ? req.query.campaignIds.split(',').filter(Boolean) : [];
         
         if (!startDate || !endDate) {
             return res.status(400).json({ success: false, error: 'Missing startDate or endDate' });
@@ -3593,6 +3618,9 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         // Google Ads geo data
         if (isGoogleAdsConfigured()) {
             try {
+                const campaignFilter = campaignIds.length > 0 
+                    ? `AND campaign.id IN (${campaignIds.join(',')})` 
+                    : '';
                 const query = `
                     SELECT 
                         campaign_criterion.location.geo_target_constant,
@@ -3602,6 +3630,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     FROM location_view
                     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                         AND metrics.impressions > 0
+                        ${campaignFilter}
                 `;
                 const googleData = await googleAdsApiRequest(query);
                 

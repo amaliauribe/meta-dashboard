@@ -7826,6 +7826,91 @@ async function loadOursPrivacyData() {
 // ==================== Clinic Performance ====================
 let clinicPerfDataLoaded = false;
 let clinicPerfChart = null;
+let clinicCampaignsLoaded = false;
+let clinicSelectedCampaignIds = []; // empty = all
+
+// Campaign filter dropdown logic
+function initClinicCampaignFilter() {
+    const selected = document.getElementById('clinicCampaignSelected');
+    const dropdown = document.getElementById('clinicCampaignDropdown');
+    const selectAll = document.getElementById('clinicCampaignSelectAll');
+    const applyBtn = document.getElementById('clinicCampaignApply');
+    
+    if (!selected) return;
+    
+    selected.addEventListener('click', () => {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#clinicCampaignFilter')) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    selectAll.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('#clinicCampaignOptions input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        updateCampaignLabel();
+    });
+    
+    applyBtn.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('#clinicCampaignOptions input[type="checkbox"]');
+        const allChecked = document.getElementById('clinicCampaignSelectAll').checked;
+        
+        if (allChecked || [...checkboxes].every(cb => cb.checked)) {
+            clinicSelectedCampaignIds = [];
+        } else {
+            clinicSelectedCampaignIds = [...checkboxes].filter(cb => cb.checked).map(cb => cb.value);
+        }
+        
+        dropdown.style.display = 'none';
+        clinicPerfDataLoaded = false;
+        loadClinicPerformanceData();
+    });
+}
+
+function updateCampaignLabel() {
+    const checkboxes = document.querySelectorAll('#clinicCampaignOptions input[type="checkbox"]');
+    const checked = [...checkboxes].filter(cb => cb.checked);
+    const label = document.getElementById('clinicCampaignLabel');
+    const selectAll = document.getElementById('clinicCampaignSelectAll');
+    
+    if (checked.length === 0) {
+        label.textContent = 'None selected';
+        selectAll.checked = false;
+    } else if (checked.length === checkboxes.length) {
+        label.textContent = 'All Campaigns';
+        selectAll.checked = true;
+    } else {
+        label.textContent = `${checked.length} campaign${checked.length > 1 ? 's' : ''} selected`;
+        selectAll.checked = false;
+    }
+}
+
+async function loadClinicCampaigns(startDate, endDate) {
+    try {
+        const response = await fetch(`/api/google/campaigns-list?startDate=${startDate}&endDate=${endDate}`);
+        const data = await response.json();
+        const options = document.getElementById('clinicCampaignOptions');
+        if (!options) return;
+        
+        options.innerHTML = data.campaigns.map(c => `
+            <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer; font-size:13px; color:#e5e7eb; hover:background:#374151;">
+                <input type="checkbox" value="${c.id}" checked> ${c.name}
+            </label>
+        `).join('');
+        
+        // Add change listeners
+        options.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', updateCampaignLabel);
+        });
+        
+        clinicCampaignsLoaded = true;
+    } catch (e) {
+        console.error('Error loading campaigns for filter:', e);
+    }
+}
 
 async function loadClinicPerformanceData() {
     if (clinicPerfDataLoaded) return;
@@ -7872,8 +7957,20 @@ async function loadClinicPerformanceData() {
             delayNote.style.display = (endDate >= todayStr) ? 'block' : 'none';
         }
         
+        // Load campaign filter options (once)
+        if (!clinicCampaignsLoaded) {
+            await loadClinicCampaigns(startDate, endDate);
+            initClinicCampaignFilter();
+        }
+        
+        // Build API URL with campaign filter
+        let clinicPerfUrl = `/api/looker/clinic-performance?startDate=${startDate}&endDate=${endDate}`;
+        if (clinicSelectedCampaignIds.length > 0) {
+            clinicPerfUrl += `&campaignIds=${clinicSelectedCampaignIds.join(',')}`;
+        }
+        
         // Use the Looker clinic-performance endpoint (Ad Clicks + Bookings)
-        const response = await fetch(`/api/looker/clinic-performance?startDate=${startDate}&endDate=${endDate}`);
+        const response = await fetch(clinicPerfUrl);
         const result = await response.json();
         
         if (!result.success) {

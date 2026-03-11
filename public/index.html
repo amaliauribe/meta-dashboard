@@ -2321,6 +2321,24 @@
             <!-- Table -->
             <section id="clinicPerfTableContainer" class="table-section" style="display: none;">
                 <h2>📋 Clinic Conversion Ranking</h2>
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:14px;">Google Ads Campaigns:</label>
+                    <div id="clinicCampaignFilter" style="position:relative; display:inline-block; min-width:300px;">
+                        <div id="clinicCampaignSelected" style="border:1px solid #374151; background:#1f2937; color:#e5e7eb; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px; min-height:36px; display:flex; align-items:center; justify-content:space-between;">
+                            <span id="clinicCampaignLabel">All Campaigns</span>
+                            <span style="margin-left:8px;">▼</span>
+                        </div>
+                        <div id="clinicCampaignDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1f2937; border:1px solid #374151; border-radius:6px; max-height:300px; overflow-y:auto; z-index:100; margin-top:4px; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="padding:8px; border-bottom:1px solid #374151;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:#e5e7eb;">
+                                    <input type="checkbox" id="clinicCampaignSelectAll" checked> <strong>Select All</strong>
+                                </label>
+                            </div>
+                            <div id="clinicCampaignOptions" style="padding:4px 0;"></div>
+                        </div>
+                    </div>
+                    <button id="clinicCampaignApply" style="background:#3b82f6; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">Apply Filter</button>
+                </div>
                 <p class="table-subtitle">Click column headers to sort</p>
                 <div class="table-wrapper">
                     <table id="clinicPerfTable">
