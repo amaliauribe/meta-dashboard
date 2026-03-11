@@ -3918,8 +3918,9 @@ async function loadSummaryData() {
         // Weekly table
         let weeklyHtml = '';
         let weeklyTotalMeta = 0, weeklyTotalGoogle = 0, weeklyTotalBing = 0;
+        const weeklyCount = weeklyPeriods.length;
         
-        aggregatedData.slice(0, 2).forEach(row => {
+        aggregatedData.slice(0, weeklyCount).forEach(row => {
             const total = row.meta + row.google + row.bing;
             weeklyTotalMeta += row.meta;
             weeklyTotalGoogle += row.google;
@@ -3937,22 +3938,24 @@ async function loadSummaryData() {
         });
         
         const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing;
-        weeklyHtml += `
+        if (weeklyCount > 0) {
+            weeklyHtml += `
             <tr class="total-row">
-                <td><strong>2-Week Total</strong></td>
+                <td><strong>${weeklyCount === 2 ? '2-Week' : 'Weekly'} Total</strong></td>
                 <td><strong>$${weeklyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             </tr>
         `;
-        document.getElementById('summaryWeeklyBody').innerHTML = weeklyHtml;
+        }
+        document.getElementById('summaryWeeklyBody').innerHTML = weeklyHtml || '<tr><td colspan="5">No weekly data available for this range</td></tr>';
         
         // Monthly table
         let monthlyHtml = '';
         let monthlyTotalMeta = 0, monthlyTotalGoogle = 0, monthlyTotalBing = 0;
         
-        aggregatedData.slice(2).forEach(row => {
+        aggregatedData.slice(weeklyCount).forEach(row => {
             const total = row.meta + row.google + row.bing;
             monthlyTotalMeta += row.meta;
             monthlyTotalGoogle += row.google;
