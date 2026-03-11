@@ -8518,6 +8518,13 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Fetch Looker funnel data
         const lookerData = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => null);
         
+        // Fetch Ours Privacy l_f_s data
+        const [metaOursLfs, googleOursLfs, bingOursLfs] = await Promise.all([
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
+            fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
+        ]);
+        
         // Process Meta
         let metaSpend = 0, metaImpressions = 0, metaClicks = 0, metaResults = 0;
         if (metaData?.data?.[0]) {
@@ -8581,6 +8588,10 @@ async function loadUnifiedFunnels(startDate, endDate) {
         el('unifiedMetaResults', fmt(metaResults));
         el('unifiedMetaCostPerResult', metaResults > 0 ? fmtMoney(metaSpend / metaResults) : '');
         el('unifiedMetaLfs', fmt(looker.mutm.lfs));
+        // Ours Privacy l_f_s for Meta
+        const metaOursLfsVal = metaOursLfs?.total || 0;
+        el('unifiedMetaLfsOurs', fmt(metaOursLfsVal));
+        el('unifiedMetaCostPerLfsOurs', metaOursLfsVal > 0 ? fmtMoney(metaSpend / metaOursLfsVal) : '');
         el('unifiedMetaBooked', fmt(looker.mutm.booked));
         el('unifiedMetaVerif', fmt(looker.mutm.verif));
         el('unifiedMetaCovered', fmt(looker.mutm.covered));
@@ -8601,6 +8612,10 @@ async function loadUnifiedFunnels(startDate, endDate) {
         el('unifiedGoogleResults', fmt(googleResults));
         el('unifiedGoogleCostPerResult', googleResults > 0 ? fmtMoney(googleSpend / googleResults) : '');
         el('unifiedGoogleLfs', fmt(looker.g1utm.lfs));
+        // Ours Privacy l_f_s for Google
+        const googleOursLfsVal = googleOursLfs?.total || 0;
+        el('unifiedGoogleLfsOurs', fmt(googleOursLfsVal));
+        el('unifiedGoogleCostPerLfsOurs', googleOursLfsVal > 0 ? fmtMoney(googleSpend / googleOursLfsVal) : '');
         el('unifiedGoogleBooked', fmt(looker.g1utm.booked));
         el('unifiedGoogleVerif', fmt(looker.g1utm.verif));
         el('unifiedGoogleCovered', fmt(looker.g1utm.covered));
@@ -8621,6 +8636,10 @@ async function loadUnifiedFunnels(startDate, endDate) {
         el('unifiedBingResults', fmt(bingResults));
         el('unifiedBingCostPerResult', bingResults > 0 ? fmtMoney(bingSpend / bingResults) : '');
         el('unifiedBingLfs', fmt(looker.butm.lfs));
+        // Ours Privacy l_f_s for Bing
+        const bingOursLfsVal = bingOursLfs?.total || 0;
+        el('unifiedBingLfsOurs', fmt(bingOursLfsVal));
+        el('unifiedBingCostPerLfsOurs', bingOursLfsVal > 0 ? fmtMoney(bingSpend / bingOursLfsVal) : '');
         el('unifiedBingBooked', fmt(looker.butm.booked));
         el('unifiedBingVerif', fmt(looker.butm.verif));
         el('unifiedBingCovered', fmt(looker.butm.covered));
@@ -8637,6 +8656,9 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Update TikTok card (no API data yet, just Looker)
         el('unifiedTiktokCost', '-');
         el('unifiedTiktokLfs', fmt(looker.tutm.lfs));
+        // Ours Privacy l_f_s for TikTok (not available)
+        el('unifiedTiktokLfsOurs', '-');
+        el('unifiedTiktokCostPerLfsOurs', '');
         el('unifiedTiktokBooked', fmt(looker.tutm.booked));
         el('unifiedTiktokVerif', fmt(looker.tutm.verif));
         el('unifiedTiktokCovered', fmt(looker.tutm.covered));
