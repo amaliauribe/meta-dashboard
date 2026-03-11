@@ -3764,13 +3764,23 @@ async function loadSummaryData() {
         });
         const dailyData = await dailyResponse.json();
         
-        // Use Meta data from server-side API (already included in dailyData)
+        // Fetch Meta daily data directly (with results)
         let metaByDate = {};
         let metaConvByDate = {};
-        (dailyData.meta || []).forEach(row => {
-            metaByDate[row.date] = row.spend || 0;
-            metaConvByDate[row.date] = row.conversions || 0;
-        });
+        try {
+            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${ACCESS_TOKEN}`;
+            const metaResponse = await fetch(metaUrl);
+            const metaData = await metaResponse.json();
+            if (metaData.data) {
+                metaData.data.forEach(row => {
+                    metaByDate[row.date_start] = parseFloat(row.spend) || 0;
+                    // Use same getResults() function as Meta Campaigns page for consistency
+                    metaConvByDate[row.date_start] = getResults(row.actions);
+                });
+            }
+        } catch (e) {
+            console.error('Meta summary error:', e);
+        }
         
         // Build daily map
         const googleByDate = {};
@@ -3865,14 +3875,11 @@ async function loadSummaryData() {
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
         
-        // Weekly breakdown - only include periods we have data for
-        const weeklyPeriods = [];
-        if (dates.length >= 7 && dates[6] && dates[0]) {
-            weeklyPeriods.push({ name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] });
-        }
-        if (dates.length >= 14 && dates[13] && dates[7]) {
-            weeklyPeriods.push({ name: '7-14 Days Ago', startDate: dates[13], endDate: dates[7] });
-        }
+        // Weekly breakdown
+        const weeklyPeriods = [
+            { name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] },
+            { name: '7-14 Days Ago', startDate: dates[13], endDate: dates[7] }
+        ];
         
         // Monthly breakdown - current and last month
         const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -3918,9 +3925,8 @@ async function loadSummaryData() {
         // Weekly table
         let weeklyHtml = '';
         let weeklyTotalMeta = 0, weeklyTotalGoogle = 0, weeklyTotalBing = 0;
-        const weeklyCount = weeklyPeriods.length;
         
-        aggregatedData.slice(0, weeklyCount).forEach(row => {
+        aggregatedData.slice(0, 2).forEach(row => {
             const total = row.meta + row.google + row.bing;
             weeklyTotalMeta += row.meta;
             weeklyTotalGoogle += row.google;
@@ -3938,24 +3944,22 @@ async function loadSummaryData() {
         });
         
         const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing;
-        if (weeklyCount > 0) {
-            weeklyHtml += `
+        weeklyHtml += `
             <tr class="total-row">
-                <td><strong>${weeklyCount === 2 ? '2-Week' : 'Weekly'} Total</strong></td>
+                <td><strong>2-Week Total</strong></td>
                 <td><strong>$${weeklyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             </tr>
         `;
-        }
-        document.getElementById('summaryWeeklyBody').innerHTML = weeklyHtml || '<tr><td colspan="5">No weekly data available for this range</td></tr>';
+        document.getElementById('summaryWeeklyBody').innerHTML = weeklyHtml;
         
         // Monthly table
         let monthlyHtml = '';
         let monthlyTotalMeta = 0, monthlyTotalGoogle = 0, monthlyTotalBing = 0;
         
-        aggregatedData.slice(weeklyCount).forEach(row => {
+        aggregatedData.slice(2).forEach(row => {
             const total = row.meta + row.google + row.bing;
             monthlyTotalMeta += row.meta;
             monthlyTotalGoogle += row.google;
