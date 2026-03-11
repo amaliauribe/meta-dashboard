@@ -3865,11 +3865,14 @@ async function loadSummaryData() {
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
         
-        // Weekly breakdown
-        const weeklyPeriods = [
-            { name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] },
-            { name: '7-14 Days Ago', startDate: dates[13], endDate: dates[7] }
-        ];
+        // Weekly breakdown - only include periods we have data for
+        const weeklyPeriods = [];
+        if (dates.length >= 7 && dates[6] && dates[0]) {
+            weeklyPeriods.push({ name: 'Last 7 Days', startDate: dates[6], endDate: dates[0] });
+        }
+        if (dates.length >= 14 && dates[13] && dates[7]) {
+            weeklyPeriods.push({ name: '7-14 Days Ago', startDate: dates[13], endDate: dates[7] });
+        }
         
         // Monthly breakdown - current and last month
         const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);

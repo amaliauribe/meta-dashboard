@@ -2332,14 +2332,16 @@ app.post('/api/summary/aggregated', async (req, res) => {
         }
         
         // Fetch Bing
-        if (isBingConfigured()) {
+        if (isBingConfigured() && period.startDate && period.endDate) {
             try {
                 const columns = ['TimePeriod', 'Spend'];
                 const report = await submitAndDownloadReport('account', period.startDate, period.endDate, columns);
                 
-                report.rows.forEach(row => {
-                    periodData.bing += parseFloat(row.Spend) || 0;
-                });
+                if (report && report.rows) {
+                    report.rows.forEach(row => {
+                        periodData.bing += parseFloat(row.Spend) || 0;
+                    });
+                }
             } catch (e) {
                 console.error('Bing aggregated error:', e.message);
             }
