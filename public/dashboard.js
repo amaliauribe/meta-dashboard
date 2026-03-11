@@ -5416,6 +5416,7 @@ function renderQsHistoryTable() {
         return `
             <tr>
                 <td>${kw.keyword}</td>
+                <td>${kw.adGroup || '-'}</td>
                 <td class="${qsClass}">${currentQs}</td>
                 <td>${qs7d}</td>
                 <td>${qs30d}</td>
@@ -6092,6 +6093,7 @@ function renderBingQsHistoryTable() {
         
         return `<tr>
             <td>${kw.keyword}</td>
+            <td>${kw.adGroup || '-'}</td>
             <td class="${qsClass}">${currentQs}</td>
             <td>${qs7d}</td>
             <td>${qs30d}</td>
@@ -6101,7 +6103,7 @@ function renderBingQsHistoryTable() {
     }).join('');
     
     if (filtered.length === 0) {
-        document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="6" class="loading">No keywords match the filters</td></tr>';
+        document.getElementById('bingQsHistoryBody').innerHTML = '<tr><td colspan="7" class="loading">No keywords match the filters</td></tr>';
     }
 }
 

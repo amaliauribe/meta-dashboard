@@ -1964,6 +1964,7 @@ async function captureQsSnapshot() {
         SELECT 
             ad_group_criterion.keyword.text,
             ad_group_criterion.quality_info.quality_score,
+            ad_group.name,
             metrics.clicks
         FROM keyword_view
         WHERE segments.date DURING LAST_7_DAYS
@@ -1977,7 +1978,8 @@ async function captureQsSnapshot() {
         date: today,
         keywords: results.map(row => ({
             keyword: row.ad_group_criterion?.keyword?.text || 'Unknown',
-            qs: row.ad_group_criterion?.quality_info?.quality_score || null
+            qs: row.ad_group_criterion?.quality_info?.quality_score || null,
+            adGroup: row.ad_group?.name || 'Unknown'
         })).filter(k => k.keyword !== 'Unknown')
     };
     
@@ -2034,7 +2036,7 @@ app.post('/api/google/qs-history', async (req, res) => {
         
         if (currentSnapshot) {
             currentSnapshot.keywords.forEach(k => {
-                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs };
+                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs, adGroup: k.adGroup || '-' };
             });
         }
         
@@ -2105,14 +2107,15 @@ async function captureBingQsSnapshot() {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const startDate = sevenDaysAgo.toISOString().split('T')[0];
     
-    const columns = ['Keyword', 'QualityScore', 'Clicks'];
+    const columns = ['Keyword', 'AdGroupName', 'QualityScore', 'Clicks'];
     const report = await submitAndDownloadReport('keyword', startDate, today, columns);
     
     const snapshot = {
         date: today,
         keywords: report.rows.map(row => ({
             keyword: row.Keyword || 'Unknown',
-            qs: parseInt(row.QualityScore) || null
+            qs: parseInt(row.QualityScore) || null,
+            adGroup: row.AdGroupName || 'Unknown'
         })).filter(k => k.keyword !== 'Unknown' && k.qs !== null)
     };
     
@@ -2188,7 +2191,7 @@ app.post('/api/bing/qs-history', async (req, res) => {
         
         if (currentSnapshot) {
             currentSnapshot.keywords.forEach(k => {
-                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs };
+                keywordMap[k.keyword] = { keyword: k.keyword, currentQs: k.qs, adGroup: k.adGroup || '-' };
             });
         }
         
