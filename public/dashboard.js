@@ -3764,23 +3764,13 @@ async function loadSummaryData() {
         });
         const dailyData = await dailyResponse.json();
         
-        // Fetch Meta daily data directly (with results)
+        // Use Meta data from server-side API (already included in dailyData)
         let metaByDate = {};
         let metaConvByDate = {};
-        try {
-            const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${ACCESS_TOKEN}`;
-            const metaResponse = await fetch(metaUrl);
-            const metaData = await metaResponse.json();
-            if (metaData.data) {
-                metaData.data.forEach(row => {
-                    metaByDate[row.date_start] = parseFloat(row.spend) || 0;
-                    // Use same getResults() function as Meta Campaigns page for consistency
-                    metaConvByDate[row.date_start] = getResults(row.actions);
-                });
-            }
-        } catch (e) {
-            console.error('Meta summary error:', e);
-        }
+        (dailyData.meta || []).forEach(row => {
+            metaByDate[row.date] = row.spend || 0;
+            metaConvByDate[row.date] = row.conversions || 0;
+        });
         
         // Build daily map
         const googleByDate = {};
