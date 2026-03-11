@@ -8658,6 +8658,9 @@ async function loadUnifiedFunnels(startDate, endDate) {
             fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
         ]);
         
+        // Fetch Invoca calls data
+        const invocaData = await fetch(`/api/ours-privacy/invoca-by-platform?startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({byPlatform: {meta: 0, google: 0, bing: 0}}));
+        
         // Process Meta
         let metaSpend = 0, metaImpressions = 0, metaClicks = 0, metaResults = 0;
         if (metaData?.data?.[0]) {
@@ -8724,6 +8727,7 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Ours Privacy l_f_s for Meta
         const metaOursLfsVal = metaOursLfs?.total || 0;
         el('unifiedMetaLfsOurs', fmt(metaOursLfsVal));
+        el('unifiedMetaInvoca', fmt(invocaData?.byPlatform?.meta || 0));
         el('unifiedMetaCostPerLfsOurs', metaOursLfsVal > 0 ? fmtMoney(metaSpend / metaOursLfsVal) : '');
         el('unifiedMetaBooked', fmt(looker.mutm.booked));
         el('unifiedMetaVerif', fmt(looker.mutm.verif));
@@ -8748,6 +8752,7 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Ours Privacy l_f_s for Google
         const googleOursLfsVal = googleOursLfs?.total || 0;
         el('unifiedGoogleLfsOurs', fmt(googleOursLfsVal));
+        el('unifiedGoogleInvoca', fmt(invocaData?.byPlatform?.google || 0));
         el('unifiedGoogleCostPerLfsOurs', googleOursLfsVal > 0 ? fmtMoney(googleSpend / googleOursLfsVal) : '');
         el('unifiedGoogleBooked', fmt(looker.g1utm.booked));
         el('unifiedGoogleVerif', fmt(looker.g1utm.verif));
@@ -8772,6 +8777,7 @@ async function loadUnifiedFunnels(startDate, endDate) {
         // Ours Privacy l_f_s for Bing
         const bingOursLfsVal = bingOursLfs?.total || 0;
         el('unifiedBingLfsOurs', fmt(bingOursLfsVal));
+        el('unifiedBingInvoca', fmt(invocaData?.byPlatform?.bing || 0));
         el('unifiedBingCostPerLfsOurs', bingOursLfsVal > 0 ? fmtMoney(bingSpend / bingOursLfsVal) : '');
         el('unifiedBingBooked', fmt(looker.butm.booked));
         el('unifiedBingVerif', fmt(looker.butm.verif));

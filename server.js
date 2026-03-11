@@ -2802,6 +2802,41 @@ app.get("/api/ours-privacy/lfs-by-date", async (req, res) => {
 });
 
 // Get l_f_s events grouped by source
+// Invoca calls from raw webhooks by platform
+app.get("/api/ours-privacy/invoca-by-platform", (req, res) => {
+    const data = global.webhookData || [];
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let invocaData = data.filter(d => {
+        const event = d.body?.event?.event || "";
+        return event.includes("invoca_call");
+    });
+    
+    // Date filter
+    if (startDate) {
+        const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+        invocaData = invocaData.filter(d => new Date(d.timestamp) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+        invocaData = invocaData.filter(d => new Date(d.timestamp) <= end);
+    }
+    
+    // Group by platform
+    const byPlatform = { meta: 0, google: 0, bing: 0, tiktok: 0, other: 0 };
+    invocaData.forEach(d => {
+        const event = (d.body?.event?.event || "").toLowerCase();
+        if (event.includes("google") || event.includes("gmb")) byPlatform.google++;
+        else if (event.includes("bing")) byPlatform.bing++;
+        else if (event.includes("meta") || event.includes("facebook")) byPlatform.meta++;
+        else if (event.includes("tiktok")) byPlatform.tiktok++;
+        else byPlatform.other++;
+    });
+    
+    res.json({ total: invocaData.length, byPlatform, source: "webhooks" });
+});
+
 // Ours Privacy l_f_s from RAW WEBHOOKS (not Looker) - for the "Ours P" rows
 app.get("/api/ours-privacy/lfs-raw-by-platform", (req, res) => {
     const data = global.webhookData || [];
