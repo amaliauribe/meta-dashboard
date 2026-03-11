@@ -3691,6 +3691,15 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             }
         }
         
+        // Debug: Check FiDi and Midtown zips in the data
+        const fidiZipsDebug = ['10002','10003','10004','10006','10007','10009','10010','10011','10012','10013','10014','10038','10080','10280','10282'];
+        const midtownZipsDebug = ['10001','10016','10017','10018','10019','10020','10021','10022','10023','10024','10025','10028','10036','10065','10069','10075','10119','10128','10199'];
+        const fidiFound = fidiZipsDebug.filter(z => adClicksByZip[z]);
+        const midtownFound = midtownZipsDebug.filter(z => adClicksByZip[z]);
+        console.log(`Clinic perf debug: ${Object.keys(adClicksByZip).length} total zips with data`);
+        console.log(`FiDi zips with data: ${fidiFound.length}/${fidiZipsDebug.length}`, fidiFound.map(z => `${z}:${adClicksByZip[z].clicks}clicks`));
+        console.log(`Midtown zips with data: ${midtownFound.length}/${midtownZipsDebug.length}`, midtownFound.map(z => `${z}:${adClicksByZip[z].clicks}clicks`));
+        
         // 3. Map ad clicks to clinics using CLINIC_ZIPCODES
         const clinicAdData = {};
         Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
