@@ -3984,7 +3984,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
                     'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza'],
                     'Newport Beach': ['Newport Beach'],
-                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'National City', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
+                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
                     'National City': ['National City']
                 };
                 
