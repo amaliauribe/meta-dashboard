@@ -3817,7 +3817,8 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         // 2. Get ad clicks by zipcode from Google Ads only
         let adClicksByZip = {};
         
-        // Google Ads geo data
+        // Google Ads geo data — use geographic_view with postal code segmentation
+        // This captures ALL clicks by user location, not just targeted locations
         if (isGoogleAdsConfigured()) {
             try {
                 const campaignFilter = campaignIds.length > 0 
@@ -3825,58 +3826,65 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     : '';
                 const query = `
                     SELECT 
-                        campaign_criterion.location.geo_target_constant,
+                        segments.geo_target_postal_code,
                         metrics.impressions,
                         metrics.clicks,
                         metrics.cost_micros
-                    FROM location_view
+                    FROM geographic_view
                     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                         AND metrics.impressions > 0
                         ${campaignFilter}
+                    LIMIT 10000
                 `;
                 const googleData = await googleAdsApiRequest(query);
                 
-                // Get geo IDs and look up names
+                // Extract unique geo IDs to look up postal code names
                 const geoIds = [...new Set(googleData.map(r => {
-                    const geoConstant = r.campaign_criterion?.location?.geo_target_constant || '';
-                    const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+                    const geoRef = r.segments?.geo_target_postal_code || '';
+                    const match = geoRef.match(/geoTargetConstants\/(\d+)/);
                     return match ? match[1] : null;
                 }).filter(Boolean))];
                 
+                // Look up names for uncached geo IDs
                 const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
                 if (uncachedIds.length > 0) {
-                    const geoQuery = `
-                        SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.target_type
-                        FROM geo_target_constant
-                        WHERE geo_target_constant.id IN (${uncachedIds.join(',')})
-                    `;
-                    const geoResults = await googleAdsApiRequest(geoQuery);
-                    geoResults.forEach(r => {
-                        const g = r.geo_target_constant || {};
-                        geoNameCache[g.id] = { name: g.name, targetType: g.target_type };
-                    });
+                    // Batch lookups in chunks of 500 to avoid query limits
+                    for (let i = 0; i < uncachedIds.length; i += 500) {
+                        const chunk = uncachedIds.slice(i, i + 500);
+                        const geoQuery = `
+                            SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.target_type, geo_target_constant.canonical_name
+                            FROM geo_target_constant
+                            WHERE geo_target_constant.id IN (${chunk.join(',')})
+                        `;
+                        const geoResults = await googleAdsApiRequest(geoQuery);
+                        geoResults.forEach(r => {
+                            const g = r.geo_target_constant || {};
+                            geoNameCache[g.id] = { name: g.name, canonicalName: g.canonical_name, targetType: g.target_type };
+                        });
+                    }
                 }
                 
-                // Aggregate by geo ID
-                const geoMap = {};
+                // Aggregate by postal code
+                const zipMap = {};
                 googleData.forEach(row => {
-                    const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
-                    const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+                    const geoRef = row.segments?.geo_target_postal_code || '';
+                    const match = geoRef.match(/geoTargetConstants\/(\d+)/);
                     if (!match) return;
                     const geoId = match[1];
                     const metrics = row.metrics || {};
-                    if (!geoMap[geoId]) geoMap[geoId] = { impressions: 0, clicks: 0, cost: 0 };
-                    geoMap[geoId].impressions += parseInt(metrics.impressions) || 0;
-                    geoMap[geoId].clicks += parseInt(metrics.clicks) || 0;
-                    geoMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+                    if (!zipMap[geoId]) zipMap[geoId] = { impressions: 0, clicks: 0, cost: 0 };
+                    zipMap[geoId].impressions += parseInt(metrics.impressions) || 0;
+                    zipMap[geoId].clicks += parseInt(metrics.clicks) || 0;
+                    zipMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
                 });
                 
-                // Extract postal codes
+                // Map geo IDs to zip codes
                 let googleZipCount = 0;
-                Object.entries(geoMap).forEach(([geoId, metrics]) => {
+                Object.entries(zipMap).forEach(([geoId, metrics]) => {
                     const geoInfo = geoNameCache[geoId];
-                    if (!geoInfo || geoInfo.targetType !== 'Postal Code') return;
-                    const zipMatch = geoInfo.name.match(/^(\d{5})/);
+                    if (!geoInfo) return;
+                    // Extract 5-digit zip from name (e.g., "10001" or "New York 10001")
+                    const zipMatch = (geoInfo.name || '').match(/(\d{5})/);
                     if (!zipMatch) return;
                     const zip = zipMatch[1];
                     
@@ -3887,7 +3895,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     if (!adClicksByZip[zip].sources.includes('Google')) adClicksByZip[zip].sources.push('Google');
                     googleZipCount++;
                 });
-                console.log('Clinic perf: Google geo loaded, zips:', googleZipCount);
+                console.log('Clinic perf: Google geographic_view loaded, zips:', googleZipCount);
             } catch (e) {
                 console.log('Google geo for clinic perf:', e.message);
             }
