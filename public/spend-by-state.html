@@ -149,7 +149,28 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Login Screen -->
+    <div class="container" id="loginScreen">
+        <div class="header" style="text-align:center; margin-bottom:32px;">
+            <h1>📊 Spend by State</h1>
+            <p>Please log in to view the report</p>
+        </div>
+        <form onsubmit="handleLogin(event)" style="max-width:320px; margin:0 auto;">
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:13px; font-weight:500; color:#666; margin-bottom:6px;">Username</label>
+                <input type="text" id="loginUser" style="width:100%; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:15px; font-family:inherit;" autocomplete="username" autofocus>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:13px; font-weight:500; color:#666; margin-bottom:6px;">Password</label>
+                <input type="password" id="loginPass" style="width:100%; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:15px; font-family:inherit;" autocomplete="current-password">
+            </div>
+            <div id="loginError" style="color:#e53e3e; font-size:13px; margin-bottom:12px; display:none;">Invalid username or password</div>
+            <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:15px;">Log In</button>
+        </form>
+    </div>
+
+    <!-- Report (hidden until login) -->
+    <div class="container" id="reportScreen" style="display:none;">
         <div class="header">
             <h1>📊 Spend by State</h1>
             <p>Ad spend breakdown by state across all platforms (based on geographic targeting data)</p>
@@ -193,10 +214,29 @@
     </div>
 
     <script>
-        const META_TOKEN = '';
-        const META_ACCOUNT = '';
+        // Auth
+        const VALID_USERS = { 'Accounting': '12345', 'ama': 'ama123' };
         
-        // Read config from parent dashboard's .env via API
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+            if (VALID_USERS[user] === pass) {
+                sessionStorage.setItem('sbs_auth', '1');
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('reportScreen').style.display = 'block';
+                loadData();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+        
+        // Check if already logged in this session
+        if (sessionStorage.getItem('sbs_auth') === '1') {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('reportScreen').style.display = 'block';
+        }
+        
         let CONFIG = {};
         
         function getEST() {
@@ -382,7 +422,6 @@
             </tr>`;
         }
         
-        // Need a simple Meta geo proxy endpoint
         // Init with last month
         (function init() {
             const today = getEST();
@@ -390,7 +429,10 @@
             const end = new Date(today.getFullYear(), today.getMonth(), 0);
             document.getElementById('startDate').value = fmt(start);
             document.getElementById('endDate').value = fmt(end);
-            loadData();
+            // Only load data if already authenticated
+            if (sessionStorage.getItem('sbs_auth') === '1') {
+                loadData();
+            }
         })();
     </script>
 </body>
