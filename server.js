@@ -3981,8 +3981,8 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'San Jose': ['San Jose', 'Sunnyvale', 'Mountain View', 'Milpitas', 'Fremont', 'Hayward', 'Union City', 'Newark'],
                     'Temecula': ['Temecula', 'Murrieta', 'Menifee', 'Riverside', 'Moreno Valley', 'Hemet', 'Norco', 'Corona', 'Wildomar', 'Lake Elsinore', 'San Jacinto', 'Winchester', 'Canyon Lake', 'Perris', 'Banning', 'Temescal Valley', 'El Sobrante', 'Valle Vista', 'Lakeland Village', 'Cherry Valley', 'Romoland'],
                     'Palo Alto': ['Palo Alto', 'Redwood City', 'Menlo Park', 'San Mateo', 'San Carlos', 'Belmont', 'Burlingame', 'Foster City', 'East Palo Alto', 'Woodside', 'Los Altos', 'Los Altos Hills', 'Stanford', 'Hillsborough', 'Emerald Hills'],
-                    'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
-                    'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza'],
+                    'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Costa Mesa', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
+                    'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza', 'Santa Ana', 'Tustin', 'Fountain Valley'],
                     'Newport Beach': ['Newport Beach'],
                     'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
                     'National City': ['National City']
@@ -3993,13 +3993,38 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Forest Hills', 'Midtown Manhattan', 'Staten Island', 'Upper East Side'];
                 const totalNYCZips = NYC_CLINICS.reduce((s, c) => s + (CLINIC_ZIPCODES[c]?.length || 0), 0);
                 
+                // Shared cities — split 50/50 between two clinics
+                const SHARED_CITIES = {
+                    'Costa Mesa':       ['Irvine', 'Huntington Beach'],
+                    'Santa Ana':        ['Huntington Beach', 'Irvine'],
+                    'Tustin':           ['Huntington Beach', 'Irvine'],
+                    'Fountain Valley':  ['Huntington Beach', 'Irvine']
+                };
+
+                const sharedCitiesHandled = new Set();
+
                 // Map direct city matches to clinics
                 Object.entries(CLINIC_CITIES).forEach(([clinic, cities]) => {
                     cities.forEach(city => {
                         if (cityData[city]) {
-                            clinicAdData[clinic].clicks += cityData[city].clicks;
-                            clinicAdData[clinic].impressions += cityData[city].impressions;
-                            clinicAdData[clinic].spend += cityData[city].cost;
+                            // Check if this is a shared city
+                            if (SHARED_CITIES[city]) {
+                                if (!sharedCitiesHandled.has(city)) {
+                                    sharedCitiesHandled.add(city);
+                                    const [clinicA, clinicB] = SHARED_CITIES[city];
+                                    const d = cityData[city];
+                                    clinicAdData[clinicA].clicks += Math.round(d.clicks / 2);
+                                    clinicAdData[clinicA].impressions += Math.round(d.impressions / 2);
+                                    clinicAdData[clinicA].spend += d.cost / 2;
+                                    clinicAdData[clinicB].clicks += Math.round(d.clicks / 2);
+                                    clinicAdData[clinicB].impressions += Math.round(d.impressions / 2);
+                                    clinicAdData[clinicB].spend += d.cost / 2;
+                                }
+                            } else {
+                                clinicAdData[clinic].clicks += cityData[city].clicks;
+                                clinicAdData[clinic].impressions += cityData[city].impressions;
+                                clinicAdData[clinic].spend += cityData[city].cost;
+                            }
                         }
                     });
                 });
