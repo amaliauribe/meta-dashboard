@@ -3984,8 +3984,8 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
                     'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza'],
                     'Newport Beach': ['Newport Beach'],
-                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Santee', 'Lemon Grove', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'Lakeside', 'Bonsall'],
-                    'National City': ['National City', 'Chula Vista', 'El Cajon', 'La Mesa', 'Spring Valley', 'Imperial Beach', 'San Ysidro', 'La Presa']
+                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'National City', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
+                    'National City': ['National City']
                 };
                 
                 // NYC clinics — "New York" mega-city split proportionally by zip count
@@ -4072,7 +4072,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             'Maple Lawn': ['maple lawn', 'fulton'],
             'Cedar Park': ['cedar park'],
             'Fort Worth': ['fort worth'],
-            'National City': ['national city', 'chula vista', 'el cajon', 'la mesa', 'spring valley', 'imperial beach', 'san ysidro', 'la presa'],
+            'National City': ['national city'],
             'Huntington Beach': ['huntington beach', 'huntington'],
             'Newport Beach': ['newport beach', 'newport'],
             'Brighton Beach': ['brighton beach', 'brighton']
