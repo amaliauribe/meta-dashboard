@@ -3842,107 +3842,182 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
         const bookedMap = toMap(isBooked);
         const fulfilledMap = toMap(initialFulfilled);
         
-        // 2. Get ad clicks by zipcode from Google Ads only
-        let adClicksByZip = {};
+        // 2. Get ad clicks from Google Ads using HYBRID approach:
+        //    - City-level data (geographic_view + geo_target_city) for complete coverage
+        //    - "New York" city gets split across NYC clinics proportionally by zip count
+        const clinicAdData = {};
+        Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
+            clinicAdData[clinic] = { clicks: 0, impressions: 0, spend: 0 };
+        });
         
-        // Google Ads geo data — use geographic_view with postal code segmentation
-        // This captures ALL clicks by user location, not just targeted locations
         if (isGoogleAdsConfigured()) {
             try {
                 const campaignFilter = campaignIds.length > 0 
                     ? `AND campaign.id IN (${campaignIds.join(',')})` 
                     : '';
-                const query = `
+                
+                // Fetch city-level geographic data
+                const cityQuery = `
                     SELECT 
-                        segments.geo_target_postal_code,
+                        segments.geo_target_city,
                         metrics.impressions,
                         metrics.clicks,
                         metrics.cost_micros
                     FROM geographic_view
                     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-                        AND metrics.impressions > 0
+                        AND metrics.clicks > 0
                         ${campaignFilter}
-                    LIMIT 10000
+                    LIMIT 5000
                 `;
-                const googleData = await googleAdsApiRequest(query);
+                const cityResults = await googleAdsApiRequest(cityQuery);
                 
-                // Extract unique geo IDs to look up postal code names
-                const geoIds = [...new Set(googleData.map(r => {
-                    const geoRef = r.segments?.geo_target_postal_code || '';
-                    const match = geoRef.match(/geoTargetConstants\/(\d+)/);
-                    return match ? match[1] : null;
+                // Look up city names
+                const cityGeoIds = [...new Set(cityResults.map(r => {
+                    const ref = r.segments?.geo_target_city || '';
+                    const m = ref.match(/geoTargetConstants\/(\d+)/);
+                    return m ? m[1] : null;
                 }).filter(Boolean))];
                 
-                // Look up names for uncached geo IDs
-                const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
-                if (uncachedIds.length > 0) {
-                    // Batch lookups in chunks of 500 to avoid query limits
-                    for (let i = 0; i < uncachedIds.length; i += 500) {
-                        const chunk = uncachedIds.slice(i, i + 500);
+                const uncachedCityIds = cityGeoIds.filter(id => !geoNameCache[id]);
+                if (uncachedCityIds.length > 0) {
+                    for (let i = 0; i < uncachedCityIds.length; i += 500) {
+                        const chunk = uncachedCityIds.slice(i, i + 500);
                         const geoQuery = `
-                            SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.target_type, geo_target_constant.canonical_name
+                            SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.canonical_name
                             FROM geo_target_constant
                             WHERE geo_target_constant.id IN (${chunk.join(',')})
                         `;
                         const geoResults = await googleAdsApiRequest(geoQuery);
                         geoResults.forEach(r => {
                             const g = r.geo_target_constant || {};
-                            geoNameCache[g.id] = { name: g.name, canonicalName: g.canonical_name, targetType: g.target_type };
+                            geoNameCache[g.id] = { name: g.name, canonicalName: g.canonical_name };
                         });
                     }
                 }
                 
-                // Aggregate by postal code
-                const zipMap = {};
-                googleData.forEach(row => {
-                    const geoRef = row.segments?.geo_target_postal_code || '';
-                    const match = geoRef.match(/geoTargetConstants\/(\d+)/);
-                    if (!match) return;
-                    const geoId = match[1];
-                    const metrics = row.metrics || {};
-                    if (!zipMap[geoId]) zipMap[geoId] = { impressions: 0, clicks: 0, cost: 0 };
-                    zipMap[geoId].impressions += parseInt(metrics.impressions) || 0;
-                    zipMap[geoId].clicks += parseInt(metrics.clicks) || 0;
-                    zipMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
+                // Aggregate by city name
+                const cityData = {};
+                cityResults.forEach(row => {
+                    const ref = row.segments?.geo_target_city || '';
+                    const m = ref.match(/geoTargetConstants\/(\d+)/);
+                    const geoId = m ? m[1] : '?';
+                    const info = geoNameCache[geoId] || {};
+                    const cityName = info.name || geoId;
+                    if (!cityData[cityName]) cityData[cityName] = { clicks: 0, impressions: 0, cost: 0 };
+                    cityData[cityName].clicks += parseInt(row.metrics?.clicks) || 0;
+                    cityData[cityName].impressions += parseInt(row.metrics?.impressions) || 0;
+                    cityData[cityName].cost += (parseInt(row.metrics?.cost_micros) || 0) / 1000000;
                 });
                 
-                // Map geo IDs to zip codes
-                let googleZipCount = 0;
-                Object.entries(zipMap).forEach(([geoId, metrics]) => {
-                    const geoInfo = geoNameCache[geoId];
-                    if (!geoInfo) return;
-                    // Extract 5-digit zip from name (e.g., "10001" or "New York 10001")
-                    const zipMatch = (geoInfo.name || '').match(/(\d{5})/);
-                    if (!zipMatch) return;
-                    const zip = zipMatch[1];
-                    
-                    if (!adClicksByZip[zip]) adClicksByZip[zip] = { clicks: 0, impressions: 0, spend: 0, sources: [] };
-                    adClicksByZip[zip].clicks += metrics.clicks;
-                    adClicksByZip[zip].impressions += metrics.impressions;
-                    adClicksByZip[zip].spend += metrics.cost;
-                    if (!adClicksByZip[zip].sources.includes('Google')) adClicksByZip[zip].sources.push('Google');
-                    googleZipCount++;
+                // City-to-clinic mapping for direct matches
+                const CLINIC_CITIES = {
+                    // NYC clinics — "New York" city gets split proportionally below
+                    // NJ
+                    'Harrison': ['Harrison'],
+                    'Woodland Park': ['Woodland Park', 'Wayne'],
+                    'Hoboken': ['Hoboken', 'Weehawken Township'],
+                    'West Orange': ['West Orange', 'Livingston', 'Bloomfield', 'Nutley', 'Irvington', 'Montclair', 'South Orange Village', 'Maplewood'],
+                    'Princeton': ['Princeton', 'Hamilton Township', 'East Windsor', 'Lawrence Township', 'Ewing Township', 'Pennington', 'Hopewell', 'Plainsboro Township'],
+                    'Woodbridge': ['Woodbridge Township', 'Edison', 'Carteret', 'Rahway', 'Perth Amboy', 'Metuchen', 'South Amboy', 'Sayreville', 'Old Bridge', 'South River', 'Piscataway'],
+                    'Edgewater': ['Edgewater', 'Fort Lee', 'North Bergen', 'Palisades Park', 'Ridgefield', 'Ridgefield Park', 'Leonia', 'Cliffside Park'],
+                    'Clifton': ['Clifton', 'Passaic', 'Garfield', 'Elmwood Park', 'East Rutherford', 'Rutherford', 'Lyndhurst', 'Kearny', 'Belleville', 'North Arlington', 'Carlstadt'],
+                    'Paramus': ['Paramus', 'Hackensack', 'Teaneck', 'Bergenfield', 'Fair Lawn', 'Glen Rock', 'Ridgewood', 'Saddle Brook', 'Hawthorne', 'Totowa', 'River Edge', 'Oradell', 'New Milford', 'Dumont', 'River Vale', 'Montvale', 'Park Ridge', 'Hillsdale', 'Haworth', 'Emerson', 'Allendale', 'Ramsey', 'Upper Saddle River', 'Wyckoff', 'Midland Park'],
+                    'Morristown': ['Morristown', 'Denville', 'Boonton', 'Parsippany-Troy Hills', 'Florham Park', 'Madison', 'Chatham Township', 'Bernardsville', 'Bernards', 'Montville', 'Kinnelon', 'Boonton Township', 'Mountain Lakes', 'Harding Township'],
+                    // TX
+                    'Kyle': ['Kyle', 'San Marcos', 'Lockhart', 'Wimberley', 'Driftwood', 'Uhland', 'Manchaca', 'Creedmoor'],
+                    'Fort Worth': ['Fort Worth', 'Saginaw', 'Richland Hills', 'Forest Hill'],
+                    'Cedar Park': ['Cedar Park', 'Round Rock', 'Leander', 'Georgetown', 'Jollyville', 'Sunset Valley', 'Lakeway', 'Wells Branch'],
+                    'Arlington': ['Arlington', 'Grand Prairie', 'Dallas'],
+                    // MD
+                    'Maple Lawn': ['Columbia', 'Ellicott City', 'Fulton', 'Clarksville', 'Glenwood', 'Jessup', 'Millersville', 'West Friendship', 'Russett'],
+                    'Bowie': ['Bowie', 'Glen Burnie', 'Hanover', 'Linthicum Heights', 'Pasadena', 'Fort Meade', 'Severn', 'Severna Park', 'Odenton', 'Crofton', 'Crownsville', 'Arnold', 'Edgewater', 'Cape Saint Claire', 'Riviera Beach', 'Herald Harbor', 'Annapolis', 'Davidsonville', 'West Laurel', 'Mitchellville', 'Glenarden'],
+                    'Bethesda': ['Bethesda', 'Rockville', 'Silver Spring', 'North Bethesda', 'Chevy Chase', 'Catonsville', 'Aspen Hill', 'Colesville', 'Laurel', 'Washington', 'McLean'],
+                    // CT
+                    'Stamford': ['Stamford', 'Greenwich', 'Norwalk', 'Darien', 'New Canaan', 'Westport'],
+                    'Hamden': ['Hamden', 'New Haven', 'North Haven', 'Shelton', 'Milford', 'Derby', 'Ansonia', 'West Haven', 'Meriden', 'Cheshire', 'Wallingford'],
+                    'Farmington': ['Farmington', 'Hartford', 'New Britain', 'West Hartford', 'Avon', 'Newington', 'Plainville', 'Wethersfield', 'Stratford', 'Waterbury'],
+                    // CA
+                    'San Jose': ['San Jose', 'Sunnyvale', 'Mountain View', 'Milpitas', 'Fremont', 'Hayward', 'Union City', 'Newark'],
+                    'Temecula': ['Temecula', 'Murrieta', 'Menifee', 'Riverside', 'Moreno Valley', 'Hemet', 'Norco', 'Corona', 'Wildomar', 'Lake Elsinore', 'San Jacinto', 'Winchester', 'Canyon Lake', 'Perris', 'Banning', 'Temescal Valley', 'El Sobrante', 'Valle Vista', 'Lakeland Village', 'Cherry Valley', 'Romoland'],
+                    'Palo Alto': ['Palo Alto', 'Redwood City', 'Menlo Park', 'San Mateo', 'San Carlos', 'Belmont', 'Burlingame', 'Foster City', 'East Palo Alto', 'Woodside', 'Los Altos', 'Los Altos Hills', 'Stanford', 'Hillsborough', 'Emerald Hills'],
+                    'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
+                    'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza'],
+                    'Newport Beach': ['Newport Beach'],
+                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'National City', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
+                    'National City': ['National City']
+                };
+                
+                // NYC clinics — "New York" mega-city split proportionally by zip count
+                const NYC_CLINICS = ['Astoria', 'Brighton Beach', 'Bronx', 'Downtown Brooklyn', 'Financial District',
+                    'Forest Hills', 'Midtown Manhattan', 'Staten Island', 'Upper East Side'];
+                const totalNYCZips = NYC_CLINICS.reduce((s, c) => s + (CLINIC_ZIPCODES[c]?.length || 0), 0);
+                
+                // Map direct city matches to clinics
+                Object.entries(CLINIC_CITIES).forEach(([clinic, cities]) => {
+                    cities.forEach(city => {
+                        if (cityData[city]) {
+                            clinicAdData[clinic].clicks += cityData[city].clicks;
+                            clinicAdData[clinic].impressions += cityData[city].impressions;
+                            clinicAdData[clinic].spend += cityData[city].cost;
+                        }
+                    });
                 });
-                console.log('Clinic perf: Google geographic_view loaded, zips:', googleZipCount);
+                
+                // Split "New York" city across NYC clinics proportionally by zip count
+                if (cityData['New York']) {
+                    const nyc = cityData['New York'];
+                    NYC_CLINICS.forEach(clinic => {
+                        const zipCount = CLINIC_ZIPCODES[clinic]?.length || 0;
+                        const share = zipCount / totalNYCZips;
+                        clinicAdData[clinic].clicks += Math.round(nyc.clicks * share);
+                        clinicAdData[clinic].impressions += Math.round(nyc.impressions * share);
+                        clinicAdData[clinic].spend += nyc.cost * share;
+                    });
+                }
+                
+                // Also map Long Island / Westchester / upstate NY cities
+                const LI_WESTCHESTER_CITIES = {
+                    'Hartsdale': ['White Plains', 'Scarsdale', 'New Rochelle', 'Mamaroneck', 'Larchmont', 'Dobbs Ferry', 'Briarcliff Manor', 'Chappaqua', 'Mount Kisco', 'Pleasantville', 'Valhalla', 'Elmsford', 'Armonk', 'Croton-on-Hudson', 'Sleepy Hollow', 'Thornwood', 'Ossining', 'Ardsley', 'Rye', 'Rye Brook', 'Pelham Manor', 'Montebello', 'Bardonia'],
+                    'Yonkers': ['Yonkers', 'Mount Vernon'],
+                    'Jericho': ['North Hills', 'Valley Stream', 'Rockville Centre', 'Mineola', 'East Meadow', 'Garden City', 'Manhasset', 'Plainview', 'Hicksville', 'Westbury', 'Jericho', 'Roslyn Heights', 'Roslyn', 'Floral Park', 'Hempstead', 'Baldwin', 'East Rockaway', 'Glen Cove', 'Oyster Bay', 'Glen Head', 'Syosset', 'West Hempstead', 'Williston Park', 'Great Neck Plaza', 'Levittown', 'Massapequa Park', 'Sands Point', 'Salisbury', 'Lynbrook', 'Woodbury', 'Kings Point', 'Mill Neck', 'Franklin Square', 'Lawrence', 'Hewlett', 'Lido Beach', 'Island Park', 'Locust Valley', 'Dix Hills', 'Cold Spring Harbor', 'Smithtown', 'Commack', 'Melville', 'Baldwin Harbor', 'South Farmingdale', 'Elwood'],
+                    'West Islip': ['West Islip', 'Bay Shore', 'Babylon', 'Amityville', 'Copiague', 'Lindenhurst', 'North Babylon', 'West Babylon', 'Deer Park', 'East Islip', 'Islip', 'Oakdale', 'West Sayville', 'Bayport', 'Great River', 'North Bay Shore', 'Wheatley Heights'],
+                    'Port Jefferson': ['Holbrook', 'Centereach', 'Stony Brook', 'Farmingville', 'Bohemia', 'Shirley', 'Manorville', 'Eastport', 'Lake Ronkonkoma', 'Islandia', 'Central Islip', 'Selden', 'Coram', 'Yaphank', 'Mastic', 'Medford', 'Blue Point', 'Sayville', 'East Moriches', 'Center Moriches', 'Bellport', 'East Patchogue', 'Terryville', 'Lake Grove', 'Nesconset', 'Wading River', 'Calverton', 'Middle Island', 'Rocky Point', 'Holtsville', 'Kings Park', 'Saint James', 'Fort Salonga', 'Miller Place', 'Mount Sinai', 'Flanders', 'Setauket- East Setauket', 'Greenlawn', 'Huntington', 'Brentwood', 'West Sayville']
+                };
+                
+                // Also NJ cities near Harrison / Scotch Plains
+                const NJ_EXTRA_CITIES = {
+                    'Harrison': ['Elizabeth', 'Linden', 'Union', 'Kenilworth', 'Roselle', 'Roselle Park', 'Hillside', 'City of Orange', 'East Orange', 'Glen Ridge', 'Verona'],
+                    'West Orange': ['Berkeley Heights', 'Summit', 'Springfield', 'Cranford', 'Westfield', 'Scotch Plains', 'Clark', 'New Providence', 'Millburn', 'Essex Fells', 'North Caldwell', 'Roseland', 'Cedar Grove']
+                };
+                
+                [LI_WESTCHESTER_CITIES, NJ_EXTRA_CITIES].forEach(mapping => {
+                    Object.entries(mapping).forEach(([clinic, cities]) => {
+                        cities.forEach(city => {
+                            if (cityData[city]) {
+                                if (!clinicAdData[clinic]) clinicAdData[clinic] = { clicks: 0, impressions: 0, spend: 0 };
+                                clinicAdData[clinic].clicks += cityData[city].clicks;
+                                clinicAdData[clinic].impressions += cityData[city].impressions;
+                                clinicAdData[clinic].spend += cityData[city].cost;
+                            }
+                        });
+                    });
+                });
+                
+                // Add Chestnut Ridge, Pearl River, West Nyack (Rockland County) to Paramus
+                ['Chestnut Ridge', 'Pearl River', 'West Nyack'].forEach(city => {
+                    if (cityData[city]) {
+                        clinicAdData['Paramus'].clicks += cityData[city].clicks;
+                        clinicAdData['Paramus'].impressions += cityData[city].impressions;
+                        clinicAdData['Paramus'].spend += cityData[city].cost;
+                    }
+                });
+                
+                const clinicsWithData = Object.entries(clinicAdData).filter(([k,v]) => v.clicks > 0).length;
+                console.log(`Clinic perf: city-level mapping done, ${clinicsWithData} clinics with clicks, ${Object.keys(cityData).length} cities`);
             } catch (e) {
                 console.log('Google geo for clinic perf:', e.message);
             }
         }
-        
-        console.log(`Clinic perf: ${Object.keys(adClicksByZip).length} zips with ad data`);
-        
-        // 3. Map ad clicks to clinics using CLINIC_ZIPCODES
-        const clinicAdData = {};
-        Object.keys(CLINIC_ZIPCODES).forEach(clinic => {
-            clinicAdData[clinic] = { clicks: 0, impressions: 0, spend: 0 };
-            CLINIC_ZIPCODES[clinic].forEach(zip => {
-                if (adClicksByZip[zip]) {
-                    clinicAdData[clinic].clicks += adClicksByZip[zip].clicks;
-                    clinicAdData[clinic].impressions += adClicksByZip[zip].impressions;
-                    clinicAdData[clinic].spend += adClicksByZip[zip].spend;
-                }
-            });
-        });
         
         // 4. Match Looker clinic names to our clinic keys (fuzzy match)
         const CLINIC_ALIASES = {
