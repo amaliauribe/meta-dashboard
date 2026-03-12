@@ -1115,7 +1115,7 @@ async function updateMetaFunnel(impressions, clicks, conversions) {
 }
 
 function updateFunnelBars(impressions, clicks, conversions, lfs, lfsOurs) {
-    const steps = document.querySelectorAll('#metaCampaigns .funnel-step, #metaView .funnel-step');
+    const steps = document.querySelectorAll('#campaignsView .funnel-step');
     if (steps.length < 5) return;
     
     // Scale bars proportionally - impressions is 100%, others relative to clicks
@@ -8045,6 +8045,7 @@ async function loadClinicPerformanceData() {
 function renderClinicPerfChart(clinics) {
     const chartContainer = document.getElementById('clinicPerfChartContainer');
     const canvas = document.getElementById('clinicPerfChart');
+    if (!canvas) { console.error('clinicPerfChart canvas not found'); return; }
     const ctx = canvas.getContext('2d');
     
     // Filter clinics with ad click data and sort by booked per 100 clicks
