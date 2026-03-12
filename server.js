@@ -1890,28 +1890,29 @@ app.post('/api/google/geographic-performance', async (req, res) => {
     const { startDate, endDate } = req.body;
     
     try {
-        // Get location performance data
+        // Use geographic_view (user location) instead of location_view (targeted location)
+        // geographic_view captures ALL spend by where users actually are,
+        // not just spend on explicitly targeted locations (~34% was missing before)
         const query = `
             SELECT 
-                campaign.name,
-                campaign_criterion.location.geo_target_constant,
+                segments.geo_target_region,
                 metrics.impressions,
                 metrics.clicks,
                 metrics.cost_micros,
                 metrics.conversions
-            FROM location_view
+            FROM geographic_view
             WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                 AND metrics.impressions > 0
             ORDER BY metrics.clicks DESC
-            LIMIT 500
+            LIMIT 1000
         `;
         
         const results = await googleAdsApiRequest(query);
         
         // Extract unique geo IDs to look up names
         const geoIds = [...new Set(results.map(r => {
-            const geoConstant = r.campaign_criterion?.location?.geo_target_constant || '';
-            const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+            const geoRegion = r.segments?.geo_target_region || '';
+            const match = geoRegion.match(/geoTargetConstants\/(\d+)/);
             return match ? match[1] : null;
         }).filter(Boolean))];
         
@@ -1938,12 +1939,12 @@ app.post('/api/google/geographic-performance', async (req, res) => {
             });
         }
         
-        // Aggregate by location (combining all campaigns)
+        // Aggregate by region (combining all campaigns)
         const locationMap = {};
         
         results.forEach(row => {
-            const geoConstant = row.campaign_criterion?.location?.geo_target_constant || '';
-            const match = geoConstant.match(/geoTargetConstants\/(\d+)/);
+            const geoRegion = row.segments?.geo_target_region || '';
+            const match = geoRegion.match(/geoTargetConstants\/(\d+)/);
             const geoId = match ? match[1] : 'unknown';
             const metrics = row.metrics || {};
             
@@ -1957,8 +1958,7 @@ app.post('/api/google/geographic-performance', async (req, res) => {
                     impressions: 0,
                     clicks: 0,
                     cost: 0,
-                    conversions: 0,
-                    campaigns: new Set()
+                    conversions: 0
                 };
             }
             
@@ -1966,7 +1966,6 @@ app.post('/api/google/geographic-performance', async (req, res) => {
             locationMap[geoId].clicks += parseInt(metrics.clicks) || 0;
             locationMap[geoId].cost += (parseInt(metrics.cost_micros) || 0) / 1000000;
             locationMap[geoId].conversions += parseFloat(metrics.conversions) || 0;
-            locationMap[geoId].campaigns.add(row.campaign?.name || 'Unknown');
         });
         
         // Convert to array and calculate derived metrics
@@ -1982,8 +1981,7 @@ app.post('/api/google/geographic-performance', async (req, res) => {
             ctr: loc.impressions > 0 ? (loc.clicks / loc.impressions) * 100 : 0,
             cpc: loc.clicks > 0 ? loc.cost / loc.clicks : 0,
             costPerConv: loc.conversions > 0 ? loc.cost / loc.conversions : 0,
-            convRate: loc.clicks > 0 ? (loc.conversions / loc.clicks) * 100 : 0,
-            campaignCount: loc.campaigns.size
+            convRate: loc.clicks > 0 ? (loc.conversions / loc.clicks) * 100 : 0
         }));
         
         // Sort by clicks descending
