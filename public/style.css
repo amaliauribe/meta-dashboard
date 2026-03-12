@@ -2003,6 +2003,10 @@ table.resizable-table td {
     background: linear-gradient(90deg, #F7931A, #ffb74d);
 }
 
+.funnel-bar.ours-privacy {
+    background: linear-gradient(90deg, #9C27B0, #CE93D8);
+}
+
 .funnel-label {
     display: flex;
     flex-direction: column;

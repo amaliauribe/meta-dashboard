@@ -1087,41 +1087,50 @@ async function updateMetaFunnel(impressions, clicks, conversions) {
         }
         
         const params = new URLSearchParams({ startDate, endDate });
-        const response = await fetch('/api/ours-privacy/lfs-by-platform?platform=meta&' + params);
-        const data = await response.json();
+        const [lookerResponse, oursResponse] = await Promise.all([
+            fetch('/api/ours-privacy/lfs-by-platform?platform=meta&' + params).then(r => r.json()),
+            fetch('/api/ours-privacy/lfs-raw-by-platform?platform=meta&' + params).then(r => r.json())
+        ]);
         
-        const lfsCount = data.total || 0;
+        const lfsCount = lookerResponse.total || 0;
         document.getElementById('funnelLfs').textContent = lfsCount.toLocaleString();
-        
         const lfsRate = conversions > 0 ? ((lfsCount / conversions) * 100).toFixed(1) : 0;
         document.getElementById('funnelLfsRate').textContent = lfsRate + '% of conv';
         
+        const lfsOursCount = oursResponse.total || 0;
+        document.getElementById('funnelLfsOurs').textContent = lfsOursCount.toLocaleString();
+        const lfsOursRate = conversions > 0 ? ((lfsOursCount / conversions) * 100).toFixed(1) : 0;
+        document.getElementById('funnelLfsOursRate').textContent = lfsOursRate + '% of conv';
+        
         // Update funnel bar widths based on actual ratios
-        updateFunnelBars(impressions, clicks, conversions, lfsCount);
+        updateFunnelBars(impressions, clicks, conversions, lfsCount, lfsOursCount);
     } catch (e) {
         console.error('Error fetching l_f_s for funnel:', e);
         document.getElementById('funnelLfs').textContent = '-';
         document.getElementById('funnelLfsRate').textContent = '';
-        updateFunnelBars(impressions, clicks, conversions, 0);
+        document.getElementById('funnelLfsOurs').textContent = '-';
+        document.getElementById('funnelLfsOursRate').textContent = '';
+        updateFunnelBars(impressions, clicks, conversions, 0, 0);
     }
 }
 
-function updateFunnelBars(impressions, clicks, conversions, lfs) {
-    const steps = document.querySelectorAll('.funnel-step');
-    if (steps.length < 4) return;
+function updateFunnelBars(impressions, clicks, conversions, lfs, lfsOurs) {
+    const steps = document.querySelectorAll('#metaCampaigns .funnel-step, #metaView .funnel-step');
+    if (steps.length < 5) return;
     
     // Scale bars proportionally - impressions is 100%, others relative to clicks
-    // Use clicks as the reference for the lower funnel (Results & l_f_s)
     steps[0].style.setProperty('--step-width', '100%');
     steps[1].style.setProperty('--step-width', clicks > 0 ? '70%' : '10%');
     
-    // Results and l_f_s scaled relative to each other
-    const maxLower = Math.max(conversions, lfs, 1);
+    // Results, l_f_s Looker, l_f_s Ours scaled relative to each other
+    const maxLower = Math.max(conversions, lfs, lfsOurs || 0, 1);
     const resultsWidth = conversions > 0 ? Math.max((conversions / maxLower) * 45, 15) : 10;
     const lfsWidth = lfs > 0 ? Math.max((lfs / maxLower) * 45, 15) : 10;
+    const lfsOursWidth = (lfsOurs || 0) > 0 ? Math.max(((lfsOurs || 0) / maxLower) * 45, 15) : 10;
     
     steps[2].style.setProperty('--step-width', resultsWidth + '%');
     steps[3].style.setProperty('--step-width', lfsWidth + '%');
+    steps[4].style.setProperty('--step-width', lfsOursWidth + '%');
 }
 
 async function loadChartData() {
@@ -1476,18 +1485,20 @@ async function loadDailyData() {
             endDate = formatDateEST(end);
         }
         
-        // Fetch Meta data and l_f_s data in parallel
-        const [data, lfsResponse] = await Promise.all([
+        // Fetch Meta data, Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
             apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}&time_increment=1`),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${startDate}&endDate=${endDate}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
+        const oursLfsByDate = oursLfsResponse.byDate || {};
 
         const tbody = document.getElementById('dailyBody');
         
         if (!data.data || data.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -1500,11 +1511,14 @@ async function loadDailyData() {
             const clicks = parseInt(day.clicks || 0);
             const results = getResults(day.actions);
             const lfs = lfsByDate[day.date_start] || 0;
+            const oursLfsDay = oursLfsByDate[day.date_start];
+            const oursLfs = oursLfsDay ? (oursLfsDay.meta || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
             const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
+            const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date - create from parts to avoid timezone issues
             const dateParts = day.date_start.split('-');
@@ -1525,12 +1539,14 @@ async function loadDailyData() {
                     <td>${costPerResult}</td>
                     <td>${lfs}</td>
                     <td>${costPerLfs}</td>
+                    <td>${oursLfs}</td>
+                    <td>${costPerOursLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Daily error:', e);
-        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="11" class="loading">Error loading daily data</td></tr>';
+        document.getElementById('dailyBody').innerHTML = '<tr><td colspan="13" class="loading">Error loading daily data</td></tr>';
     }
 }
 
