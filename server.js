@@ -3901,6 +3901,10 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             }
         }
         
+        // Debug: Log sample zip entries to check format
+        const sampleZips = Object.entries(adClicksByZip).slice(0, 10);
+        console.log('Sample zip entries:', sampleZips.map(([z, d]) => `${z}:${d.clicks}clicks`));
+        
         // Debug: Check FiDi and Midtown zips in the data
         const fidiZipsDebug = ['10002','10003','10004','10006','10007','10009','10010','10011','10012','10013','10014','10038','10080','10280','10282'];
         const midtownZipsDebug = ['10001','10016','10017','10018','10019','10020','10021','10022','10023','10024','10025','10028','10036','10065','10069','10075','10119','10128','10199'];
