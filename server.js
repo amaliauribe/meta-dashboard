@@ -3985,7 +3985,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza', 'Santa Ana', 'Tustin', 'Fountain Valley'],
                     'Newport Beach': ['Newport Beach'],
                     'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
-                    'National City': ['National City']
+                    'National City': ['National City', 'Chula Vista', 'El Cajon', 'La Mesa', 'Spring Valley', 'La Presa']
                 };
                 
                 // NYC clinics — "New York" mega-city split proportionally by zip count
@@ -3998,7 +3998,12 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Costa Mesa':       ['Irvine', 'Huntington Beach'],
                     'Santa Ana':        ['Huntington Beach', 'Irvine'],
                     'Tustin':           ['Huntington Beach', 'Irvine'],
-                    'Fountain Valley':  ['Huntington Beach', 'Irvine']
+                    'Fountain Valley':  ['Huntington Beach', 'Irvine'],
+                    'Chula Vista':      ['San Diego', 'National City'],
+                    'El Cajon':         ['San Diego', 'National City'],
+                    'La Mesa':          ['San Diego', 'National City'],
+                    'Spring Valley':    ['San Diego', 'National City'],
+                    'La Presa':         ['San Diego', 'National City']
                 };
 
                 const sharedCitiesHandled = new Set();
