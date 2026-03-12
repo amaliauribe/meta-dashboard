@@ -3963,6 +3963,11 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             return null;
         };
         
+        // Debug: Log clinicAdData totals
+        const clinicsWithClicks = Object.entries(clinicAdData).filter(([k, v]) => v.clicks > 0);
+        console.log(`Clinic ad data: ${clinicsWithClicks.length} clinics with clicks:`, 
+            clinicsWithClicks.map(([k, v]) => `${k}:${v.clicks}`));
+        
         // 5. Build combined clinic data
         const allLookerClinics = new Set([...Object.keys(leadsMap), ...Object.keys(bookedMap)]);
         const clinicResults = [];
