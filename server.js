@@ -2347,6 +2347,34 @@ app.post('/api/bing/qs-history', async (req, res) => {
     }
 });
 
+// ==================== Meta Geographic Proxy ====================
+// Proxy for Meta region breakdown (used by spend-by-state standalone page)
+app.get('/api/meta-geo', async (req, res) => {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) return res.json({ regions: [] });
+    
+    try {
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const accountId = process.env.META_ACCOUNT_ID;
+        const token = process.env.META_ACCESS_TOKEN;
+        if (!accountId || !token) return res.json({ regions: [] });
+        
+        const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${token}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const regions = (data.data || []).map(r => ({
+            region: r.region || 'Unknown',
+            spend: r.spend || '0'
+        }));
+        
+        res.json({ regions });
+    } catch (e) {
+        console.error('Meta geo proxy error:', e.message);
+        res.json({ regions: [] });
+    }
+});
+
 // ==================== Summary API ====================
 
 // Summary: Get daily spend data for all platforms

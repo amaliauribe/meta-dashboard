@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spend by State | VTC Ads Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 32px;
+        }
+        .header {
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .header p {
+            font-size: 14px;
+            color: #666;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .date-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .date-group label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+        input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #fff;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #333; }
+        .btn-preset {
+            background: #f0f0f0;
+            color: #333;
+            padding: 6px 14px;
+            font-size: 13px;
+        }
+        .btn-preset:hover { background: #e0e0e0; }
+        .btn-preset.active { background: #1a1a1a; color: #fff; }
+        .presets {
+            display: flex;
+            gap: 6px;
+            margin-left: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+        }
+        thead th:not(:first-child) {
+            text-align: right;
+        }
+        tbody td {
+            padding: 14px 16px;
+            font-size: 15px;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        tbody td:first-child {
+            font-weight: 600;
+        }
+        tbody td:not(:first-child) {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        tbody tr:hover {
+            background: #fafafa;
+        }
+        tfoot td {
+            padding: 14px 16px;
+            font-size: 15px;
+            font-weight: 700;
+            border-top: 2px solid #1a1a1a;
+        }
+        tfoot td:not(:first-child) {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+        .date-range-label {
+            font-size: 13px;
+            color: #999;
+            margin-left: auto;
+        }
+        @media (max-width: 768px) {
+            body { padding: 16px 8px; }
+            .container { padding: 20px 16px; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .presets { margin-left: 0; }
+            .date-range-label { margin-left: 0; margin-top: 8px; }
+            table { font-size: 13px; }
+            thead th, tbody td, tfoot td { padding: 10px 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Spend by State</h1>
+            <p>Ad spend breakdown by state across all platforms (based on geographic targeting data)</p>
+        </div>
+        
+        <div class="controls">
+            <div class="date-group">
+                <label>From</label>
+                <input type="date" id="startDate">
+                <label>To</label>
+                <input type="date" id="endDate">
+                <button class="btn btn-primary" onclick="loadData()">Update</button>
+            </div>
+            <div class="presets">
+                <button class="btn btn-preset" onclick="setPreset('yesterday')">Yesterday</button>
+                <button class="btn btn-preset" onclick="setPreset('7d')">7 Days</button>
+                <button class="btn btn-preset" onclick="setPreset('14d')">14 Days</button>
+                <button class="btn btn-preset" onclick="setPreset('30d')">30 Days</button>
+                <button class="btn btn-preset" onclick="setPreset('mtd')">MTD</button>
+                <button class="btn btn-preset" onclick="setPreset('lastMonth')">Last Month</button>
+            </div>
+            <span class="date-range-label" id="dateLabel"></span>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>State</th>
+                    <th>Meta</th>
+                    <th>Google</th>
+                    <th>Bing</th>
+                    <th>Total</th>
+                    <th>% of Total</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="6" class="loading">Loading...</td></tr>
+            </tbody>
+            <tfoot id="tableFoot"></tfoot>
+        </table>
+    </div>
+
+    <script>
+        const META_TOKEN = '';
+        const META_ACCOUNT = '';
+        
+        // Read config from parent dashboard's .env via API
+        let CONFIG = {};
+        
+        function getEST() {
+            return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        }
+        
+        function fmt(d) {
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+        
+        function fmtMoney(n) {
+            return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        function setPreset(p) {
+            const today = getEST();
+            let start, end;
+            
+            document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            switch(p) {
+                case 'yesterday':
+                    end = new Date(today); end.setDate(end.getDate() - 1);
+                    start = new Date(end);
+                    break;
+                case '7d':
+                    end = new Date(today); end.setDate(end.getDate() - 1);
+                    start = new Date(end); start.setDate(start.getDate() - 6);
+                    break;
+                case '14d':
+                    end = new Date(today); end.setDate(end.getDate() - 1);
+                    start = new Date(end); start.setDate(start.getDate() - 13);
+                    break;
+                case '30d':
+                    end = new Date(today); end.setDate(end.getDate() - 1);
+                    start = new Date(end); start.setDate(start.getDate() - 29);
+                    break;
+                case 'mtd':
+                    start = new Date(today.getFullYear(), today.getMonth(), 1);
+                    end = new Date(today); end.setDate(end.getDate() - 1);
+                    break;
+                case 'lastMonth':
+                    start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    end = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+            }
+            
+            document.getElementById('startDate').value = fmt(start);
+            document.getElementById('endDate').value = fmt(end);
+            loadData();
+        }
+        
+        async function loadData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (!startDate || !endDate) return;
+            
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="loading">Loading data...</td></tr>';
+            document.getElementById('tableFoot').innerHTML = '';
+            document.getElementById('dateLabel').textContent = `${startDate} → ${endDate}`;
+            
+            const vtcStates = ['New York', 'New Jersey', 'California', 'Texas', 'Maryland', 'Connecticut'];
+            const dmvStates = ['Virginia', 'Washington, District of Columbia'];
+            const stateAbbrev = { 'New York': 'NY', 'New Jersey': 'NJ', 'California': 'CA', 'Texas': 'TX', 'Maryland': 'MD', 'Connecticut': 'CT' };
+            
+            const stateData = {};
+            vtcStates.forEach(s => { stateData[s] = { meta: 0, google: 0, bing: 0 }; });
+            stateData['Other'] = { meta: 0, google: 0, bing: 0 };
+            
+            // Fetch Meta
+            try {
+                const metaRes = await fetch(`/api/meta-geo?startDate=${startDate}&endDate=${endDate}`);
+                const metaData = await metaRes.json();
+                if (metaData.regions) {
+                    metaData.regions.forEach(r => {
+                        const spend = parseFloat(r.spend) || 0;
+                        if (vtcStates.includes(r.region)) {
+                            stateData[r.region].meta += spend;
+                        } else if (dmvStates.includes(r.region)) {
+                            stateData['Maryland'].meta += spend;
+                        } else {
+                            stateData['Other'].meta += spend;
+                        }
+                    });
+                }
+            } catch(e) { console.error('Meta error:', e); }
+            
+            // Fetch Google
+            try {
+                const googleRes = await fetch('/api/google/geographic-performance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ startDate, endDate })
+                });
+                const googleData = await googleRes.json();
+                if (googleData.locations) {
+                    googleData.locations.forEach(row => {
+                        const parts = (row.canonicalName || '').split(',').map(p => p.trim());
+                        const foundState = parts.find(p => vtcStates.includes(p) || dmvStates.includes(p) || p === 'Virginia' || p === 'District of Columbia');
+                        const state = foundState || 'Other';
+                        const spend = parseFloat(row.cost) || 0;
+                        
+                        if (vtcStates.includes(state)) {
+                            stateData[state].google += spend;
+                        } else if (state === 'Virginia' || state === 'District of Columbia' || dmvStates.includes(state)) {
+                            stateData['Maryland'].google += spend;
+                        } else {
+                            stateData['Other'].google += spend;
+                        }
+                    });
+                }
+            } catch(e) { console.error('Google error:', e); }
+            
+            // Fetch Bing
+            try {
+                const bingRes = await fetch('/api/bing/geographic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ startDate, endDate })
+                });
+                const bingData = await bingRes.json();
+                if (bingData.locations) {
+                    bingData.locations.forEach(row => {
+                        const state = row.state || row.location || 'Unknown';
+                        const spend = parseFloat(row.cost) || 0;
+                        const matched = vtcStates.find(s => state.includes(s) || s.includes(state));
+                        
+                        if (matched) {
+                            stateData[matched].bing += spend;
+                        } else if (state.includes('Virginia') || state.includes('District of Columbia') || state === 'VA' || state === 'DC') {
+                            stateData['Maryland'].bing += spend;
+                        } else {
+                            stateData['Other'].bing += spend;
+                        }
+                    });
+                }
+            } catch(e) { console.error('Bing error:', e); }
+            
+            // Calculate totals
+            let grandTotal = 0;
+            Object.keys(stateData).forEach(s => {
+                stateData[s].total = stateData[s].meta + stateData[s].google + stateData[s].bing;
+                grandTotal += stateData[s].total;
+            });
+            
+            // Sort by total
+            const sorted = Object.keys(stateData)
+                .filter(s => s !== 'Other')
+                .sort((a, b) => stateData[b].total - stateData[a].total);
+            if (stateData['Other'].total > 0) sorted.push('Other');
+            
+            // Render
+            let html = '';
+            let totalMeta = 0, totalGoogle = 0, totalBing = 0;
+            
+            sorted.forEach(state => {
+                const d = stateData[state];
+                const pct = grandTotal > 0 ? (d.total / grandTotal * 100).toFixed(1) + '%' : '0%';
+                const label = state === 'Other' ? 'Other States' : (stateAbbrev[state] || state);
+                totalMeta += d.meta;
+                totalGoogle += d.google;
+                totalBing += d.bing;
+                
+                html += `<tr>
+                    <td>${label}</td>
+                    <td>${fmtMoney(d.meta)}</td>
+                    <td>${fmtMoney(d.google)}</td>
+                    <td>${fmtMoney(d.bing)}</td>
+                    <td><strong>${fmtMoney(d.total)}</strong></td>
+                    <td>${pct}</td>
+                </tr>`;
+            });
+            
+            document.getElementById('tableBody').innerHTML = html || '<tr><td colspan="6" class="loading">No data</td></tr>';
+            document.getElementById('tableFoot').innerHTML = `<tr>
+                <td>Total</td>
+                <td>${fmtMoney(totalMeta)}</td>
+                <td>${fmtMoney(totalGoogle)}</td>
+                <td>${fmtMoney(totalBing)}</td>
+                <td><strong>${fmtMoney(grandTotal)}</strong></td>
+                <td>100%</td>
+            </tr>`;
+        }
+        
+        // Need a simple Meta geo proxy endpoint
+        // Init with last month
+        (function init() {
+            const today = getEST();
+            const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const end = new Date(today.getFullYear(), today.getMonth(), 0);
+            document.getElementById('startDate').value = fmt(start);
+            document.getElementById('endDate').value = fmt(end);
+            loadData();
+        })();
+    </script>
+</body>
+</html>
