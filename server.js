@@ -2349,23 +2349,52 @@ app.post('/api/bing/qs-history', async (req, res) => {
 
 // ==================== Meta Geographic Proxy ====================
 // Proxy for Meta region breakdown (used by spend-by-state standalone page)
+// All VTC Meta ad accounts
+const META_VTC_ACCOUNTS = [
+    { id: '1151591609552634', name: 'CA : Vein Treatment Clinic' },
+    { id: '1494663471476338', name: 'NY: Vein Treatment Clinic (New)' },
+    { id: '3175094602799544', name: 'NJ: Vein Treatment Clinic' },
+    { id: '1900481344131830', name: 'TX: Vein Treatment Clinic' },
+    { id: '2979710872232006', name: 'CT : Vein Treatment Clinic' },
+    { id: '409210661685307', name: 'MD : Vein Treatment Clinic' },
+    { id: '7200144256714286', name: 'LI : Vein Treatment Clinic' },
+];
+
 app.get('/api/meta-geo', async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.json({ regions: [] });
     
     try {
         const apiVersion = process.env.META_API_VERSION || 'v19.0';
-        const accountId = process.env.META_ACCOUNT_ID;
         const token = process.env.META_ACCESS_TOKEN;
-        if (!accountId || !token) return res.json({ regions: [] });
+        if (!token) return res.json({ regions: [] });
         
-        const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${token}`;
-        const response = await fetch(url);
-        const data = await response.json();
+        // Query all VTC accounts in parallel
+        const allResults = await Promise.all(META_VTC_ACCOUNTS.map(async (acct) => {
+            try {
+                const url = `https://graph.facebook.com/${apiVersion}/act_${acct.id}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${token}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                return data.data || [];
+            } catch (e) {
+                console.error(`Meta geo error for ${acct.name}:`, e.message);
+                return [];
+            }
+        }));
         
-        const regions = (data.data || []).map(r => ({
-            region: r.region || 'Unknown',
-            spend: r.spend || '0'
+        // Aggregate spend by region across all accounts
+        const regionMap = {};
+        for (const accountData of allResults) {
+            for (const r of accountData) {
+                const region = r.region || 'Unknown';
+                const spend = parseFloat(r.spend) || 0;
+                regionMap[region] = (regionMap[region] || 0) + spend;
+            }
+        }
+        
+        const regions = Object.entries(regionMap).map(([region, spend]) => ({
+            region,
+            spend: spend.toFixed(6)
         }));
         
         res.json({ regions });
