@@ -3984,8 +3984,8 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     'Huntington Beach': ['Huntington Beach', 'Santa Ana', 'Fountain Valley', 'Westminster', 'Garden Grove', 'Stanton', 'Orange', 'Anaheim', 'Tustin', 'Villa Park', 'Yorba Linda', 'North Tustin', 'Rossmoor'],
                     'Irvine': ['Irvine', 'Lake Forest', 'Laguna Hills', 'Laguna Niguel', 'Laguna Woods', 'Laguna Beach', 'Mission Viejo', 'Rancho Santa Margarita', 'San Juan Capistrano', 'Dana Point', 'San Clemente', 'Costa Mesa', 'Coto de Caza'],
                     'Newport Beach': ['Newport Beach'],
-                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Chula Vista', 'El Cajon', 'Santee', 'La Mesa', 'Lemon Grove', 'National City', 'Spring Valley', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'La Presa', 'Lakeside', 'Bonsall'],
-                    'National City': ['National City']
+                    'San Diego': ['San Diego', 'Carlsbad', 'Encinitas', 'Oceanside', 'Santee', 'Lemon Grove', 'Solana Beach', 'Del Mar', 'Rancho Santa Fe', 'San Marcos', 'Vista', 'Bonita', 'Lakeside', 'Bonsall'],
+                    'National City': ['National City', 'Chula Vista', 'El Cajon', 'La Mesa', 'Spring Valley', 'Imperial Beach', 'San Ysidro', 'La Presa']
                 };
                 
                 // NYC clinics — "New York" mega-city split proportionally by zip count
@@ -4072,7 +4072,7 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
             'Maple Lawn': ['maple lawn', 'fulton'],
             'Cedar Park': ['cedar park'],
             'Fort Worth': ['fort worth'],
-            'National City': ['national city'],
+            'National City': ['national city', 'chula vista', 'el cajon', 'la mesa', 'spring valley', 'imperial beach', 'san ysidro', 'la presa'],
             'Huntington Beach': ['huntington beach', 'huntington'],
             'Newport Beach': ['newport beach', 'newport'],
             'Brighton Beach': ['brighton beach', 'brighton']
@@ -4237,7 +4237,7 @@ const CLINIC_ZIPCODES = {
     'Irvine': ['92602', '92603', '92604', '92606', '92610', '92612', '92614', '92617', '92618', '92620', '92625', '92626', '92627', '92630', '92637', '92647', '92653', '92656', '92660', '92661', '92662', '92663', '92683', '92691', '92692', '92701', '92704', '92705', '92706', '92707', '92708', '92780', '92782', '92866', '92868'],
     'Newport Beach': ['92602', '92603', '92604', '92606', '92612', '92614', '92617', '92618', '92620', '92624', '92625', '92626', '92627', '92629', '92630', '92637', '92646', '92651', '92653', '92656', '92657', '92660', '92661', '92662', '92663', '92672', '92673', '92675', '92677', '92679', '92688', '92691', '92692', '92694', '92701', '92703', '92704', '92705', '92706', '92707', '92708', '92780', '92782', '92807', '92808', '92861', '92866', '92867', '92868', '92869', '92886', '92887'],
     'San Diego': ['91902', '91910', '91914', '91941', '91942', '91945', '91950', '91977', '91978', '92003', '92007', '92008', '92009', '92010', '92011', '92014', '92019', '92020', '92021', '92024', '92037', '92040', '92054', '92056', '92057', '92058', '92067', '92071', '92075', '92081', '92083', '92091', '92101', '92102', '92103', '92104', '92105', '92106', '92107', '92108', '92109', '92110', '92111', '92113', '92114', '92115', '92116', '92117', '92118', '92119', '92120', '92121', '92122', '92123', '92124', '92130', '92139'],
-    'National City': ['91902', '91910', '91911', '91950', '91977', '92113', '92114', '92139']
+    'National City': ['91902', '91910', '91913', '91914', '91915', '91932', '91941', '91950', '91977', '91978', '92019', '92113', '92114', '92139', '92173', '92179']
 };
 
 // Looker: l_f_s by date and tracking type (replaces Ours Privacy webhooks)
