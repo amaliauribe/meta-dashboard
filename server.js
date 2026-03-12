@@ -3857,8 +3857,10 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     : '';
                 
                 // Fetch city-level geographic data
-                const cityQuery = `
+                // campaign.id must be in SELECT when filtering by campaign in geographic_view
+                const cityQuery = campaignIds.length > 0 ? `
                     SELECT 
+                        campaign.id,
                         segments.geo_target_city,
                         metrics.impressions,
                         metrics.clicks,
@@ -3867,6 +3869,16 @@ app.get('/api/looker/clinic-performance', async (req, res) => {
                     WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
                         AND metrics.clicks > 0
                         ${campaignFilter}
+                    LIMIT 5000
+                ` : `
+                    SELECT 
+                        segments.geo_target_city,
+                        metrics.impressions,
+                        metrics.clicks,
+                        metrics.cost_micros
+                    FROM geographic_view
+                    WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                        AND metrics.clicks > 0
                     LIMIT 5000
                 `;
                 const cityResults = await googleAdsApiRequest(cityQuery);
