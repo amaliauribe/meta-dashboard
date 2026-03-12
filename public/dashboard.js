@@ -4147,15 +4147,17 @@ async function loadStateSpend(startDate, endDate) {
             
             if (googleData.locations) {
                 googleData.locations.forEach(row => {
-                    // Parse state from canonicalName (format: "zipcode,State,Country")
+                    // Parse state from canonicalName
+                    // geographic_view format: "State,United States" or "Region,State,United States"
                     let state = 'Unknown';
                     if (row.canonicalName) {
-                        const parts = row.canonicalName.split(',');
-                        if (parts.length >= 2) {
-                            state = parts[1].trim(); // State is second part
-                        }
+                        const parts = row.canonicalName.split(',').map(p => p.trim());
+                        // Check each part against VTC states (state could be at any position)
+                        const foundState = parts.find(p => vtcStates.includes(p) || 
+                            dmvStates.includes(p) || p === 'Virginia' || p === 'District of Columbia');
+                        state = foundState || parts[0] || 'Unknown';
                     } else {
-                        state = row.state || row.location || 'Unknown';
+                        state = row.name || row.state || row.location || 'Unknown';
                     }
                     const spend = parseFloat(row.cost) || 0;
                     
@@ -5942,21 +5944,24 @@ function renderGeoTable() {
     document.getElementById('geoBody').innerHTML = sorted.map(loc => {
         const convRateClass = loc.convRate >= 10 ? 'qs-good' : (loc.convRate >= 5 ? 'qs-ok' : 'qs-low');
         
-        // Extract state from canonical name (format: "ZIP,State,Country")
+        // Extract state from canonical name
+        // geographic_view format: "State,United States" or "Region,State,United States"
         let stateAbbr = '';
         if (loc.canonicalName) {
-            const parts = loc.canonicalName.split(',');
-            if (parts.length >= 2) {
-                const stateName = parts[1].trim();
-                // Convert state name to abbreviation
-                const stateMap = {
-                    'New York': 'NY', 'California': 'CA', 'Texas': 'TX', 'New Jersey': 'NJ',
-                    'Connecticut': 'CT', 'Maryland': 'MD', 'District of Columbia': 'DC',
-                    'Florida': 'FL', 'Pennsylvania': 'PA', 'Virginia': 'VA', 'Massachusetts': 'MA',
-                    'Georgia': 'GA', 'Illinois': 'IL', 'Ohio': 'OH', 'Michigan': 'MI',
-                    'North Carolina': 'NC', 'Arizona': 'AZ', 'Washington': 'WA', 'Colorado': 'CO'
-                };
-                stateAbbr = stateMap[stateName] || stateName.substring(0, 2).toUpperCase();
+            const parts = loc.canonicalName.split(',').map(p => p.trim());
+            const stateMap = {
+                'New York': 'NY', 'California': 'CA', 'Texas': 'TX', 'New Jersey': 'NJ',
+                'Connecticut': 'CT', 'Maryland': 'MD', 'District of Columbia': 'DC',
+                'Florida': 'FL', 'Pennsylvania': 'PA', 'Virginia': 'VA', 'Massachusetts': 'MA',
+                'Georgia': 'GA', 'Illinois': 'IL', 'Ohio': 'OH', 'Michigan': 'MI',
+                'North Carolina': 'NC', 'Arizona': 'AZ', 'Washington': 'WA', 'Colorado': 'CO'
+            };
+            // Check each part for a state match
+            for (const part of parts) {
+                if (stateMap[part]) { stateAbbr = stateMap[part]; break; }
+            }
+            if (!stateAbbr && parts.length >= 1 && parts[0] !== 'United States') {
+                stateAbbr = parts[0].substring(0, 2).toUpperCase();
             }
         }
         const locationDisplay = stateAbbr ? `${loc.name} <span class="state-badge">${stateAbbr}</span>` : loc.name;
