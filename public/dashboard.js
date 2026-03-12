@@ -8005,6 +8005,7 @@ async function loadClinicPerformanceData() {
         // Map clinic data for display
         const clinicsData = clinics.map(c => ({
             clinic: c.clinic,
+            adSpend: c.adSpend || 0,
             adClicks: c.adClicks || 0,
             leads: c.leads || 0,
             booked: c.booked || 0,
@@ -8170,9 +8171,13 @@ function sortAndRenderClinicPerfTable() {
         const clickRateEmoji = clickRate === null ? '' :
             clickRate >= 10 ? '🌟' : clickRate >= 5 ? '⭐' : clickRate >= 2 ? '' : '⚠️';
         
+        const spend = c.adSpend || 0;
+        const spendFormatted = spend > 0 ? '$' + spend.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-';
+        
         return `
             <tr>
                 <td><strong>${c.clinic}</strong></td>
+                <td>${spendFormatted}</td>
                 <td>${c.adClicks > 0 ? c.adClicks.toLocaleString() : '-'}</td>
                 <td>${c.leads.toLocaleString()}</td>
                 <td><strong>${c.booked}</strong></td>
