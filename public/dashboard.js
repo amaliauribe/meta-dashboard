@@ -3698,7 +3698,8 @@ function renderCostTrendDailyChart(source, stage = 'all') {
             backgroundColor: stageConfig[key].backgroundColor,
             tension: 0.3,
             fill: false,
-            pointRadius: 2
+            pointRadius: 2,
+            yAxisID: 'y'
         }));
     } else {
         const cfg = stageConfig[stage];
@@ -3709,9 +3710,26 @@ function renderCostTrendDailyChart(source, stage = 'all') {
             backgroundColor: cfg.backgroundColor,
             tension: 0.3,
             fill: true,
-            pointRadius: 2
+            pointRadius: 2,
+            yAxisID: 'y'
         }];
     }
+    
+    // Add l_f_s count line on secondary axis
+    const lfsCountData = data.l_f_s || [];
+    datasets.push({
+        label: 'Total l_f_s (LookerML)',
+        data: lfsCountData,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.3,
+        fill: false,
+        pointRadius: 3,
+        pointBackgroundColor: '#3b82f6',
+        borderWidth: 2,
+        borderDash: [],
+        yAxisID: 'y1'
+    });
     
     if (costTrendDailyChart) {
         costTrendDailyChart.destroy();
@@ -3749,6 +3767,9 @@ function renderCostTrendDailyChart(source, stage = 'all') {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
+                            if (context.dataset.yAxisID === 'y1') {
+                                return context.dataset.label + ': ' + (context.raw || 0);
+                            }
                             return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
                         }
                     }
@@ -3764,9 +3785,19 @@ function renderCostTrendDailyChart(source, stage = 'all') {
                 },
                 y: {
                     beginAtZero: true,
+                    position: 'left',
                     title: { display: true, text: 'Cost ($)' },
                     ticks: {
                         callback: function(value) { return '$' + value; }
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: { display: true, text: 'l_f_s Count' },
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        callback: function(value) { return Math.round(value); }
                     }
                 }
             }
