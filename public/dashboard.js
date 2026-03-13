@@ -1,3 +1,9 @@
+// Disable datalabels plugin globally (enable per-chart)
+if (window.ChartDataLabels) {
+    Chart.register(ChartDataLabels);
+    Chart.defaults.plugins.datalabels = { display: false };
+}
+
 // Authentication
 const VALID_USER = 'ranchi';
 const VALID_PASS = 'ranchera2026';
@@ -3728,7 +3734,29 @@ function renderCostTrendDailyChart(source, stage = 'all') {
         pointBackgroundColor: '#3b82f6',
         borderWidth: 2,
         borderDash: [],
-        yAxisID: 'y1'
+        yAxisID: 'y1',
+        datalabels: {
+            display: true,
+            color: '#3b82f6',
+            anchor: 'end',
+            align: 'top',
+            font: { size: 10, weight: 'bold' },
+            formatter: (value) => value != null ? Math.round(value) : ''
+        }
+    });
+    
+    // Add datalabels to cost datasets
+    datasets.forEach(ds => {
+        if (ds.yAxisID === 'y') {
+            ds.datalabels = {
+                display: true,
+                color: ds.borderColor || '#ef4444',
+                anchor: 'end',
+                align: 'bottom',
+                font: { size: 10 },
+                formatter: (value) => value != null ? '$' + value.toFixed(0) : ''
+            };
+        }
     });
     
     if (costTrendDailyChart) {
