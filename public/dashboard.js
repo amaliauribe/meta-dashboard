@@ -3282,10 +3282,12 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
             });
         }
         
-        // Fetch REAL spend data for daily periods
-        if (costTrendDailyData) {
+        // Daily spend comes from the server cache (no extra API calls needed)
+        if (costTrendDailyData && costTrendDailyData.spend) {
+            costTrendDailySpendData = costTrendDailyData.spend;
+        } else if (costTrendDailyData) {
+            // Fallback: initialize empty spend
             costTrendDailySpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
-            
             for (let i = 0; i < dailyData.days.length; i++) {
                 costTrendDailySpendData.mutm.push(0);
                 costTrendDailySpendData.g1utm.push(0);
@@ -3293,21 +3295,6 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                 costTrendDailySpendData.tutm.push(0);
                 costTrendDailySpendData.all.push(0);
             }
-            
-            const dailySpendPromises = [];
-            for (let i = 0; i < dailyData.days.length; i++) {
-                const date = dailyData.dates[i];
-                dailySpendPromises.push(fetchPlatformSpend(date, date, i));
-            }
-            
-            const dailySpendResults = await Promise.all(dailySpendPromises);
-            dailySpendResults.forEach((spend, idx) => {
-                costTrendDailySpendData.mutm[idx] = spend.meta;
-                costTrendDailySpendData.g1utm[idx] = spend.google;
-                costTrendDailySpendData.butm[idx] = spend.bing;
-                costTrendDailySpendData.tutm[idx] = spend.tiktok;
-                costTrendDailySpendData.all[idx] = spend.meta + spend.google + spend.bing + spend.tiktok;
-            });
         }
         
         renderCostTrendChart(costTrendSource, costTrendStage);
