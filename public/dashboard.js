@@ -4728,21 +4728,23 @@ async function loadBingDailyData() {
     const dateRange = getBingDateRange(range);
 
     try {
-        // Fetch Bing data and l_f_s data in parallel
-        const [data, lfsResponse] = await Promise.all([
+        // Fetch Bing data, Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
             bingApiCall('daily-performance', {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
+        const oursLfsByDate = oursLfsResponse.byDate || {};
 
         const tbody = document.getElementById('bingDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -4765,11 +4767,14 @@ async function loadBingDailyData() {
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
             const lfs = lfsByDate[day.normalizedDate] || 0;
+            const oursLfsDay = oursLfsByDate[day.normalizedDate];
+            const oursLfs = oursLfsDay ? (oursLfsDay.bing || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
+            const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date from normalized format
             const dateParts = day.normalizedDate.split('-');
@@ -4790,12 +4795,14 @@ async function loadBingDailyData() {
                     <td>${costPerConv}</td>
                     <td>${lfs}</td>
                     <td>${costPerLfs}</td>
+                    <td>${oursLfs}</td>
+                    <td>${costPerOursLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="13" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -5151,21 +5158,23 @@ async function loadGoogleDailyData() {
     const dateRange = getGoogleDateRange(range);
 
     try {
-        // Fetch Google data and l_f_s data in parallel
-        const [data, lfsResponse] = await Promise.all([
+        // Fetch Google data, Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
             googleApiCall('daily-performance', {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
+        const oursLfsByDate = oursLfsResponse.byDate || {};
 
         const tbody = document.getElementById('googleDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -5178,11 +5187,14 @@ async function loadGoogleDailyData() {
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
             const lfs = lfsByDate[day.date] || 0;
+            const oursLfsDay = oursLfsByDate[day.date];
+            const oursLfs = oursLfsDay ? (oursLfsDay.google || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
+            const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date
             const dateParts = day.date.split('-');
@@ -5203,12 +5215,14 @@ async function loadGoogleDailyData() {
                     <td>${costPerConv}</td>
                     <td>${lfs}</td>
                     <td>${costPerLfs}</td>
+                    <td>${oursLfs}</td>
+                    <td>${costPerOursLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Google Daily error:', e);
-        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="13" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
