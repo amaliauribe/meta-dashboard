@@ -3147,10 +3147,13 @@ async function fetchPlatformSpend(startDate, endDate, idx) {
 // Monthly Cost Per Stage Trends Chart
 let costTrendChart = null;
 let costTrendWeeklyChart = null;
+let costTrendDailyChart = null;
 let costTrendData = null;
 let costTrendWeeklyData = null;
+let costTrendDailyData = null;
 let costTrendSpendData = null;
 let costTrendWeeklySpendData = null;
+let costTrendDailySpendData = null;
 let costTrendSource = 'all';
 let costTrendStage = 'all';
 let costTrendStartDate = null;
@@ -3160,6 +3163,7 @@ let costTrendFiltersInitialized = false;
 async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     const container = document.getElementById('costTrendChartContainer');
     const weeklyContainer = document.getElementById('costTrendWeeklyContainer');
+    const dailyContainer = document.getElementById('costTrendDailyContainer');
     const loading = document.getElementById('costTrendLoading');
     
     if (!container) return;
@@ -3192,16 +3196,27 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     loading.style.display = 'block';
     container.style.opacity = '0.5';
     if (weeklyContainer) weeklyContainer.style.opacity = '0.5';
+    if (dailyContainer) dailyContainer.style.opacity = '0.5';
+    
+    // Build daily URL
+    let dailyUrl = '/api/looker/daily-cost-trends';
+    if (params.length > 0) {
+        dailyUrl += '?' + params.join('&');
+    } else {
+        dailyUrl += `?startDate=${costTrendStartDate}&endDate=${costTrendEndDate}`;
+    }
     
     try {
-        // Fetch both monthly and weekly data in parallel
-        const [monthlyRes, weeklyRes] = await Promise.all([
+        // Fetch monthly, weekly, and daily data in parallel
+        const [monthlyRes, weeklyRes, dailyRes] = await Promise.all([
             fetch(monthlyUrl),
-            fetch(weeklyUrl)
+            fetch(weeklyUrl),
+            fetch(dailyUrl)
         ]);
         
         const monthlyData = await monthlyRes.json();
         const weeklyData = await weeklyRes.json();
+        const dailyData = await dailyRes.json();
         
         if (!monthlyData.success) {
             throw new Error(monthlyData.error || 'Failed to load monthly data');
@@ -3209,6 +3224,7 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         
         costTrendData = monthlyData;
         costTrendWeeklyData = weeklyData.success ? weeklyData : null;
+        costTrendDailyData = dailyData.success ? dailyData : null;
         
         // Fetch REAL spend data from each platform for monthly periods
         costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
@@ -3266,8 +3282,37 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
             });
         }
         
+        // Fetch REAL spend data for daily periods
+        if (costTrendDailyData) {
+            costTrendDailySpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
+            
+            for (let i = 0; i < dailyData.days.length; i++) {
+                costTrendDailySpendData.mutm.push(0);
+                costTrendDailySpendData.g1utm.push(0);
+                costTrendDailySpendData.butm.push(0);
+                costTrendDailySpendData.tutm.push(0);
+                costTrendDailySpendData.all.push(0);
+            }
+            
+            const dailySpendPromises = [];
+            for (let i = 0; i < dailyData.days.length; i++) {
+                const date = dailyData.dates[i];
+                dailySpendPromises.push(fetchPlatformSpend(date, date, i));
+            }
+            
+            const dailySpendResults = await Promise.all(dailySpendPromises);
+            dailySpendResults.forEach((spend, idx) => {
+                costTrendDailySpendData.mutm[idx] = spend.meta;
+                costTrendDailySpendData.g1utm[idx] = spend.google;
+                costTrendDailySpendData.butm[idx] = spend.bing;
+                costTrendDailySpendData.tutm[idx] = spend.tiktok;
+                costTrendDailySpendData.all[idx] = spend.meta + spend.google + spend.bing + spend.tiktok;
+            });
+        }
+        
         renderCostTrendChart(costTrendSource, costTrendStage);
         renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+        renderCostTrendDailyChart(costTrendSource, costTrendStage);
         
         // Setup filters (only once)
         if (!costTrendFiltersInitialized) {
@@ -3275,12 +3320,14 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                 costTrendSource = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
                 renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+                renderCostTrendDailyChart(costTrendSource, costTrendStage);
             });
             
             document.getElementById('costTrendStageFilter').addEventListener('change', (e) => {
                 costTrendStage = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
                 renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+                renderCostTrendDailyChart(costTrendSource, costTrendStage);
             });
             
             // Initialize date pickers with default values (last 30 days)
@@ -3360,11 +3407,13 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         loading.style.display = 'none';
         container.style.opacity = '1';
         if (weeklyContainer) weeklyContainer.style.opacity = '1';
+        if (dailyContainer) dailyContainer.style.opacity = '1';
     } catch (error) {
         console.error('Cost trend error:', error);
         loading.innerHTML = `<div class="error">Error loading trend data: ${error.message}</div>`;
         container.style.opacity = '1';
         if (weeklyContainer) weeklyContainer.style.opacity = '1';
+        if (dailyContainer) dailyContainer.style.opacity = '1';
     }
 }
 
@@ -3624,6 +3673,134 @@ function renderCostTrendWeeklyChart(source, stage = 'all') {
                 }
             },
             scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCostTrendDailyChart(source, stage = 'all') {
+    if (!costTrendDailyData || !costTrendDailySpendData) return;
+    
+    const canvas = document.getElementById('costTrendDailyChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const data = costTrendDailyData.data[source];
+    const spend = costTrendDailySpendData[source];
+    
+    const stageConfig = {
+        l_f_s: {
+            label: 'Cost per l_f_s (LookerML)',
+            data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)'
+        },
+        is_booked: {
+            label: 'Cost per Is Booked',
+            data: data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)'
+        },
+        sent_to_verification: {
+            label: 'Cost per Sent to Verif.',
+            data: data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)'
+        },
+        is_booked_covered: {
+            label: 'Cost per Booked Covered',
+            data: data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+        },
+        initial_fulfilled: {
+            label: 'Cost per Fulfilled',
+            data: data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)'
+        }
+    };
+    
+    let datasets;
+    if (stage === 'all') {
+        datasets = Object.keys(stageConfig).map(key => ({
+            label: stageConfig[key].label,
+            data: stageConfig[key].data,
+            borderColor: stageConfig[key].borderColor,
+            backgroundColor: stageConfig[key].backgroundColor,
+            tension: 0.3,
+            fill: false,
+            pointRadius: 2
+        }));
+    } else {
+        const cfg = stageConfig[stage];
+        datasets = [{
+            label: cfg.label,
+            data: cfg.data,
+            borderColor: cfg.borderColor,
+            backgroundColor: cfg.backgroundColor,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 2
+        }];
+    }
+    
+    if (costTrendDailyChart) {
+        costTrendDailyChart.destroy();
+    }
+    
+    const sourceNames = { all: 'All Sources', mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok' };
+    const stageNames = { 
+        all: 'All Stages',
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    const titleText = stage === 'all' 
+        ? `Daily Trends - ${sourceNames[source]}`
+        : `${stageNames[stage]} by Day - ${sourceNames[source]}`;
+    
+    costTrendDailyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costTrendDailyData.days,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: titleText,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                },
                 y: {
                     beginAtZero: true,
                     title: { display: true, text: 'Cost ($)' },

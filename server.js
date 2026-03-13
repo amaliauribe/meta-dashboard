@@ -3733,6 +3733,100 @@ app.get('/api/looker/weekly-cost-trends', async (req, res) => {
 });
 
 
+// Daily cost trends endpoint
+app.get('/api/looker/daily-cost-trends', async (req, res) => {
+    try {
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+        const stages = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+        const stageFilters = {
+            l_f_s: {},
+            is_booked: { [`${v}.is_booked`]: '1' },
+            sent_to_verification: { [`${v}.sent_to_verification`]: '1' },
+            is_booked_covered: { [`${v}.is_booked_covered`]: '1' },
+            initial_fulfilled: { [`${v}.initial_fulfilled`]: '1' }
+        };
+
+        let { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            const today = new Date();
+            const thirtyAgo = new Date(today);
+            thirtyAgo.setDate(today.getDate() - 30);
+            startDate = thirtyAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+        }
+
+        // Build list of days
+        const days = [];
+        let cur = new Date(startDate + 'T12:00:00');
+        const end = new Date(endDate + 'T12:00:00');
+        while (cur <= end) {
+            const iso = cur.toISOString().split('T')[0];
+            const label = cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            days.push({ label, date: iso });
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        const result = {
+            days: days.map(d => d.label),
+            dates: days.map(d => d.date),
+            data: {}
+        };
+
+        // Build queries
+        const allQueries = [];
+        const queryMeta = [];
+
+        for (const platform of platforms) {
+            for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+                const day = days[dayIdx];
+                const dateFilter = { [`${v}.lead_created_date_est_date`]: day.date };
+                const platformFilter = { ...dateFilter, [`${v}.tracking_type`]: platform };
+
+                for (const stage of stages) {
+                    allQueries.push(lookerQuery(v, [`${v}.count`], { ...platformFilter, ...stageFilters[stage] }));
+                    queryMeta.push({ platform, dayIdx, stage });
+                }
+            }
+        }
+
+        // Run in batches of 50 to avoid overwhelming the API
+        const BATCH = 50;
+        const allResults = [];
+        for (let i = 0; i < allQueries.length; i += BATCH) {
+            const batch = allQueries.slice(i, i + BATCH);
+            const batchResults = await Promise.all(batch);
+            allResults.push(...batchResults);
+        }
+
+        // Init structure
+        for (const platform of platforms) {
+            result.data[platform] = {};
+            stages.forEach(s => { result.data[platform][s] = new Array(days.length).fill(0); });
+        }
+
+        allResults.forEach((r, idx) => {
+            const meta = queryMeta[idx];
+            const count = r[0]?.[`${v}.count`] || 0;
+            result.data[meta.platform][meta.stage][meta.dayIdx] = count;
+        });
+
+        // Totals
+        result.data.all = {};
+        stages.forEach(stage => {
+            result.data.all[stage] = new Array(days.length).fill(0);
+            for (let i = 0; i < days.length; i++) {
+                result.data.all[stage][i] = platforms.reduce((sum, p) => sum + result.data[p][stage][i], 0);
+            }
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Daily cost trends error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get visitor journey - all events for a specific visitor ID
 app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
     const data = global.webhookData || [];
