@@ -9323,6 +9323,10 @@ function renderTikTokCampaignTable() {
                 <td>$${campaign.cpc.toFixed(2)}</td>
                 <td>${campaign.conversions}</td>
                 <td>$${costPerConv.toFixed(2)}</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
             </tr>
         `;
     }).join('');
@@ -9333,6 +9337,31 @@ function renderTikTokCampaignTable() {
 async function loadTikTokDailyData() {
     try {
         const range = dateRanges[currentRange];
+        const { startDate: tiktokStart, endDate: tiktokEnd } = getTikTokDateRange();
+        
+        // Fetch Looker l_f_s by date for TikTok and Ours Privacy l_f_s by date
+        let lookerLfsByDate = {};
+        let oursLfsByDate = {};
+        try {
+            const [lookerRes, oursRes] = await Promise.all([
+                fetch('/api/looker/lfs-by-date?platform=tutm&startDate=' + tiktokStart + '&endDate=' + tiktokEnd).then(r => r.json()).catch(() => ({})),
+                fetch('/api/ours-privacy/lfs-daily-breakdown?startDate=' + tiktokStart + '&endDate=' + tiktokEnd).then(r => r.json()).catch(() => ({ byDate: {} }))
+            ]);
+            if (lookerRes && lookerRes.byDate) {
+                for (const [date, counts] of Object.entries(lookerRes.byDate)) {
+                    lookerLfsByDate[date] = counts.tutm || 0;
+                }
+            }
+            if (oursRes && oursRes.byDate) {
+                for (const [date, counts] of Object.entries(oursRes.byDate)) {
+                    oursLfsByDate[date] = counts.tiktok || 0;
+                }
+            }
+        } catch(e) { console.error('TikTok l_f_s fetch error:', e); }
+        
+        // Store for use in rendering
+        window._tiktokLookerLfs = lookerLfsByDate;
+        window._tiktokOursLfs = oursLfsByDate;
         const { startDate, endDate } = getTikTokDateRange();
         
         const response = await fetch('/api/tiktok/daily-performance', {
@@ -9377,6 +9406,10 @@ function renderTikTokDailyTable(dailyData) {
                 <td>$${day.cpc.toFixed(2)}</td>
                 <td>${day.conversions}</td>
                 <td>$${costPerConv.toFixed(2)}</td>
+                <td>${(() => { const v = (window._tiktokLookerLfs || {})[(day.date || '').split(' ')[0]] || 0; return v > 0 ? v : '-'; })()}</td>
+                <td>${(() => { const v = (window._tiktokLookerLfs || {})[(day.date || '').split(' ')[0]] || 0; return v > 0 ? '$' + (day.spend / v).toFixed(2) : '-'; })()}</td>
+                <td>${(() => { const v = (window._tiktokOursLfs || {})[(day.date || '').split(' ')[0]] || 0; return v > 0 ? v : '-'; })()}</td>
+                <td>${(() => { const v = (window._tiktokOursLfs || {})[(day.date || '').split(' ')[0]] || 0; return v > 0 ? '$' + (day.spend / v).toFixed(2) : '-'; })()}</td>
             </tr>
         `;
     }).join('');
