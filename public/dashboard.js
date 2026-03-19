@@ -3996,7 +3996,7 @@ function renderFunnelsComparisonChart(data) {
 }
 
 async function loadSummaryData() {
-    document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="loading">Loading summary data...</td></tr>';
+    document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="11" class="loading">Loading summary data...</td></tr>';
     document.getElementById('summaryWeeklyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     document.getElementById('summaryMonthlyBody').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     
@@ -4321,7 +4321,7 @@ async function loadSummaryData() {
         
     } catch (error) {
         console.error('Summary error:', error);
-        document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="10" class="error">Error loading summary data</td></tr>';
+        document.getElementById('summaryDailyBody').innerHTML = '<tr><td colspan="11" class="error">Error loading summary data</td></tr>';
     }
 }
 
@@ -6954,7 +6954,7 @@ function renderMetaGeoHeatmap() {
 // ==================== Bing Geographic ====================
 
 async function loadBingGeoData() {
-    document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="10" class="loading">Loading geographic data...</td></tr>';
+    document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="11" class="loading">Loading geographic data...</td></tr>';
     
     try {
         const range = dateRanges[currentRange];
@@ -6975,7 +6975,7 @@ async function loadBingGeoData() {
         updateLastUpdated();
     } catch (e) {
         console.error('Bing geographic error:', e);
-        document.getElementById('bingGeoBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingGeoBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -7015,7 +7015,7 @@ function renderBingGeoTable() {
     }).join('');
     
     if (sorted.length === 0) {
-        document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="10" class="loading">No locations match the search</td></tr>';
+        document.getElementById('bingGeoBody').innerHTML = '<tr><td colspan="11" class="loading">No locations match the search</td></tr>';
     }
 }
 
@@ -7618,7 +7618,7 @@ function renderZipcodeTable(zipcodes) {
 async function loadBingAdsData() {
     const range = dateRanges[currentRange];
     const dateRange = getBingDateRange(range);
-    document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
+    document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="11" class="loading">Loading ad data...</td></tr>';
     
     try {
         const response = await fetch('/api/bing/ad-performance', {
@@ -7648,7 +7648,7 @@ async function loadBingAdsData() {
         renderBingAdsTable(bingAdsRawData);
     } catch (e) {
         console.error('Bing ads error:', e);
-        document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading ad data</td></tr>';
+        document.getElementById('bingAdsBody').innerHTML = '<tr><td colspan="11" class="loading">Error loading ad data</td></tr>';
     }
 }
 
@@ -7656,7 +7656,7 @@ function renderBingAdsTable(ads) {
     const tbody = document.getElementById('bingAdsBody');
     
     if (ads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="loading">No ad data available</td></tr>';
         return;
     }
     
@@ -7705,7 +7705,7 @@ function renderBingAdsTable(ads) {
 async function loadGoogleAdsData() {
     const range = dateRanges[currentRange];
     const dateRange = getGoogleDateRange(range);
-    document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Loading ad data...</td></tr>';
+    document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="11" class="loading">Loading ad data...</td></tr>';
     
     try {
         const response = await fetch('/api/google/ad-performance', {
@@ -7735,7 +7735,7 @@ async function loadGoogleAdsData() {
         renderGoogleAdsTable(googleAdsRawData);
     } catch (e) {
         console.error('Google ads error:', e);
-        document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="10" class="loading">Error loading ad data</td></tr>';
+        document.getElementById('googleAdsBody').innerHTML = '<tr><td colspan="11" class="loading">Error loading ad data</td></tr>';
     }
 }
 
@@ -7743,7 +7743,7 @@ function renderGoogleAdsTable(ads) {
     const tbody = document.getElementById('googleAdsBody');
     
     if (ads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="loading">No ad data available</td></tr>';
         return;
     }
     
@@ -9427,10 +9427,72 @@ async function loadTikTokChartData() {
 // ==================== TikTok Ads View ====================
 let tiktokAdsDataLoaded = false;
 
+
+function renderTikTokAdsTable(allAds) {
+    const tbody = document.getElementById('tiktokAdsBody');
+    if (!tbody) return;
+    
+    // Apply filters
+    let filtered = allAds;
+    const campaignFilter = document.getElementById('ttFilterCampaign')?.value || '';
+    const statusFilter = document.getElementById('ttFilterStatus')?.value || '';
+    
+    if (campaignFilter) {
+        filtered = filtered.filter(a => a.campaignName === campaignFilter);
+    }
+    if (statusFilter) {
+        filtered = filtered.filter(a => {
+            const s = (a.status || '').toLowerCase();
+            if (statusFilter === 'active') return s === 'active' || s === 'enable' || a.spend > 0;
+            if (statusFilter === 'paused') return s === 'paused' || s === 'disable' || (a.spend === 0 && s !== 'active');
+            return true;
+        });
+    }
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="loading">No ads match the current filters</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map(ad => {
+        let thumbnailHtml;
+        if (ad.thumbnailUrl && ad.videoPreviewUrl) {
+            thumbnailHtml = `
+                <a href="${ad.videoPreviewUrl}" target="_blank" class="ad-thumbnail-link" title="Watch video">
+                    <img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
+                </a>
+            `;
+        } else if (ad.thumbnailUrl) {
+            thumbnailHtml = `<img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
+        } else {
+            thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
+        }
+        
+        const statusClass = ad.spend > 0 ? 'status-active' : 'status-paused';
+        const statusLabel = ad.spend > 0 ? 'Active' : 'Paused';
+        
+        return `
+        <tr>
+            <td>${thumbnailHtml}</td>
+            <td>${ad.adName || 'Ad ' + ad.adId}</td>
+            <td><span class="${statusClass}">${statusLabel}</span></td>
+            <td>${ad.campaignName}</td>
+            <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td>${ad.impressions.toLocaleString()}</td>
+            <td>${ad.clicks.toLocaleString()}</td>
+            <td>${(ad.ctr * 100).toFixed(2)}%</td>
+            <td>$${ad.cpc.toFixed(2)}</td>
+            <td>${ad.conversions}</td>
+            <td>${ad.conversions > 0 ? '$' + ad.costPerConversion.toFixed(2) : '\u2014'}</td>
+        </tr>
+    `;
+    }).join('');
+}
+
 async function loadTikTokAdsData() {
     const tbody = document.getElementById('tiktokAdsBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading TikTok ads data...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading TikTok ads data...</td></tr>';
     
     try {
         const { startDate, endDate } = getTikTokDateRange();
@@ -9453,47 +9515,38 @@ async function loadTikTokAdsData() {
         document.getElementById('tiktokAdsTotalClicks').textContent = (data.totals?.clicks || 0).toLocaleString();
         document.getElementById('tiktokAdsTotalConversions').textContent = (data.totals?.conversions || 0).toLocaleString();
         
-        // Build table rows sorted by spend descending
-        const ads = (data.ads || []).sort((a, b) => b.spend - a.spend);
+        // Render ads table with filters
+        window._tiktokAllAds = (data.ads || []).sort((a, b) => b.spend - a.spend);
+        renderTikTokAdsTable(window._tiktokAllAds);
         
-        if (ads.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available for this period</td></tr>';
-            return;
+        // Populate campaign filter
+        const campaigns = [...new Set(data.ads.map(a => a.campaignName))].sort();
+        const ttCampaignSelect = document.getElementById('ttFilterCampaign');
+        if (ttCampaignSelect) {
+            ttCampaignSelect.innerHTML = '<option value="">All Campaigns</option>' + 
+                campaigns.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+            ttCampaignSelect.addEventListener('change', () => renderTikTokAdsTable(data.ads));
+        }
+        const ttStatusSelect = document.getElementById('ttFilterStatus');
+        if (ttStatusSelect) {
+            ttStatusSelect.addEventListener('change', () => renderTikTokAdsTable(data.ads));
+        }
+        const ttClearBtn = document.getElementById('ttClearFilters');
+        if (ttClearBtn) {
+            ttClearBtn.addEventListener('click', () => {
+                if (ttCampaignSelect) ttCampaignSelect.value = '';
+                if (ttStatusSelect) ttStatusSelect.value = '';
+                renderTikTokAdsTable(data.ads);
+            });
         }
         
-        tbody.innerHTML = ads.map(ad => {
-            let thumbnailHtml;
-            if (ad.thumbnailUrl && ad.videoPreviewUrl) {
-                thumbnailHtml = `
-                    <a href="${ad.videoPreviewUrl}" target="_blank" class="ad-thumbnail-link" title="Watch video">
-                        <img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
-                    </a>
-                `;
-            } else if (ad.thumbnailUrl) {
-                thumbnailHtml = `<img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
-            } else {
-                thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
-            }
-            return `
-            <tr>
-                <td>${thumbnailHtml}</td>
-                <td>${ad.adName || 'Ad ' + ad.adId}</td>
-                <td>${ad.campaignName}</td>
-                <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td>${ad.impressions.toLocaleString()}</td>
-                <td>${ad.clicks.toLocaleString()}</td>
-                <td>${(ad.ctr * 100).toFixed(2)}%</td>
-                <td>$${ad.cpc.toFixed(2)}</td>
-                <td>${ad.conversions}</td>
-                <td>${ad.conversions > 0 ? '$' + ad.costPerConversion.toFixed(2) : '—'}</td>
-            </tr>
-        `;
-        }).join('');
+        // Store ads data for filtering
+        window._tiktokAdsData = data.ads;
         
         tiktokAdsDataLoaded = true;
         updateLastUpdated();
     } catch (error) {
         console.error('TikTok ads data error:', error);
-        tbody.innerHTML = '<tr><td colspan="10" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
     }
 }

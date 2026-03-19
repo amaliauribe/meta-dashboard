@@ -2113,12 +2113,24 @@
             
             <section class="table-section">
                 <h2>📝 Ad Creatives</h2>
+                <div class="ads-filters">
+                    <select id="ttFilterCampaign" class="filter-dropdown">
+                        <option value="">All Campaigns</option>
+                    </select>
+                    <select id="ttFilterStatus" class="filter-dropdown">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="paused">Paused</option>
+                    </select>
+                    <button id="ttClearFilters" class="clear-filters-btn">Clear Filters</button>
+                </div>
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
                                 <th>Creative</th>
                                 <th>Ad Name</th>
+                                <th>Status</th>
                                 <th>Campaign</th>
                                 <th>Spend</th>
                                 <th>Impressions</th>
@@ -2130,7 +2142,7 @@
                             </tr>
                         </thead>
                         <tbody id="tiktokAdsBody">
-                            <tr><td colspan="10" class="loading">Loading...</td></tr>
+                            <tr><td colspan="11" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
