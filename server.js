@@ -3865,7 +3865,29 @@ async function fetchServerSpend(date) {
         }
     } catch (e) { console.error('Cache: Bing spend error:', e.message); }
     
-    // TikTok - skip for now since it's not fully configured
+    // TikTok
+    try {
+        if (isTikTokConfigured()) {
+            const ttParams = new URLSearchParams({
+                advertiser_id: TIKTOK_CONFIG.adAccountId,
+                start_date: date,
+                end_date: date,
+                metrics: JSON.stringify(['spend']),
+                data_level: 'AUCTION_ADVERTISER',
+                report_type: 'BASIC',
+                dimensions: JSON.stringify(['stat_time_day'])
+            });
+            const ttRes = await fetch('https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?' + ttParams, {
+                headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
+            });
+            const ttData = await ttRes.json();
+            if (ttData.code === 0 && ttData.data && ttData.data.list) {
+                ttData.data.list.forEach(row => {
+                    result.tiktok += parseFloat(row.metrics?.spend) || 0;
+                });
+            }
+        }
+    } catch (e) { console.error('Cache: TikTok spend error:', e.message); }
     
     return result;
 }
