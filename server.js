@@ -2565,7 +2565,8 @@ app.post('/api/summary/aggregated', async (req, res) => {
             name: period.name,
             meta: 0,
             google: 0,
-            bing: 0
+            bing: 0,
+            tiktok: 0
         };
         
         // Fetch Google
@@ -2598,6 +2599,32 @@ app.post('/api/summary/aggregated', async (req, res) => {
                 }
             } catch (e) {
                 console.error('Bing aggregated error:', e.message);
+            }
+        }
+        
+        // Fetch TikTok
+        if (isTikTokConfigured() && period.startDate && period.endDate) {
+            try {
+                const ttParams = new URLSearchParams({
+                    advertiser_id: TIKTOK_CONFIG.adAccountId,
+                    start_date: period.startDate,
+                    end_date: period.endDate,
+                    metrics: JSON.stringify(['spend']),
+                    data_level: 'AUCTION_ADVERTISER',
+                    report_type: 'BASIC',
+                    dimensions: JSON.stringify(['stat_time_day'])
+                });
+                const ttResponse = await fetch('https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?' + ttParams, {
+                    headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
+                });
+                const ttResult = await ttResponse.json();
+                if (ttResult.code === 0 && ttResult.data && ttResult.data.list) {
+                    ttResult.data.list.forEach(row => {
+                        periodData.tiktok += parseFloat(row.metrics?.spend) || 0;
+                    });
+                }
+            } catch (e) {
+                console.error('TikTok aggregated error:', e.message);
             }
         }
         
