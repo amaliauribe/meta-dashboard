@@ -8992,10 +8992,11 @@ async function loadUnifiedFunnels(startDate, endDate) {
         const lookerData = await fetch(`/api/looker/leads-funnel?startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => null);
         
         // Fetch Ours Privacy l_f_s data from RAW WEBHOOKS (not Looker)
-        const [metaOursLfs, googleOursLfs, bingOursLfs] = await Promise.all([
+        const [metaOursLfs, googleOursLfs, bingOursLfs, tiktokOursLfs] = await Promise.all([
             fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
             fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=google&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
-            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
+            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=bing&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0})),
+            fetch(`/api/ours-privacy/lfs-raw-by-platform?platform=tiktok&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()).catch(() => ({total: 0}))
         ]);
         
         // Fetch Invoca calls data
@@ -9149,8 +9150,9 @@ async function loadUnifiedFunnels(startDate, endDate) {
         el('unifiedTiktokResults', fmt(tiktokResults));
         el('unifiedTiktokLfs', fmt(looker.tutm.lfs));
         // Ours Privacy l_f_s for TikTok (not available)
-        el('unifiedTiktokLfsOurs', '-');
-        el('unifiedTiktokCostPerLfsOurs', '');
+        const tiktokOursLfsVal = tiktokOursLfs?.total || 0;
+        el('unifiedTiktokLfsOurs', fmt(tiktokOursLfsVal));
+        el('unifiedTiktokCostPerLfsOurs', tiktokOursLfsVal > 0 ? fmtMoney(tiktokSpend / tiktokOursLfsVal) : '');
         el('unifiedTiktokBooked', fmt(looker.tutm.booked));
         el('unifiedTiktokCostPerBooked', looker.tutm.booked > 0 ? fmtMoney(tiktokSpend / looker.tutm.booked) : "");
         el('unifiedTiktokVerif', fmt(looker.tutm.verif));
