@@ -4241,13 +4241,15 @@ async function loadSummaryData() {
         
         // Weekly table
         let weeklyHtml = '';
-        let weeklyTotalMeta = 0, weeklyTotalGoogle = 0, weeklyTotalBing = 0;
+        let weeklyTotalMeta = 0, weeklyTotalGoogle = 0, weeklyTotalBing = 0, weeklyTotalTiktok = 0;
         
         aggregatedData.slice(0, 2).forEach(row => {
-            const total = row.meta + row.google + row.bing;
+            const tiktok = row.tiktok || 0;
+            const total = row.meta + row.google + row.bing + tiktok;
             weeklyTotalMeta += row.meta;
             weeklyTotalGoogle += row.google;
             weeklyTotalBing += row.bing;
+            weeklyTotalTiktok += tiktok;
             
             weeklyHtml += `
                 <tr>
@@ -4255,18 +4257,20 @@ async function loadSummaryData() {
                     <td>${row.meta > 0 ? '$' + row.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td>${row.google > 0 ? '$' + row.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td>${row.bing > 0 ? '$' + row.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${tiktok > 0 ? '$' + tiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 </tr>
             `;
         });
         
-        const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing;
+        const weeklyGrandTotal = weeklyTotalMeta + weeklyTotalGoogle + weeklyTotalBing + weeklyTotalTiktok;
         weeklyHtml += `
             <tr class="total-row">
                 <td><strong>2-Week Total</strong></td>
                 <td><strong>$${weeklyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${weeklyTotalTiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${weeklyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             </tr>
         `;
@@ -4274,13 +4278,15 @@ async function loadSummaryData() {
         
         // Monthly table
         let monthlyHtml = '';
-        let monthlyTotalMeta = 0, monthlyTotalGoogle = 0, monthlyTotalBing = 0;
+        let monthlyTotalMeta = 0, monthlyTotalGoogle = 0, monthlyTotalBing = 0, monthlyTotalTiktok = 0;
         
         aggregatedData.slice(2).forEach(row => {
-            const total = row.meta + row.google + row.bing;
+            const tiktok = row.tiktok || 0;
+            const total = row.meta + row.google + row.bing + tiktok;
             monthlyTotalMeta += row.meta;
             monthlyTotalGoogle += row.google;
             monthlyTotalBing += row.bing;
+            monthlyTotalTiktok += tiktok;
             
             monthlyHtml += `
                 <tr>
@@ -4288,18 +4294,20 @@ async function loadSummaryData() {
                     <td>${row.meta > 0 ? '$' + row.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td>${row.google > 0 ? '$' + row.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td>${row.bing > 0 ? '$' + row.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${tiktok > 0 ? '$' + tiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 </tr>
             `;
         });
         
-        const monthlyGrandTotal = monthlyTotalMeta + monthlyTotalGoogle + monthlyTotalBing;
+        const monthlyGrandTotal = monthlyTotalMeta + monthlyTotalGoogle + monthlyTotalBing + monthlyTotalTiktok;
         monthlyHtml += `
             <tr class="total-row">
                 <td><strong>Grand Total</strong></td>
                 <td><strong>$${monthlyTotalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${monthlyTotalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${monthlyTotalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${monthlyTotalTiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${monthlyGrandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             </tr>
         `;
