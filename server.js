@@ -4991,29 +4991,45 @@ app.post('/api/tiktok/ad-performance', async (req, res) => {
         const { startDate: rawStart, endDate: rawEnd } = req.body;
         const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
-        const params = new URLSearchParams({
-            advertiser_id: TIKTOK_CONFIG.adAccountId,
-            start_date: startDate,
-            end_date: endDate,
-            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion', 'ad_name', 'campaign_name']),
-            data_level: 'AUCTION_AD',
-            report_type: 'BASIC',
-            dimensions: JSON.stringify(['ad_id'])
-        });
+        // Fetch all pages of ad-level data from TikTok
+        let allRows = [];
+        let page = 1;
+        const pageSize = 200;
+        let totalPages = 1;
         
-        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
-            headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
-        });
-        
-        const result = await response.json();
-        
-        if (result.code !== 0) {
-            throw new Error(result.message);
+        while (page <= totalPages) {
+            const params = new URLSearchParams({
+                advertiser_id: TIKTOK_CONFIG.adAccountId,
+                start_date: startDate,
+                end_date: endDate,
+                metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion', 'ad_name', 'campaign_name']),
+                data_level: 'AUCTION_AD',
+                report_type: 'BASIC',
+                dimensions: JSON.stringify(['ad_id']),
+                page_size: String(pageSize),
+                page: String(page)
+            });
+            
+            const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+                headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
+            });
+            
+            const result = await response.json();
+            
+            if (result.code !== 0) {
+                throw new Error(result.message);
+            }
+            
+            allRows = allRows.concat(result.data?.list || []);
+            totalPages = result.data?.page_info?.total_page || 1;
+            page++;
         }
+        
+        console.log(`[TikTok Ads] Fetched ${allRows.length} ads across ${totalPages} pages`);
         
         let campaignNames = {};
         
-        const ads = (result.data?.list || []).map(row => ({
+        const ads = allRows.map(row => ({
             adId: row.dimensions.ad_id,
             campaignId: row.dimensions.ad_id,
             campaignName: row.metrics.campaign_name || 'Unknown Campaign',
@@ -5025,7 +5041,7 @@ app.post('/api/tiktok/ad-performance', async (req, res) => {
             cpc: parseFloat(row.metrics.cpc) || 0,
             conversions: parseInt(row.metrics.conversion) || 0,
             costPerConversion: parseFloat(row.metrics.cost_per_conversion) || 0
-        }));
+        })).filter(ad => ad.spend > 0 || ad.impressions > 0);
         
         // Fetch creative thumbnails (graceful - don't break if API is blocked)
         try {
