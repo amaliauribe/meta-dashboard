@@ -4324,7 +4324,7 @@ async function loadStateSpend(startDate, endDate) {
     
     if (!tbody) return;
     
-    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading state data...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading state data...</td></tr>';
     
     try {
         // VTC states we care about
@@ -4339,9 +4339,9 @@ async function loadStateSpend(startDate, endDate) {
         // Initialize state data
         const stateData = {};
         vtcStates.forEach(state => {
-            stateData[state] = { meta: 0, google: 0, bing: 0, total: 0 };
+            stateData[state] = { meta: 0, google: 0, bing: 0, tiktok: 0, total: 0 };
         });
-        stateData['Other'] = { meta: 0, google: 0, bing: 0, total: 0 };
+        stateData['Other'] = { meta: 0, google: 0, bing: 0, tiktok: 0, total: 0 };
         
         // Fetch Meta geographic data
         try {
@@ -4443,10 +4443,42 @@ async function loadStateSpend(startDate, endDate) {
             console.error('Google state spend error:', e);
         }
         
+        // Fetch TikTok geographic data
+        try {
+            const tiktokRes = await fetch('/api/tiktok/geographic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            });
+            const tiktokData = await tiktokRes.json();
+            
+            if (tiktokData.locations) {
+                tiktokData.locations.forEach(row => {
+                    const state = row.state || 'Unknown';
+                    const spend = parseFloat(row.cost) || 0;
+                    
+                    const matchedState = vtcStates.find(s => 
+                        state.includes(s) || s.includes(state) ||
+                        state === stateAbbrev[s]
+                    );
+                    
+                    if (matchedState) {
+                        stateData[matchedState].tiktok += spend;
+                    } else if (state.includes('Virginia') || state.includes('District of Columbia') || state === 'VA' || state === 'DC') {
+                        stateData['Maryland'].tiktok += spend;
+                    } else {
+                        stateData['Other'].tiktok += spend;
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('TikTok state spend error:', e);
+        }
+        
         // Calculate totals
         let grandTotal = 0;
         Object.keys(stateData).forEach(state => {
-            stateData[state].total = stateData[state].meta + stateData[state].google + stateData[state].bing;
+            stateData[state].total = stateData[state].meta + stateData[state].google + stateData[state].bing + stateData[state].tiktok;
             grandTotal += stateData[state].total;
         });
         
@@ -4458,7 +4490,7 @@ async function loadStateSpend(startDate, endDate) {
         
         // Render table
         let html = '';
-        let totalMeta = 0, totalGoogle = 0, totalBing = 0;
+        let totalMeta = 0, totalGoogle = 0, totalBing = 0, totalTiktok = 0;
         
         sortedStates.forEach(state => {
             const data = stateData[state];
@@ -4470,6 +4502,7 @@ async function loadStateSpend(startDate, endDate) {
             totalMeta += data.meta;
             totalGoogle += data.google;
             totalBing += data.bing;
+            totalTiktok += data.tiktok;
             
             html += `
                 <tr>
@@ -4477,13 +4510,14 @@ async function loadStateSpend(startDate, endDate) {
                     <td>$${data.meta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                     <td>$${data.google.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                     <td>$${data.bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>$${data.tiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                     <td><strong>$${data.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                     <td>${pct}%</td>
                 </tr>
             `;
         });
         
-        tbody.innerHTML = html || '<tr><td colspan="6">No state data available</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="7">No state data available</td></tr>';
         
         // Add totals row
         tfoot.innerHTML = `
@@ -4492,6 +4526,7 @@ async function loadStateSpend(startDate, endDate) {
                 <td><strong>$${totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${totalGoogle.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>$${totalTiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>100%</strong></td>
             </tr>
@@ -4499,7 +4534,7 @@ async function loadStateSpend(startDate, endDate) {
         
     } catch (error) {
         console.error('State spend error:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="error">Error loading state data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="error">Error loading state data</td></tr>';
     }
 }
 
@@ -6063,9 +6098,9 @@ async function loadInsuranceFunnel() {
         if (insurancePlatformCards) {
             try {
                 // Fetch spend data from ad platforms (only if we have dates)
-                let metaSpend = 0, googleSpend = 0, bingSpend = 0;
+                let metaSpend = 0, googleSpend = 0, bingSpend = 0, tiktokSpend = 0;
                 if (startDate && endDate) {
-                    const [metaSpendData, googleSpendData, bingSpendData] = await Promise.all([
+                    const [metaSpendData, googleSpendData, bingSpendData, tiktokSpendData] = await Promise.all([
                         apiCall(`${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}`).catch(() => null),
                         fetch('/api/google/account-performance', {
                             method: 'POST',
@@ -6076,11 +6111,17 @@ async function loadInsuranceFunnel() {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ startDate, endDate })
+                        }).then(r => r.json()).catch(() => null),
+                        fetch('/api/tiktok/account-performance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ startDate, endDate })
                         }).then(r => r.json()).catch(() => null)
                     ]);
                     metaSpend = metaSpendData?.data?.[0]?.spend ? parseFloat(metaSpendData.data[0].spend) : 0;
                     googleSpend = googleSpendData?.spend ? parseFloat(googleSpendData.spend) : 0;
                     bingSpend = bingSpendData?.spend ? parseFloat(bingSpendData.spend) : 0;
+                    tiktokSpend = tiktokSpendData?.spend ? parseFloat(tiktokSpendData.spend) : 0;
                 }
                 
                 const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
@@ -6092,7 +6133,7 @@ async function loadInsuranceFunnel() {
                     { prefix: 'insMeta', platform: 'mutm', spend: metaSpend },
                     { prefix: 'insGoogle', platform: 'g1utm', spend: googleSpend },
                     { prefix: 'insBing', platform: 'butm', spend: bingSpend },
-                    { prefix: 'insTiktok', platform: 'tutm', spend: 0 }
+                    { prefix: 'insTiktok', platform: 'tutm', spend: tiktokSpend }
                 ];
                 
                 for (const cfg of platformConfigs) {
