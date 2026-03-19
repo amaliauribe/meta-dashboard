@@ -9430,7 +9430,7 @@ let tiktokAdsDataLoaded = false;
 async function loadTikTokAdsData() {
     const tbody = document.getElementById('tiktokAdsBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading TikTok ads data...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading TikTok ads data...</td></tr>';
     
     try {
         const { startDate, endDate } = getTikTokDateRange();
@@ -9457,12 +9457,26 @@ async function loadTikTokAdsData() {
         const ads = (data.ads || []).sort((a, b) => b.spend - a.spend);
         
         if (ads.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No ad data available for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">No ad data available for this period</td></tr>';
             return;
         }
         
-        tbody.innerHTML = ads.map(ad => `
+        tbody.innerHTML = ads.map(ad => {
+            let thumbnailHtml;
+            if (ad.thumbnailUrl && ad.videoPreviewUrl) {
+                thumbnailHtml = `
+                    <a href="${ad.videoPreviewUrl}" target="_blank" class="ad-thumbnail-link" title="Watch video">
+                        <img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">
+                    </a>
+                `;
+            } else if (ad.thumbnailUrl) {
+                thumbnailHtml = `<img src="${ad.thumbnailUrl}" alt="Ad creative" class="ad-thumbnail" loading="lazy">`;
+            } else {
+                thumbnailHtml = `<div class="no-thumbnail">🖼️</div>`;
+            }
+            return `
             <tr>
+                <td>${thumbnailHtml}</td>
                 <td>${ad.adName || 'Ad ' + ad.adId}</td>
                 <td>${ad.campaignName}</td>
                 <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -9473,12 +9487,13 @@ async function loadTikTokAdsData() {
                 <td>${ad.conversions}</td>
                 <td>${ad.conversions > 0 ? '$' + ad.costPerConversion.toFixed(2) : '—'}</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
         
         tiktokAdsDataLoaded = true;
         updateLastUpdated();
     } catch (error) {
         console.error('TikTok ads data error:', error);
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
     }
 }

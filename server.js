@@ -5027,6 +5027,77 @@ app.post('/api/tiktok/ad-performance', async (req, res) => {
             costPerConversion: parseFloat(row.metrics.cost_per_conversion) || 0
         }));
         
+        // Fetch creative thumbnails (graceful - don't break if API is blocked)
+        try {
+            const adIds = ads.map(a => a.adId).filter(Boolean);
+            if (adIds.length > 0) {
+                // Step 1: Get ad creative details (video_id per ad)
+                const adGetParams = new URLSearchParams({
+                    advertiser_id: TIKTOK_CONFIG.adAccountId,
+                    filtering: JSON.stringify({ ad_ids: adIds }),
+                    fields: JSON.stringify(["ad_id", "ad_name", "video_id", "image_ids"])
+                });
+                
+                const adGetResp = await fetch(
+                    `https://business-api.tiktok.com/open_api/v1.3/ad/get/?${adGetParams}`,
+                    { headers: { 'Access-Token': TIKTOK_CONFIG.accessToken } }
+                );
+                const adGetResult = await adGetResp.json();
+                
+                if (adGetResult.code === 0 && adGetResult.data?.list) {
+                    // Map ad_id -> video_id
+                    const adVideoMap = {};
+                    const videoIds = [];
+                    adGetResult.data.list.forEach(item => {
+                        if (item.video_id) {
+                            adVideoMap[item.ad_id] = item.video_id;
+                            if (!videoIds.includes(item.video_id)) {
+                                videoIds.push(item.video_id);
+                            }
+                        }
+                    });
+                    
+                    // Step 2: Get video poster/preview URLs
+                    if (videoIds.length > 0) {
+                        const videoInfoParams = new URLSearchParams({
+                            advertiser_id: TIKTOK_CONFIG.adAccountId,
+                            video_ids: JSON.stringify(videoIds)
+                        });
+                        
+                        const videoResp = await fetch(
+                            `https://business-api.tiktok.com/open_api/v1.3/file/video/ad/info/?${videoInfoParams}`,
+                            { headers: { 'Access-Token': TIKTOK_CONFIG.accessToken } }
+                        );
+                        const videoResult = await videoResp.json();
+                        
+                        if (videoResult.code === 0 && videoResult.data?.list) {
+                            // Map video_id -> poster/preview
+                            const videoInfoMap = {};
+                            videoResult.data.list.forEach(v => {
+                                videoInfoMap[v.video_id] = {
+                                    posterUrl: v.poster_url || v.video_cover_url || '',
+                                    previewUrl: v.preview_url || v.preview_url_expire_time ? v.preview_url : ''
+                                };
+                            });
+                            
+                            // Attach to ads
+                            ads.forEach(ad => {
+                                const videoId = adVideoMap[ad.adId];
+                                if (videoId && videoInfoMap[videoId]) {
+                                    ad.thumbnailUrl = videoInfoMap[videoId].posterUrl;
+                                    ad.videoPreviewUrl = videoInfoMap[videoId].previewUrl;
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    console.log('TikTok ad/get returned code:', adGetResult.code, adGetResult.message);
+                }
+            }
+        } catch (creativeErr) {
+            console.log('TikTok creative fetch failed (non-fatal):', creativeErr.message);
+        }
+        
         let totals = { ads: ads.length, spend: 0, impressions: 0, clicks: 0, conversions: 0 };
         ads.forEach(ad => {
             totals.spend += ad.spend;
