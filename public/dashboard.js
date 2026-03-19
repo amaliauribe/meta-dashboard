@@ -9237,8 +9237,16 @@ function renderTikTokCampaignTable() {
         return;
     }
     
+    // Filter out paused campaigns (no spend in period)
+    const activeData = tiktokRawData.filter(c => c.spend > 0);
+    
+    if (activeData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No active campaigns in this period</td></tr>';
+        return;
+    }
+    
     // Sort data
-    const sortedData = [...tiktokRawData].sort((a, b) => {
+    const sortedData = [...activeData].sort((a, b) => {
         const aVal = a[tiktokSortColumn] || 0;
         const bVal = b[tiktokSortColumn] || 0;
         
