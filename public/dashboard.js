@@ -9306,7 +9306,7 @@ function renderTikTokDailyTable(dailyData) {
         
         return `
             <tr>
-                <td>${formatDate(day.date)}</td>
+                <td>${(day.date || '').split(' ')[0]}</td>
                 <td>$${day.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${day.impressions.toLocaleString('en-US')}</td>
                 <td>${day.clicks.toLocaleString('en-US')}</td>
