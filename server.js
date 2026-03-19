@@ -4932,6 +4932,68 @@ app.post('/api/tiktok/geographic', async (req, res) => {
     }
 });
 
+// TikTok: Ad-level performance
+app.post('/api/tiktok/ad-performance', async (req, res) => {
+    if (!isTikTokConfigured()) {
+        return res.status(503).json({ error: 'TikTok Ads credentials not configured' });
+    }
+    
+    try {
+        const { startDate: rawStart, endDate: rawEnd } = req.body;
+        const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
+        
+        const params = new URLSearchParams({
+            advertiser_id: TIKTOK_CONFIG.adAccountId,
+            start_date: startDate,
+            end_date: endDate,
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion']),
+            data_level: 'AUCTION_AD',
+            report_type: 'BASIC',
+            dimensions: JSON.stringify(['ad_id'])
+        });
+        
+        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+            headers: { 'Access-Token': TIKTOK_CONFIG.accessToken }
+        });
+        
+        const result = await response.json();
+        
+        if (result.code !== 0) {
+            throw new Error(result.message);
+        }
+        
+        let campaignNames = {};
+        
+        const ads = (result.data?.list || []).map(row => ({
+            adId: row.dimensions.ad_id,
+            campaignId: row.dimensions.ad_id,
+            campaignName: 'Ad ' + row.dimensions.ad_id,
+            spend: parseFloat(row.metrics.spend) || 0,
+            impressions: parseInt(row.metrics.impressions) || 0,
+            clicks: parseInt(row.metrics.clicks) || 0,
+            ctr: parseFloat(row.metrics.ctr) || 0,
+            cpc: parseFloat(row.metrics.cpc) || 0,
+            conversions: parseInt(row.metrics.conversion) || 0,
+            costPerConversion: parseFloat(row.metrics.cost_per_conversion) || 0
+        }));
+        
+        let totals = { ads: ads.length, spend: 0, impressions: 0, clicks: 0, conversions: 0 };
+        ads.forEach(ad => {
+            totals.spend += ad.spend;
+            totals.impressions += ad.impressions;
+            totals.clicks += ad.clicks;
+            totals.conversions += ad.conversions;
+        });
+        
+        res.json({ ads, totals });
+    } catch (error) {
+        console.error('TikTok ad performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+
 // ==================== Zipcode Heatmap ====================
 
 // Get combined zipcode performance data from Google + Bing

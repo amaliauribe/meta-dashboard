@@ -300,7 +300,8 @@ function initializeDashboard() {
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
             googleGeoDataLoaded = false; // Reset google geo data when date changes
             googleAdsDataLoaded = false;
-            tiktokDataLoaded = false; // Reset TikTok data when date changes
+            tiktokDataLoaded = false;
+        tiktokAdsDataLoaded = false; // Reset TikTok data when date changes
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             heatmapDataLoaded = false; // Reset heatmap data when date changes
@@ -512,6 +513,9 @@ function initializeDashboard() {
             }
             if (currentView === 'tiktok' && !tiktokDataLoaded) {
                 loadTikTokData();
+            }
+            if (currentView === 'tiktokAds' && !tiktokAdsDataLoaded) {
+                loadTikTokAdsData();
             }
             if (currentView === 'oursPrivacy') {
                 loadOursPrivacyData();
@@ -9325,4 +9329,64 @@ async function loadTikTokChartData() {
     // For now, we'll skip the chart implementation
     // This can be added later following the same pattern as other platforms
     console.log('TikTok chart data loading - placeholder');
+}
+
+
+// ==================== TikTok Ads View ====================
+let tiktokAdsDataLoaded = false;
+
+async function loadTikTokAdsData() {
+    const tbody = document.getElementById('tiktokAdsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading TikTok ads data...</td></tr>';
+    
+    try {
+        const { startDate, endDate } = getTikTokDateRange();
+        
+        const response = await fetch('/api/tiktok/ad-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update KPIs
+        document.getElementById('tiktokAdsTotalAds').textContent = (data.totals?.ads || 0).toLocaleString();
+        document.getElementById('tiktokAdsTotalSpend').textContent = '$' + (data.totals?.spend || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('tiktokAdsTotalClicks').textContent = (data.totals?.clicks || 0).toLocaleString();
+        document.getElementById('tiktokAdsTotalConversions').textContent = (data.totals?.conversions || 0).toLocaleString();
+        
+        // Build table rows sorted by spend descending
+        const ads = (data.ads || []).sort((a, b) => b.spend - a.spend);
+        
+        if (ads.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No ad data available for this period</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = ads.map(ad => `
+            <tr>
+                <td>${ad.campaignName}</td>
+                <td>${ad.adId}</td>
+                <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>${ad.impressions.toLocaleString()}</td>
+                <td>${ad.clicks.toLocaleString()}</td>
+                <td>${(ad.ctr * 100).toFixed(2)}%</td>
+                <td>$${ad.cpc.toFixed(2)}</td>
+                <td>${ad.conversions}</td>
+                <td>${ad.conversions > 0 ? '$' + ad.costPerConversion.toFixed(2) : '—'}</td>
+            </tr>
+        `).join('');
+        
+        tiktokAdsDataLoaded = true;
+        updateLastUpdated();
+    } catch (error) {
+        console.error('TikTok ads data error:', error);
+        tbody.innerHTML = '<tr><td colspan="9" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
+    }
 }
