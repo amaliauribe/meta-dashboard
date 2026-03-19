@@ -1382,7 +1382,7 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
             advertiser_id: TIKTOK_CONFIG.adAccountId,
             start_date: startDate,
             end_date: endDate,
-            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion']),
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion', 'campaign_name']),
             data_level: 'AUCTION_CAMPAIGN',
             report_type: 'BASIC',
             dimensions: JSON.stringify(['campaign_id'])
@@ -1424,7 +1424,7 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
         
         const campaigns = (result.data?.list || []).map(row => ({
             id: row.dimensions.campaign_id,
-            name: campaignNames[row.dimensions.campaign_id] || `Campaign ${row.dimensions.campaign_id}`,
+            name: row.metrics.campaign_name || campaignNames[row.dimensions.campaign_id] || `Campaign ${row.dimensions.campaign_id}`,
             spend: parseFloat(row.metrics.spend) || 0,
             impressions: parseInt(row.metrics.impressions) || 0,
             clicks: parseInt(row.metrics.clicks) || 0,
@@ -4946,7 +4946,7 @@ app.post('/api/tiktok/ad-performance', async (req, res) => {
             advertiser_id: TIKTOK_CONFIG.adAccountId,
             start_date: startDate,
             end_date: endDate,
-            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion']),
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion', 'ad_name', 'campaign_name']),
             data_level: 'AUCTION_AD',
             report_type: 'BASIC',
             dimensions: JSON.stringify(['ad_id'])
@@ -4967,7 +4967,8 @@ app.post('/api/tiktok/ad-performance', async (req, res) => {
         const ads = (result.data?.list || []).map(row => ({
             adId: row.dimensions.ad_id,
             campaignId: row.dimensions.ad_id,
-            campaignName: 'Ad ' + row.dimensions.ad_id,
+            campaignName: row.metrics.campaign_name || 'Unknown Campaign',
+            adName: row.metrics.ad_name || 'Ad ' + row.dimensions.ad_id,
             spend: parseFloat(row.metrics.spend) || 0,
             impressions: parseInt(row.metrics.impressions) || 0,
             clicks: parseInt(row.metrics.clicks) || 0,

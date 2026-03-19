@@ -9379,8 +9379,8 @@ async function loadTikTokAdsData() {
         
         tbody.innerHTML = ads.map(ad => `
             <tr>
+                <td>${ad.adName || 'Ad ' + ad.adId}</td>
                 <td>${ad.campaignName}</td>
-                <td>${ad.adId}</td>
                 <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${ad.impressions.toLocaleString()}</td>
                 <td>${ad.clicks.toLocaleString()}</td>
