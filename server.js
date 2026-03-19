@@ -111,6 +111,36 @@ function migrateJsonToDb() {
 // Run migration
 migrateJsonToDb();
 
+// ==================== Daily Metrics Cache ====================
+db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_cache (
+        date TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        l_f_s INTEGER DEFAULT 0,
+        is_booked INTEGER DEFAULT 0,
+        sent_to_verification INTEGER DEFAULT 0,
+        is_booked_covered INTEGER DEFAULT 0,
+        initial_fulfilled INTEGER DEFAULT 0,
+        spend REAL DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (date, platform)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_cache_date ON daily_cache(date);
+`);
+
+const upsertCacheStmt = db.prepare(`
+    INSERT OR REPLACE INTO daily_cache (date, platform, l_f_s, is_booked, sent_to_verification, is_booked_covered, initial_fulfilled, spend, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+`);
+
+const getCacheRangeStmt = db.prepare(`
+    SELECT * FROM daily_cache WHERE date >= ? AND date <= ? ORDER BY date, platform
+`);
+
+const getCachedDatesStmt = db.prepare(`
+    SELECT DISTINCT date FROM daily_cache WHERE date >= ? AND date <= ?
+`);
+
 // ==================== Legacy JSON Storage (kept for compatibility) ====================
 
 // Load existing data on startup
@@ -3753,6 +3783,265 @@ app.get('/api/looker/weekly-cost-trends', async (req, res) => {
     }
 });
 
+
+// ==================== Cached Daily Cost Trends ====================
+
+// Server-side function to fetch spend for a single day from all platforms
+async function fetchServerSpend(date) {
+    const result = { meta: 0, google: 0, bing: 0, tiktok: 0 };
+    
+    // Meta
+    try {
+        const metaUrl = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v19.0'}/act_${process.env.META_ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${date}","until":"${date}"}&access_token=${process.env.META_ACCESS_TOKEN}`;
+        const metaRes = await fetch(metaUrl);
+        const metaData = await metaRes.json();
+        if (metaData.data && metaData.data[0]) {
+            result.meta = parseFloat(metaData.data[0].spend) || 0;
+        }
+    } catch (e) { console.error('Cache: Meta spend error:', e.message); }
+    
+    // Google
+    try {
+        if (isGoogleAdsConfigured()) {
+            const query = `SELECT metrics.cost_micros FROM customer WHERE segments.date = '${date}'`;
+            const results = await googleAdsApiRequest(query);
+            results.forEach(row => {
+                result.google += (parseInt(row.metrics?.cost_micros) || 0) / 1000000;
+            });
+        }
+    } catch (e) { console.error('Cache: Google spend error:', e.message); }
+    
+    // Bing
+    try {
+        if (isBingConfigured()) {
+            const columns = ['TimePeriod', 'Spend'];
+            const report = await submitAndDownloadReport('account', date, date, columns);
+            report.rows.forEach(row => { result.bing += parseFloat(row.Spend) || 0; });
+        }
+    } catch (e) { console.error('Cache: Bing spend error:', e.message); }
+    
+    // TikTok - skip for now since it's not fully configured
+    
+    return result;
+}
+
+// Fetch Looker stage counts for a single day and platform
+async function fetchDayStageCounts(date, platform) {
+    const v = 'fct_leads_funnel_marketing_phi_exclude';
+    const stages = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+    const stageFilters = {
+        l_f_s: {},
+        is_booked: { [`${v}.is_booked`]: '1' },
+        sent_to_verification: { [`${v}.sent_to_verification`]: '1' },
+        is_booked_covered: { [`${v}.is_booked_covered`]: '1' },
+        initial_fulfilled: { [`${v}.initial_fulfilled`]: '1' }
+    };
+    
+    const dateFilter = { [`${v}.lead_created_date_est_date`]: date };
+    const platformFilter = { ...dateFilter, [`${v}.tracking_type`]: platform };
+    
+    const queries = stages.map(stage => 
+        lookerQuery(v, [`${v}.count`], { ...platformFilter, ...stageFilters[stage] })
+    );
+    
+    const results = await Promise.all(queries);
+    const counts = {};
+    stages.forEach((stage, i) => {
+        counts[stage] = results[i][0]?.[`${v}.count`] || 0;
+    });
+    return counts;
+}
+
+// Refresh cache for a date range (fetches from APIs and stores in SQLite)
+async function refreshDailyCache(startDate, endDate) {
+    const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+    const platformSpendMap = { mutm: 'meta', g1utm: 'google', butm: 'bing', tutm: 'tiktok' };
+    
+    const days = [];
+    let cur = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
+    while (cur <= end) {
+        days.push(cur.toISOString().split('T')[0]);
+        cur.setDate(cur.getDate() + 1);
+    }
+    
+    console.log(`[Cache] Refreshing ${days.length} days (${startDate} to ${endDate})...`);
+    let refreshed = 0;
+    
+    // Process one day at a time to avoid overwhelming APIs
+    for (const date of days) {
+        try {
+            // Fetch spend for this day
+            const spend = await fetchServerSpend(date);
+            
+            // Fetch Looker counts for each platform
+            for (const platform of platforms) {
+                const counts = await fetchDayStageCounts(date, platform);
+                const platformSpend = spend[platformSpendMap[platform]] || 0;
+                
+                upsertCacheStmt.run(
+                    date, platform,
+                    counts.l_f_s, counts.is_booked, counts.sent_to_verification,
+                    counts.is_booked_covered, counts.initial_fulfilled,
+                    platformSpend
+                );
+            }
+            refreshed++;
+            if (refreshed % 5 === 0) console.log(`[Cache] Refreshed ${refreshed}/${days.length} days`);
+        } catch (e) {
+            console.error(`[Cache] Error refreshing ${date}:`, e.message);
+        }
+    }
+    
+    console.log(`[Cache] Done. Refreshed ${refreshed}/${days.length} days.`);
+    return refreshed;
+}
+
+// Cache refresh API endpoint
+app.post('/api/cache/refresh', async (req, res) => {
+    try {
+        const { startDate, endDate, days: numDays } = req.body;
+        let start, end;
+        
+        if (startDate && endDate) {
+            start = startDate;
+            end = endDate;
+        } else {
+            // Default: refresh last N days (default 3)
+            const n = numDays || 3;
+            const today = new Date();
+            const ago = new Date(today);
+            ago.setDate(today.getDate() - n);
+            start = ago.toISOString().split('T')[0];
+            end = today.toISOString().split('T')[0];
+        }
+        
+        const refreshed = await refreshDailyCache(start, end);
+        res.json({ success: true, refreshed, startDate: start, endDate: end });
+    } catch (error) {
+        console.error('Cache refresh error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Cache status endpoint
+app.get('/api/cache/status', (req, res) => {
+    const stats = db.prepare(`
+        SELECT COUNT(DISTINCT date) as days, MIN(date) as earliest, MAX(date) as latest, 
+               COUNT(*) as rows, MAX(updated_at) as last_updated
+        FROM daily_cache
+    `).get();
+    res.json({ success: true, ...stats });
+});
+
+// Daily cost trends - CACHED version (serves from SQLite, only fetches recent from API)
+app.get('/api/looker/daily-cost-trends', async (req, res) => {
+    try {
+        const platforms = ['mutm', 'g1utm', 'butm', 'tutm'];
+        const stages = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+
+        let { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            const today = new Date();
+            const thirtyAgo = new Date(today);
+            thirtyAgo.setDate(today.getDate() - 30);
+            startDate = thirtyAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+        }
+
+        // Build list of days
+        const days = [];
+        let cur = new Date(startDate + 'T12:00:00');
+        const end = new Date(endDate + 'T12:00:00');
+        while (cur <= end) {
+            const iso = cur.toISOString().split('T')[0];
+            const label = cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            days.push({ label, date: iso });
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        // Get cached data
+        const cachedRows = getCacheRangeStmt.all(startDate, endDate);
+        const cacheMap = {};
+        cachedRows.forEach(row => {
+            if (!cacheMap[row.date]) cacheMap[row.date] = {};
+            cacheMap[row.date][row.platform] = row;
+        });
+
+        // Find uncached days (or days within last 2 days that need refresh)
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        const recentDates = new Set([today, yesterday]);
+        
+        const uncachedDays = days.filter(d => !cacheMap[d.date] || recentDates.has(d.date));
+        
+        // Fetch uncached days from APIs (but limit to avoid timeout)
+        if (uncachedDays.length > 0 && uncachedDays.length <= 10) {
+            console.log(`[Cache] Fetching ${uncachedDays.length} uncached/recent days on the fly...`);
+            const refreshStart = uncachedDays[0].date;
+            const refreshEnd = uncachedDays[uncachedDays.length - 1].date;
+            await refreshDailyCache(refreshStart, refreshEnd);
+            
+            // Re-read cache
+            const freshRows = getCacheRangeStmt.all(startDate, endDate);
+            freshRows.forEach(row => {
+                if (!cacheMap[row.date]) cacheMap[row.date] = {};
+                cacheMap[row.date][row.platform] = row;
+            });
+        } else if (uncachedDays.length > 10) {
+            // Too many uncached days — trigger background refresh and serve what we have
+            console.log(`[Cache] ${uncachedDays.length} uncached days — serving partial, triggering background refresh`);
+            // Kick off refresh in background (don't await)
+            refreshDailyCache(startDate, endDate).catch(e => console.error('[Cache] Background refresh error:', e.message));
+        }
+
+        // Build response from cache
+        const result = {
+            days: days.map(d => d.label),
+            dates: days.map(d => d.date),
+            data: {},
+            spend: {}
+        };
+
+        // Init structure
+        for (const platform of [...platforms, 'all']) {
+            result.data[platform] = {};
+            result.spend[platform] = [];
+            stages.forEach(s => { result.data[platform][s] = []; });
+        }
+
+        for (let i = 0; i < days.length; i++) {
+            const date = days[i].date;
+            const dayCache = cacheMap[date] || {};
+            
+            let allSpend = 0;
+            for (const platform of platforms) {
+                const row = dayCache[platform];
+                stages.forEach(stage => {
+                    result.data[platform][stage].push(row ? row[stage] : 0);
+                });
+                const s = row ? row.spend : 0;
+                result.spend[platform].push(s);
+                allSpend += s;
+            }
+            
+            // Compute 'all' totals
+            stages.forEach(stage => {
+                result.data.all[stage].push(platforms.reduce((sum, p) => {
+                    const row = dayCache[p];
+                    return sum + (row ? row[stage] : 0);
+                }, 0));
+            });
+            result.spend.all.push(allSpend);
+        }
+
+        const cached = days.length - uncachedDays.length;
+        res.json({ success: true, ...result, _cache: { total: days.length, cached, fetched: Math.min(uncachedDays.length, 10) } });
+    } catch (error) {
+        console.error('Daily cost trends error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 // Get visitor journey - all events for a specific visitor ID
 app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {

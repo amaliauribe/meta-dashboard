@@ -1,3 +1,9 @@
+// Disable datalabels plugin globally (enable per-chart)
+if (window.ChartDataLabels) {
+    Chart.register(ChartDataLabels);
+    Chart.defaults.plugins.datalabels = { display: false };
+}
+
 // Authentication
 const VALID_USER = 'ranchi';
 const VALID_PASS = 'ranchera2026';
@@ -3159,10 +3165,13 @@ async function fetchPlatformSpend(startDate, endDate, idx) {
 // Monthly Cost Per Stage Trends Chart
 let costTrendChart = null;
 let costTrendWeeklyChart = null;
+let costTrendDailyChart = null;
 let costTrendData = null;
 let costTrendWeeklyData = null;
+let costTrendDailyData = null;
 let costTrendSpendData = null;
 let costTrendWeeklySpendData = null;
+let costTrendDailySpendData = null;
 let costTrendSource = 'all';
 let costTrendStage = 'all';
 let costTrendStartDate = null;
@@ -3172,6 +3181,7 @@ let costTrendFiltersInitialized = false;
 async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     const container = document.getElementById('costTrendChartContainer');
     const weeklyContainer = document.getElementById('costTrendWeeklyContainer');
+    const dailyContainer = document.getElementById('costTrendDailyContainer');
     const loading = document.getElementById('costTrendLoading');
     
     if (!container) return;
@@ -3204,16 +3214,27 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
     loading.style.display = 'block';
     container.style.opacity = '0.5';
     if (weeklyContainer) weeklyContainer.style.opacity = '0.5';
+    if (dailyContainer) dailyContainer.style.opacity = '0.5';
+    
+    // Build daily URL
+    let dailyUrl = '/api/looker/daily-cost-trends';
+    if (params.length > 0) {
+        dailyUrl += '?' + params.join('&');
+    } else {
+        dailyUrl += `?startDate=${costTrendStartDate}&endDate=${costTrendEndDate}`;
+    }
     
     try {
-        // Fetch both monthly and weekly data in parallel
-        const [monthlyRes, weeklyRes] = await Promise.all([
+        // Fetch monthly, weekly, and daily data in parallel
+        const [monthlyRes, weeklyRes, dailyRes] = await Promise.all([
             fetch(monthlyUrl),
-            fetch(weeklyUrl)
+            fetch(weeklyUrl),
+            fetch(dailyUrl)
         ]);
         
         const monthlyData = await monthlyRes.json();
         const weeklyData = await weeklyRes.json();
+        const dailyData = await dailyRes.json();
         
         if (!monthlyData.success) {
             throw new Error(monthlyData.error || 'Failed to load monthly data');
@@ -3221,6 +3242,7 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         
         costTrendData = monthlyData;
         costTrendWeeklyData = weeklyData.success ? weeklyData : null;
+        costTrendDailyData = dailyData.success ? dailyData : null;
         
         // Fetch REAL spend data from each platform for monthly periods
         costTrendSpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
@@ -3278,8 +3300,24 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
             });
         }
         
+        // Daily spend comes from the server cache (no extra API calls needed)
+        if (costTrendDailyData && costTrendDailyData.spend) {
+            costTrendDailySpendData = costTrendDailyData.spend;
+        } else if (costTrendDailyData) {
+            // Fallback: initialize empty spend
+            costTrendDailySpendData = { mutm: [], g1utm: [], butm: [], tutm: [], all: [] };
+            for (let i = 0; i < dailyData.days.length; i++) {
+                costTrendDailySpendData.mutm.push(0);
+                costTrendDailySpendData.g1utm.push(0);
+                costTrendDailySpendData.butm.push(0);
+                costTrendDailySpendData.tutm.push(0);
+                costTrendDailySpendData.all.push(0);
+            }
+        }
+        
         renderCostTrendChart(costTrendSource, costTrendStage);
         renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+        renderCostTrendDailyChart(costTrendSource, costTrendStage);
         
         // Setup filters (only once)
         if (!costTrendFiltersInitialized) {
@@ -3287,12 +3325,14 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
                 costTrendSource = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
                 renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+                renderCostTrendDailyChart(costTrendSource, costTrendStage);
             });
             
             document.getElementById('costTrendStageFilter').addEventListener('change', (e) => {
                 costTrendStage = e.target.value;
                 renderCostTrendChart(costTrendSource, costTrendStage);
                 renderCostTrendWeeklyChart(costTrendSource, costTrendStage);
+                renderCostTrendDailyChart(costTrendSource, costTrendStage);
             });
             
             // Initialize date pickers with default values (last 30 days)
@@ -3372,11 +3412,13 @@ async function loadMonthlyCostTrends(startDate = null, endDate = null) {
         loading.style.display = 'none';
         container.style.opacity = '1';
         if (weeklyContainer) weeklyContainer.style.opacity = '1';
+        if (dailyContainer) dailyContainer.style.opacity = '1';
     } catch (error) {
         console.error('Cost trend error:', error);
         loading.innerHTML = `<div class="error">Error loading trend data: ${error.message}</div>`;
         container.style.opacity = '1';
         if (weeklyContainer) weeklyContainer.style.opacity = '1';
+        if (dailyContainer) dailyContainer.style.opacity = '1';
     }
 }
 
@@ -3431,8 +3473,7 @@ function renderCostTrendChart(source, stage = 'all') {
             borderColor: stageConfig[key].borderColor,
             backgroundColor: stageConfig[key].backgroundColor,
             tension: 0.3,
-            fill: false,
-            yAxisID: 'y'
+            fill: false
         }));
     } else {
         // Show only selected stage
@@ -3443,22 +3484,10 @@ function renderCostTrendChart(source, stage = 'all') {
             borderColor: cfg.borderColor,
             backgroundColor: cfg.backgroundColor,
             tension: 0.3,
-            fill: true,
-            yAxisID: 'y'
+            fill: true
         }];
     }
     
-    // Add l_f_s count as bar graph on secondary axis
-    datasets.push({
-        label: 'l_f_s Count',
-        data: data.l_f_s,
-        type: 'bar',
-        backgroundColor: 'rgba(99, 102, 241, 0.3)',
-        borderColor: '#6366f1',
-        borderWidth: 1,
-        yAxisID: 'y1',
-        order: 1
-    });
     
     if (costTrendChart) {
         costTrendChart.destroy();
@@ -3503,23 +3532,10 @@ function renderCostTrendChart(source, stage = 'all') {
             },
             scales: {
                 y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
                     beginAtZero: true,
                     title: { display: true, text: 'Cost ($)' },
                     ticks: {
                         callback: function(value) { return '$' + value; }
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    beginAtZero: true,
-                    title: { display: true, text: 'l_f_s Count' },
-                    grid: {
-                        drawOnChartArea: false
                     }
                 }
             }
@@ -3641,6 +3657,187 @@ function renderCostTrendWeeklyChart(source, stage = 'all') {
                     title: { display: true, text: 'Cost ($)' },
                     ticks: {
                         callback: function(value) { return '$' + value; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCostTrendDailyChart(source, stage = 'all') {
+    if (!costTrendDailyData || !costTrendDailySpendData) return;
+    
+    const canvas = document.getElementById('costTrendDailyChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const data = costTrendDailyData.data[source];
+    const spend = costTrendDailySpendData[source];
+    
+    const stageConfig = {
+        l_f_s: {
+            label: 'Cost per l_f_s (LookerML)',
+            data: data.l_f_s.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)'
+        },
+        is_booked: {
+            label: 'Cost per Is Booked',
+            data: data.is_booked.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)'
+        },
+        sent_to_verification: {
+            label: 'Cost per Sent to Verif.',
+            data: data.sent_to_verification.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)'
+        },
+        is_booked_covered: {
+            label: 'Cost per Booked Covered',
+            data: data.is_booked_covered.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+        },
+        initial_fulfilled: {
+            label: 'Cost per Fulfilled',
+            data: data.initial_fulfilled.map((v, i) => v > 0 ? spend[i] / v : null),
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)'
+        }
+    };
+    
+    let datasets;
+    if (stage === 'all') {
+        datasets = Object.keys(stageConfig).map(key => ({
+            label: stageConfig[key].label,
+            data: stageConfig[key].data,
+            borderColor: stageConfig[key].borderColor,
+            backgroundColor: stageConfig[key].backgroundColor,
+            tension: 0.3,
+            fill: false,
+            pointRadius: 2,
+            yAxisID: 'y'
+        }));
+    } else {
+        const cfg = stageConfig[stage];
+        datasets = [{
+            label: cfg.label,
+            data: cfg.data,
+            borderColor: cfg.borderColor,
+            backgroundColor: cfg.backgroundColor,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 2,
+            yAxisID: 'y'
+        }];
+    }
+    
+    // Add l_f_s count line on secondary axis
+    const lfsCountData = data.l_f_s || [];
+    datasets.push({
+        label: 'Total l_f_s (LookerML)',
+        data: lfsCountData,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.3,
+        fill: false,
+        pointRadius: 3,
+        pointBackgroundColor: '#3b82f6',
+        borderWidth: 2,
+        borderDash: [],
+        yAxisID: 'y1',
+        datalabels: {
+            display: true,
+            color: '#3b82f6',
+            anchor: 'end',
+            align: 'top',
+            font: { size: 10, weight: 'bold' },
+            formatter: (value) => value != null ? Math.round(value) : ''
+        }
+    });
+    
+    // Add datalabels to cost datasets
+    datasets.forEach(ds => {
+        if (ds.yAxisID === 'y') {
+            ds.datalabels = {
+                display: true,
+                color: ds.borderColor || '#ef4444',
+                anchor: 'end',
+                align: 'bottom',
+                font: { size: 10 },
+                formatter: (value) => value != null ? '$' + value.toFixed(0) : ''
+            };
+        }
+    });
+    
+    if (costTrendDailyChart) {
+        costTrendDailyChart.destroy();
+    }
+    
+    const sourceNames = { all: 'All Sources', mutm: 'Meta', g1utm: 'Google', butm: 'Bing', tutm: 'TikTok' };
+    const stageNames = { 
+        all: 'All Stages',
+        l_f_s: 'l_f_s',
+        is_booked: 'Is Booked',
+        sent_to_verification: 'Sent to Verification',
+        is_booked_covered: 'Booked Covered',
+        initial_fulfilled: 'Fulfilled'
+    };
+    
+    const titleText = stage === 'all' 
+        ? `Daily Trends - ${sourceNames[source]}`
+        : `${stageNames[stage]} by Day - ${sourceNames[source]}`;
+    
+    costTrendDailyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: costTrendDailyData.days,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: titleText,
+                    font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.dataset.yAxisID === 'y1') {
+                                return context.dataset.label + ': ' + (context.raw || 0);
+                            }
+                            return context.dataset.label + ': $' + (context.raw?.toFixed(2) || '-');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    title: { display: true, text: 'Cost ($)' },
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: { display: true, text: 'l_f_s Count' },
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        callback: function(value) { return Math.round(value); }
                     }
                 }
             }
@@ -4602,21 +4799,23 @@ async function loadBingDailyData() {
     const dateRange = getBingDateRange(range);
 
     try {
-        // Fetch Bing data and l_f_s data in parallel
-        const [data, lfsResponse] = await Promise.all([
+        // Fetch Bing data, Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
             bingApiCall('daily-performance', {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=bing&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
+        const oursLfsByDate = oursLfsResponse.byDate || {};
 
         const tbody = document.getElementById('bingDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -4639,11 +4838,14 @@ async function loadBingDailyData() {
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
             const lfs = lfsByDate[day.normalizedDate] || 0;
+            const oursLfsDay = oursLfsByDate[day.normalizedDate];
+            const oursLfs = oursLfsDay ? (oursLfsDay.bing || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
+            const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date from normalized format
             const dateParts = day.normalizedDate.split('-');
@@ -4664,12 +4866,14 @@ async function loadBingDailyData() {
                     <td>${costPerConv}</td>
                     <td>${lfs}</td>
                     <td>${costPerLfs}</td>
+                    <td>${oursLfs}</td>
+                    <td>${costPerOursLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Bing Daily error:', e);
-        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('bingDailyBody').innerHTML = `<tr><td colspan="13" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
@@ -5025,21 +5229,23 @@ async function loadGoogleDailyData() {
     const dateRange = getGoogleDateRange(range);
 
     try {
-        // Fetch Google data and l_f_s data in parallel
-        const [data, lfsResponse] = await Promise.all([
+        // Fetch Google data, Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
             googleApiCall('daily-performance', {
                 startDate: dateRange.since,
                 endDate: dateRange.until
             }),
-            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
+            fetch(`/api/ours-privacy/lfs-by-date?platform=google&startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json()),
+            fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${dateRange.since}&endDate=${dateRange.until}`).then(r => r.json())
         ]);
         
         const lfsByDate = lfsResponse.byDate || {};
+        const oursLfsByDate = oursLfsResponse.byDate || {};
 
         const tbody = document.getElementById('googleDailyBody');
         
         if (!data?.rows || data.rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="loading">No daily data for this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
@@ -5052,11 +5258,14 @@ async function loadGoogleDailyData() {
             const clicks = parseInt(day.clicks || 0);
             const conversions = Math.round(parseFloat(day.conversions || 0));
             const lfs = lfsByDate[day.date] || 0;
+            const oursLfsDay = oursLfsByDate[day.date];
+            const oursLfs = oursLfsDay ? (oursLfsDay.google || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
             const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
             const costPerConv = conversions > 0 ? '$' + (spend / conversions).toFixed(2) : '-';
             const costPerLfs = lfs > 0 ? '$' + (spend / lfs).toFixed(2) : '-';
+            const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date
             const dateParts = day.date.split('-');
@@ -5077,12 +5286,14 @@ async function loadGoogleDailyData() {
                     <td>${costPerConv}</td>
                     <td>${lfs}</td>
                     <td>${costPerLfs}</td>
+                    <td>${oursLfs}</td>
+                    <td>${costPerOursLfs}</td>
                 </tr>
             `;
         }).join('');
     } catch (e) { 
         console.error('Google Daily error:', e);
-        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${e.message}</td></tr>`;
+        document.getElementById('googleDailyBody').innerHTML = `<tr><td colspan="13" class="loading">Error: ${e.message}</td></tr>`;
     }
 }
 
