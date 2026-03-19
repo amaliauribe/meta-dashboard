@@ -4058,6 +4058,27 @@ async function loadSummaryData() {
             console.error('Meta summary error:', e);
         }
         
+        // Fetch TikTok daily data
+        let tiktokByDate = {};
+        let tiktokConvByDate = {};
+        try {
+            const tiktokResponse = await fetch('/api/tiktok/daily-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            });
+            const tiktokData = await tiktokResponse.json();
+            if (tiktokData && tiktokData.rows) {
+                tiktokData.rows.forEach(row => {
+                    const dateStr = row.date.split('T')[0] || row.date;
+                    tiktokByDate[dateStr] = parseFloat(row.spend) || 0;
+                    tiktokConvByDate[dateStr] = parseInt(row.conversions) || 0;
+                });
+            }
+        } catch (e) {
+            console.error('TikTok summary error:', e);
+        }
+        
         // Build daily map
         const googleByDate = {};
         const googleConvByDate = {};
@@ -4078,8 +4099,8 @@ async function loadSummaryData() {
         // Build daily table
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         let dailyHtml = '';
-        let totalMeta = 0, totalGoogle = 0, totalBing = 0;
-        let totalMetaConv = 0, totalGoogleConv = 0, totalBingConv = 0;
+        let totalMeta = 0, totalGoogle = 0, totalBing = 0, totalTiktok = 0;
+        let totalMetaConv = 0, totalGoogleConv = 0, totalBingConv = 0, totalTiktokConv = 0;
         
         dates.forEach(date => {
             const d = new Date(date + 'T12:00:00');
@@ -4087,19 +4108,23 @@ async function loadSummaryData() {
             const meta = metaByDate[date] || 0;
             const google = googleByDate[date] || 0;
             const bing = bingByDate[date] || 0;
-            const total = meta + google + bing;
+            const tiktok = tiktokByDate[date] || 0;
+            const total = meta + google + bing + tiktok;
             
             const metaConv = metaConvByDate[date] || 0;
             const googleConv = googleConvByDate[date] || 0;
             const bingConv = bingConvByDate[date] || 0;
-            const totalConv = metaConv + googleConv + bingConv;
+            const tiktokConv = tiktokConvByDate[date] || 0;
+            const totalConv = metaConv + googleConv + bingConv + tiktokConv;
             
             totalMeta += meta;
             totalGoogle += google;
             totalBing += bing;
+            totalTiktok += tiktok;
             totalMetaConv += metaConv;
             totalGoogleConv += googleConv;
             totalBingConv += bingConv;
+            totalTiktokConv += tiktokConv;
             
             dailyHtml += `
                 <tr>
@@ -4111,6 +4136,8 @@ async function loadSummaryData() {
                     <td>${googleConv.toFixed(1)}</td>
                     <td>${bing > 0 ? '$' + bing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
                     <td>${bingConv.toFixed(1)}</td>
+                    <td>${tiktok > 0 ? '$' + tiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '$0.00'}</td>
+                    <td>${tiktokConv.toFixed(1)}</td>
                     <td><strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                     <td><strong>${totalConv.toFixed(1)}</strong></td>
                 </tr>
@@ -4120,8 +4147,8 @@ async function loadSummaryData() {
         document.getElementById('summaryDailyBody').innerHTML = dailyHtml;
         
         // Add totals row
-        const grandTotal = totalMeta + totalGoogle + totalBing;
-        const grandTotalConvDaily = totalMetaConv + totalGoogleConv + totalBingConv;
+        const grandTotal = totalMeta + totalGoogle + totalBing + totalTiktok;
+        const grandTotalConvDaily = totalMetaConv + totalGoogleConv + totalBingConv + totalTiktokConv;
         const rangeLabel = range.preset === 'today' ? 'Today' : 
                           range.preset === 'yesterday' ? 'Yesterday' : 
                           `${numDays}-Day Total`;
@@ -4135,13 +4162,15 @@ async function loadSummaryData() {
                 <td><strong>${totalGoogleConv.toFixed(1)}</strong></td>
                 <td><strong>$${totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>${totalBingConv.toFixed(1)}</strong></td>
+                <td><strong>$${totalTiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td><strong>${totalTiktokConv.toFixed(1)}</strong></td>
                 <td><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                 <td><strong>${grandTotalConvDaily.toFixed(1)}</strong></td>
             </tr>
         `;
         
         // Update KPI cards
-        const grandTotalConv = totalMetaConv + totalGoogleConv + totalBingConv;
+        const grandTotalConv = totalMetaConv + totalGoogleConv + totalBingConv + totalTiktokConv;
         document.getElementById('summaryTotalSpend').textContent = '$' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryTotalConversions').textContent = grandTotalConv.toFixed(1);
         document.getElementById('summaryMetaSpend').textContent = '$' + totalMeta.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -4150,6 +4179,8 @@ async function loadSummaryData() {
         document.getElementById('summaryGoogleConversions').textContent = totalGoogleConv.toFixed(1);
         document.getElementById('summaryBingSpend').textContent = '$' + totalBing.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('summaryBingConversions').textContent = totalBingConv.toFixed(1);
+        document.getElementById('summaryTiktokSpend').textContent = '$' + totalTiktok.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('summaryTiktokConversions').textContent = totalTiktokConv.toFixed(1);
         
         // Weekly breakdown
         const weeklyPeriods = [
