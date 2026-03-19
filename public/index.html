@@ -156,6 +156,11 @@
                     <div class="kpi-value" id="summaryBingSpend">$0.00</div>
                     <div class="kpi-subvalue"><span id="summaryBingConversions">0</span> conv.</div>
                 </div>
+                <div class="kpi-card tiktok-card">
+                    <div class="kpi-label">🎵 TikTok</div>
+                    <div class="kpi-value" id="summaryTiktokSpend">$0.00</div>
+                    <div class="kpi-subvalue"><span id="summaryTiktokConversions">0</span> conv.</div>
+                </div>
             </section>
 
             <!-- Daily Breakdown -->
@@ -170,6 +175,7 @@
                                 <th colspan="2" class="source-header meta">Meta</th>
                                 <th colspan="2" class="source-header google">Google</th>
                                 <th colspan="2" class="source-header bing">Bing</th>
+                                <th colspan="2" class="source-header tiktok">TikTok</th>
                                 <th colspan="2" class="source-header total">Total</th>
                             </tr>
                             <tr>
@@ -181,10 +187,12 @@
                                 <th>Conv</th>
                                 <th>Spend</th>
                                 <th>Conv</th>
+                                <th>Spend</th>
+                                <th>Conv</th>
                             </tr>
                         </thead>
                         <tbody id="summaryDailyBody">
-                            <tr><td colspan="10" class="loading">Loading summary data...</td></tr>
+                            <tr><td colspan="12" class="loading">Loading summary data...</td></tr>
                         </tbody>
                         <tfoot id="summaryDailyFoot">
                         </tfoot>
@@ -203,6 +211,7 @@
                                 <th>Meta</th>
                                 <th>Google</th>
                                 <th>Bing</th>
+                                <th>TikTok</th>
                                 <th>Total</th>
                             </tr>
                         </thead>
@@ -2046,28 +2055,22 @@
         <div id="tiktokView" class="view-content hidden">
             <h1>🎵 TikTok Campaigns</h1>
             
-            <div class="coming-soon-banner">
-                <span class="coming-soon-icon">🚧</span>
-                <span class="coming-soon-text">Coming Soon</span>
-                <p class="coming-soon-subtitle">TikTok Ads integration is currently in development</p>
-            </div>
-            
             <section class="kpi-cards">
                 <div class="kpi-card">
                     <div class="kpi-label">Total Spend</div>
-                    <div class="kpi-value">—</div>
+                    <div class="kpi-value" id="tiktokTotalSpend">$0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Impressions</div>
-                    <div class="kpi-value">—</div>
+                    <div class="kpi-value" id="tiktokTotalImpressions">0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Clicks</div>
-                    <div class="kpi-value">—</div>
+                    <div class="kpi-value" id="tiktokTotalClicks">0</div>
                 </div>
                 <div class="kpi-card highlight">
                     <div class="kpi-label">Conversions</div>
-                    <div class="kpi-value">—</div>
+                    <div class="kpi-value" id="tiktokTotalConversions">0</div>
                 </div>
             </section>
             
@@ -2078,18 +2081,40 @@
                         <thead>
                             <tr>
                                 <th>Campaign</th>
-                                <th>Status</th>
-                                <th>Budget</th>
                                 <th>Spend</th>
-                                <th>Impr</th>
+                                <th>Impressions</th>
                                 <th>Clicks</th>
                                 <th>CTR</th>
-                                <th>Conv</th>
-                                <th>CPA</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr><td colspan="9" class="coming-soon-cell">Data will appear here once integration is complete</td></tr>
+                        <tbody id="tiktokCampaignBody">
+                            <tr><td colspan="8" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section class="table-section">
+                <h2>📅 Daily Performance</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>Clicks</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Conversions</th>
+                                <th>Cost/Conv</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tiktokDailyBody">
+                            <tr><td colspan="8" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>

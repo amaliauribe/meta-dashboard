@@ -263,12 +263,29 @@ async function googleAdsApiRequest(query) {
 }
 
 // TikTok Ads API Configuration
-const TIKTOK_CONFIG = {
+let TIKTOK_CONFIG = {
     appId: process.env.TIKTOK_APP_ID,
     appSecret: process.env.TIKTOK_APP_SECRET,
     adAccountId: process.env.TIKTOK_AD_ACCOUNT_ID,
     accessToken: process.env.TIKTOK_ACCESS_TOKEN
 };
+
+// Load TikTok credentials from secrets file
+try {
+    const tiktokSecrets = fs.readFileSync('/root/clawd/.secrets/tiktok', 'utf8');
+    const lines = tiktokSecrets.split('\n');
+    for (const line of lines) {
+        if (line.trim() && line.includes('=')) {
+            const [key, value] = line.split('=');
+            if (key === 'TIKTOK_ACCESS_TOKEN') TIKTOK_CONFIG.accessToken = value;
+            if (key === 'TIKTOK_AD_ACCOUNT_ID') TIKTOK_CONFIG.adAccountId = value;
+            if (key === 'TIKTOK_APP_ID') TIKTOK_CONFIG.appId = value;
+            if (key === 'TIKTOK_APP_SECRET') TIKTOK_CONFIG.appSecret = value;
+        }
+    }
+} catch (error) {
+    console.log('TikTok credentials file not found or invalid');
+}
 
 function isTikTokConfigured() {
     return TIKTOK_CONFIG.appId && 
@@ -1219,7 +1236,9 @@ app.post('/api/tiktok/account-performance', async (req, res) => {
             start_date: startDate,
             end_date: endDate,
             metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'cost_per_conversion', 'ctr', 'cpc']),
-            data_level: 'AUCTION_ADVERTISER'
+            data_level: 'AUCTION_ADVERTISER',
+            report_type: 'BASIC',
+            dimensions: JSON.stringify(['stat_time_day'])
         });
         
         const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
@@ -1269,6 +1288,7 @@ app.post('/api/tiktok/daily-performance', async (req, res) => {
             end_date: endDate,
             metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc']),
             data_level: 'AUCTION_ADVERTISER',
+            report_type: 'BASIC',
             dimensions: JSON.stringify(['stat_time_day'])
         });
         
@@ -1316,6 +1336,7 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
             end_date: endDate,
             metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc', 'cost_per_conversion']),
             data_level: 'AUCTION_CAMPAIGN',
+            report_type: 'BASIC',
             dimensions: JSON.stringify(['campaign_id'])
         });
         
@@ -4503,6 +4524,105 @@ app.listen(PORT, () => {
     console.log(`Google Ads API configured: ${isGoogleAdsConfigured()}`);
 });
 
+// TikTok Geographic Report
+app.post('/api/tiktok/geographic', async (req, res) => {
+    if (!isTikTokConfigured()) {
+        return res.status(503).json({ error: 'TikTok API credentials not configured' });
+    }
+    
+    try {
+        const { startDate, endDate } = req.body;
+        
+        // DMA to State mapping for VTC states
+        const dmaToState = {
+            // New York
+            501: 'New York',    // New York
+            532: 'New York',    // Albany
+            514: 'New York',    // Buffalo
+            555: 'New York',    // Syracuse
+            538: 'New York',    // Rochester
+            // New Jersey
+            504: 'New Jersey',  // Philadelphia market covers NJ
+            // California
+            803: 'California',  // Los Angeles
+            807: 'California',  // San Francisco-Oakland-San Jose
+            825: 'California',  // San Diego
+            862: 'California',  // Sacramento-Stockton-Modesto
+            // Texas
+            623: 'Texas',       // Dallas-Ft Worth
+            618: 'Texas',       // Houston
+            635: 'Texas',       // Austin
+            641: 'Texas',       // San Antonio
+            // Maryland
+            511: 'Maryland',    // Washington DC
+            512: 'Maryland',    // Baltimore
+            // Connecticut
+            533: 'Connecticut'  // Hartford-New Haven
+        };
+        
+        const url = 'https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/';
+        const params = new URLSearchParams({
+            advertiser_id: TIKTOK_CONFIG.adAccountId,
+            report_type: 'AUDIENCE',
+            data_level: 'AUCTION_ADVERTISER',
+            dimensions: JSON.stringify(['dma_id']),
+            metrics: JSON.stringify(['spend', 'impressions', 'clicks']),
+            start_date: startDate,
+            end_date: endDate,
+            page_size: '200'
+        });
+        
+        const response = await fetch(`${url}?${params}`, {
+            method: 'GET',
+            headers: {
+                'Access-Token': TIKTOK_CONFIG.accessToken
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`TikTok API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Process the response and map DMA IDs to states
+        const stateSpend = {};
+        let otherSpend = 0;
+        
+        if (data.data && data.data.list) {
+            data.data.list.forEach(row => {
+                const dmaId = parseInt(row.dimensions?.dma_id);
+                const spend = parseFloat(row.metrics?.spend) || 0;
+                
+                if (dmaToState[dmaId]) {
+                    const state = dmaToState[dmaId];
+                    stateSpend[state] = (stateSpend[state] || 0) + spend;
+                } else {
+                    otherSpend += spend;
+                }
+            });
+        }
+        
+        // Format response in same format as Bing geographic endpoint
+        const locations = Object.entries(stateSpend).map(([state, cost]) => ({
+            state: state,
+            cost: cost
+        }));
+        
+        // Add "Other" if there's spend from non-VTC states
+        if (otherSpend > 0) {
+            locations.push({
+                state: 'Other',
+                cost: otherSpend
+            });
+        }
+        
+        res.json({ locations });
+    } catch (error) {
+        console.error('TikTok geographic error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // ==================== Zipcode Heatmap ====================
 

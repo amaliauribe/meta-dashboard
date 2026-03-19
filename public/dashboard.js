@@ -88,6 +88,12 @@ let googleAdsRawData = [];
 let googleAdsSortColumn = 'conversions';
 let googleAdsSortDirection = 'desc';
 
+// TikTok State
+let tiktokDataLoaded = false;
+let tiktokRawData = [];
+let tiktokSortColumn = 'spend';
+let tiktokSortDirection = 'desc';
+
 // Keywords sorting state
 let keywordsRawData = [];
 let keywordsSortColumn = 'clicks';
@@ -288,6 +294,7 @@ function initializeDashboard() {
             googleQsHistoryDataLoaded = false; // Reset google QS history data when date changes
             googleGeoDataLoaded = false; // Reset google geo data when date changes
             googleAdsDataLoaded = false;
+            tiktokDataLoaded = false; // Reset TikTok data when date changes
             searchTermsDataLoaded = false; // Reset search terms data when date changes
             summaryDataLoaded = false; // Reset summary data when date changes
             heatmapDataLoaded = false; // Reset heatmap data when date changes
@@ -365,6 +372,7 @@ function initializeDashboard() {
         googleQsHistoryDataLoaded = false;
         googleGeoDataLoaded = false;
         googleAdsDataLoaded = false;
+        tiktokDataLoaded = false;
         searchTermsDataLoaded = false;
         summaryDataLoaded = false;
         heatmapDataLoaded = false;
@@ -496,6 +504,9 @@ function initializeDashboard() {
             if (currentView === 'googleSearchTerms' && !searchTermsDataLoaded) {
                 loadGoogleSearchTermsData();
             }
+            if (currentView === 'tiktok' && !tiktokDataLoaded) {
+                loadTikTokData();
+            }
             if (currentView === 'oursPrivacy') {
                 loadOursPrivacyData();
             }
@@ -536,6 +547,7 @@ function initializeDashboard() {
         googleQsHistoryDataLoaded = false;
         googleGeoDataLoaded = false;
         googleAdsDataLoaded = false;
+        tiktokDataLoaded = false;
         searchTermsDataLoaded = false;
         summaryDataLoaded = false;
         if (currentView === 'summary') {
@@ -8658,7 +8670,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadUnifiedFunnels(startDate, endDate) {
     try {
         // Fetch ad platform data in parallel
-        const [metaData, googleData, bingData] = await Promise.all([
+        const [metaData, googleData, bingData, tiktokData] = await Promise.all([
             apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${startDate}","until":"${endDate}"}`).catch(() => null),
             fetch('/api/google/account-performance', {
                 method: 'POST',
@@ -8666,6 +8678,11 @@ async function loadUnifiedFunnels(startDate, endDate) {
                 body: JSON.stringify({ startDate, endDate })
             }).then(r => r.json()).catch(() => null),
             fetch('/api/bing/account-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            }).then(r => r.json()).catch(() => null),
+            fetch('/api/tiktok/account-performance', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ startDate, endDate })
@@ -8712,6 +8729,15 @@ async function loadUnifiedFunnels(startDate, endDate) {
             bingImpressions = parseInt(bingData.impressions) || 0;
             bingClicks = parseInt(bingData.clicks) || 0;
             bingResults = parseInt(bingData.conversions) || 0;
+        }
+        
+        // Process TikTok
+        let tiktokSpend = 0, tiktokImpressions = 0, tiktokClicks = 0, tiktokResults = 0;
+        if (tiktokData && !tiktokData.error) {
+            tiktokSpend = parseFloat(tiktokData.spend) || 0;
+            tiktokImpressions = parseInt(tiktokData.impressions) || 0;
+            tiktokClicks = parseInt(tiktokData.clicks) || 0;
+            tiktokResults = parseInt(tiktokData.conversions) || 0;
         }
         
         // Process Looker data
@@ -8817,20 +8843,219 @@ async function loadUnifiedFunnels(startDate, endDate) {
         el("unifiedBingCostPerCovered", looker.butm.covered > 0 ? fmtMoney(bingSpend / looker.butm.covered) : "");
         el("unifiedBingCostPerFulfilled", looker.butm.fulfilled > 0 ? fmtMoney(bingSpend / looker.butm.fulfilled) : "");
         
-        // Update TikTok card (no API data yet, just Looker)
-        el('unifiedTiktokCost', '-');
+        // Update TikTok card with real API data
+        el('unifiedTiktokCost', fmtMoney(tiktokSpend));
+        el('unifiedTiktokImpressions', fmt(tiktokImpressions));
+        el('unifiedTiktokClicks', fmt(tiktokClicks));
+        el('unifiedTiktokResults', fmt(tiktokResults));
         el('unifiedTiktokLfs', fmt(looker.tutm.lfs));
         // Ours Privacy l_f_s for TikTok (not available)
         el('unifiedTiktokLfsOurs', '-');
         el('unifiedTiktokCostPerLfsOurs', '');
         el('unifiedTiktokBooked', fmt(looker.tutm.booked));
+        el('unifiedTiktokCostPerBooked', looker.tutm.booked > 0 ? fmtMoney(tiktokSpend / looker.tutm.booked) : "");
         el('unifiedTiktokVerif', fmt(looker.tutm.verif));
+        el('unifiedTiktokCostPerVerif', looker.tutm.verif > 0 ? fmtMoney(tiktokSpend / looker.tutm.verif) : "");
         el('unifiedTiktokCovered', fmt(looker.tutm.covered));
+        el('unifiedTiktokCostPerCovered', looker.tutm.covered > 0 ? fmtMoney(tiktokSpend / looker.tutm.covered) : "");
         el('unifiedTiktokFulfilled', fmt(looker.tutm.fulfilled));
-        el('unifiedTiktokCostLfs', '-');
-        el('unifiedTiktokCostFulfilled', '-');
+        el('unifiedTiktokCostPerFulfilled', looker.tutm.fulfilled > 0 ? fmtMoney(tiktokSpend / looker.tutm.fulfilled) : "");
+        el('unifiedTiktokCostLfs', looker.tutm.lfs > 0 ? fmtMoney(tiktokSpend / looker.tutm.lfs) : "");
+        el('unifiedTiktokCostFulfilled', looker.tutm.fulfilled > 0 ? fmtMoney(tiktokSpend / looker.tutm.fulfilled) : "");
         
     } catch (error) {
         console.error('Error loading unified funnels:', error);
     }
+}
+
+// ========== TikTok Data Loading ==========
+
+async function loadTikTokData() {
+    document.getElementById('tiktokCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Loading TikTok data...</td></tr>';
+    document.getElementById('tiktokDailyBody').innerHTML = '<tr><td colspan="12" class="loading">Loading...</td></tr>';
+
+    try {
+        await Promise.all([
+            loadTikTokKPIs(),
+            loadTikTokChartData(),
+            loadTikTokCampaignData(),
+            loadTikTokDailyData()
+        ]);
+        tiktokDataLoaded = true;
+        updateLastUpdated();
+    } catch (error) {
+        console.error('TikTok data error:', error);
+        showTikTokLoadingError('Error loading TikTok data: ' + error.message);
+    }
+}
+
+// Show error message for TikTok
+function showTikTokLoadingError(errorMsg) {
+    const message = `
+        <tr>
+            <td colspan="8" class="loading">
+                <div style="padding: 20px;">
+                    <h3 style="margin-bottom: 10px;">⚠️ Error Loading TikTok Data</h3>
+                    <p style="color: #65676b;">${errorMsg}</p>
+                </div>
+            </td>
+        </tr>
+    `;
+    document.getElementById('tiktokCampaignBody').innerHTML = message;
+    document.getElementById('tiktokDailyBody').innerHTML = `<tr><td colspan="12" class="loading">${errorMsg}</td></tr>`;
+}
+
+async function loadTikTokKPIs() {
+    try {
+        const range = dateRanges[currentRange];
+        const { startDate, endDate } = getDateRange(range);
+        
+        const response = await fetch('/api/tiktok/account-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update KPI cards
+        document.getElementById('tiktokTotalSpend').textContent = '$' + (data.spend || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('tiktokTotalImpressions').textContent = (data.impressions || 0).toLocaleString('en-US');
+        document.getElementById('tiktokTotalClicks').textContent = (data.clicks || 0).toLocaleString('en-US');
+        document.getElementById('tiktokTotalConversions').textContent = (data.conversions || 0).toLocaleString('en-US');
+    } catch (error) {
+        console.error('TikTok KPIs error:', error);
+    }
+}
+
+async function loadTikTokCampaignData() {
+    try {
+        const range = dateRanges[currentRange];
+        const { startDate, endDate } = getDateRange(range);
+        
+        const response = await fetch('/api/tiktok/campaign-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        tiktokRawData = data.campaigns || [];
+        renderTikTokCampaignTable();
+    } catch (error) {
+        console.error('TikTok campaign data error:', error);
+        document.getElementById('tiktokCampaignBody').innerHTML = '<tr><td colspan="8" class="loading">Error loading campaign data</td></tr>';
+    }
+}
+
+function renderTikTokCampaignTable() {
+    const tbody = document.getElementById('tiktokCampaignBody');
+    if (!tbody) return;
+    
+    if (tiktokRawData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No campaigns found</td></tr>';
+        return;
+    }
+    
+    // Sort data
+    const sortedData = [...tiktokRawData].sort((a, b) => {
+        const aVal = a[tiktokSortColumn] || 0;
+        const bVal = b[tiktokSortColumn] || 0;
+        
+        if (typeof aVal === 'string') {
+            return tiktokSortDirection === 'asc' ? 
+                aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        
+        return tiktokSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    
+    const rows = sortedData.map(campaign => {
+        const ctr = campaign.impressions > 0 ? (campaign.clicks / campaign.impressions * 100) : 0;
+        const costPerConv = campaign.conversions > 0 ? (campaign.spend / campaign.conversions) : 0;
+        
+        return `
+            <tr>
+                <td>${campaign.name}</td>
+                <td>$${campaign.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>${campaign.impressions.toLocaleString('en-US')}</td>
+                <td>${campaign.clicks.toLocaleString('en-US')}</td>
+                <td>${ctr.toFixed(2)}%</td>
+                <td>$${campaign.cpc.toFixed(2)}</td>
+                <td>${campaign.conversions}</td>
+                <td>$${costPerConv.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.innerHTML = rows;
+}
+
+async function loadTikTokDailyData() {
+    try {
+        const range = dateRanges[currentRange];
+        const { startDate, endDate } = getDateRange(range);
+        
+        const response = await fetch('/api/tiktok/daily-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        renderTikTokDailyTable(data.rows || []);
+    } catch (error) {
+        console.error('TikTok daily data error:', error);
+        document.getElementById('tiktokDailyBody').innerHTML = '<tr><td colspan="12" class="loading">Error loading daily data</td></tr>';
+    }
+}
+
+function renderTikTokDailyTable(dailyData) {
+    const tbody = document.getElementById('tiktokDailyBody');
+    if (!tbody) return;
+    
+    if (dailyData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="loading">No daily data found</td></tr>';
+        return;
+    }
+    
+    const rows = dailyData.map(day => {
+        const ctr = day.impressions > 0 ? (day.clicks / day.impressions * 100) : 0;
+        const costPerConv = day.conversions > 0 ? (day.spend / day.conversions) : 0;
+        
+        return `
+            <tr>
+                <td>${formatDate(day.date)}</td>
+                <td>$${day.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>${day.impressions.toLocaleString('en-US')}</td>
+                <td>${day.clicks.toLocaleString('en-US')}</td>
+                <td>${ctr.toFixed(2)}%</td>
+                <td>$${day.cpc.toFixed(2)}</td>
+                <td>${day.conversions}</td>
+                <td>$${costPerConv.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.innerHTML = rows;
+}
+
+async function loadTikTokChartData() {
+    // For now, we'll skip the chart implementation
+    // This can be added later following the same pattern as other platforms
+    console.log('TikTok chart data loading - placeholder');
 }
