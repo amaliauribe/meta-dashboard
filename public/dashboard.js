@@ -9480,7 +9480,7 @@ function renderTikTokAdsTable(allAds) {
             <td>$${ad.spend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             <td>${ad.impressions.toLocaleString()}</td>
             <td>${ad.clicks.toLocaleString()}</td>
-            <td>${(ad.ctr * 100).toFixed(2)}%</td>
+            <td>${ad.ctr.toFixed(2)}%</td>
             <td>$${ad.cpc.toFixed(2)}</td>
             <td>${ad.conversions}</td>
             <td>${ad.conversions > 0 ? '$' + ad.costPerConversion.toFixed(2) : '\u2014'}</td>
