@@ -1252,6 +1252,21 @@ app.get('/api/tiktok/status', (req, res) => {
     res.json({ configured: isTikTokConfigured() });
 });
 
+// TikTok date validation helper
+function validateTikTokDates(startDate, endDate) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && endDate && dateRegex.test(startDate) && dateRegex.test(endDate)) {
+        return { startDate, endDate };
+    }
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+    return {
+        startDate: weekAgo.toISOString().split("T")[0],
+        endDate: today.toISOString().split("T")[0]
+    };
+}
+
 // TikTok: Account performance
 app.post('/api/tiktok/account-performance', async (req, res) => {
     if (!isTikTokConfigured()) {
@@ -1259,7 +1274,8 @@ app.post('/api/tiktok/account-performance', async (req, res) => {
     }
     
     try {
-        const { startDate, endDate } = req.body;
+        const { startDate: rawStart, endDate: rawEnd } = req.body;
+        const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
         const params = new URLSearchParams({
             advertiser_id: TIKTOK_CONFIG.adAccountId,
@@ -1310,7 +1326,8 @@ app.post('/api/tiktok/daily-performance', async (req, res) => {
     }
     
     try {
-        const { startDate, endDate } = req.body;
+        const { startDate: rawStart, endDate: rawEnd } = req.body;
+        const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
         const params = new URLSearchParams({
             advertiser_id: TIKTOK_CONFIG.adAccountId,
@@ -1358,7 +1375,8 @@ app.post('/api/tiktok/campaign-performance', async (req, res) => {
     }
     
     try {
-        const { startDate, endDate } = req.body;
+        const { startDate: rawStart, endDate: rawEnd } = req.body;
+        const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
         const params = new URLSearchParams({
             advertiser_id: TIKTOK_CONFIG.adAccountId,
@@ -4820,7 +4838,8 @@ app.post('/api/tiktok/geographic', async (req, res) => {
     }
     
     try {
-        const { startDate, endDate } = req.body;
+        const { startDate: rawStart, endDate: rawEnd } = req.body;
+        const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
         // DMA to State mapping for VTC states
         const dmaToState = {
