@@ -9151,10 +9151,31 @@ function showTikTokLoadingError(errorMsg) {
     document.getElementById('tiktokDailyBody').innerHTML = `<tr><td colspan="12" class="loading">${errorMsg}</td></tr>`;
 }
 
+function getTikTokDateRange() {
+    const range = dateRanges[currentRange];
+    let startDate, endDate;
+    if (range.custom && customStartDate && customEndDate) {
+        startDate = customStartDate;
+        endDate = customEndDate;
+    } else if (range.preset === 'today') {
+        startDate = endDate = formatDateEST(getESTDate());
+    } else if (range.preset === 'yesterday') {
+        const d = getESTDate(); d.setDate(d.getDate() - 1);
+        startDate = endDate = formatDateEST(d);
+    } else if (range.days) {
+        const today = getESTDate();
+        const start = new Date(today);
+        start.setDate(today.getDate() - range.days + 1);
+        startDate = formatDateEST(start);
+        endDate = formatDateEST(today);
+    }
+    return { startDate, endDate };
+}
+
 async function loadTikTokKPIs() {
     try {
         const range = dateRanges[currentRange];
-        const { startDate, endDate } = getDateRange(range);
+        const { startDate, endDate } = getTikTokDateRange();
         
         const response = await fetch('/api/tiktok/account-performance', {
             method: 'POST',
@@ -9181,7 +9202,7 @@ async function loadTikTokKPIs() {
 async function loadTikTokCampaignData() {
     try {
         const range = dateRanges[currentRange];
-        const { startDate, endDate } = getDateRange(range);
+        const { startDate, endDate } = getTikTokDateRange();
         
         const response = await fetch('/api/tiktok/campaign-performance', {
             method: 'POST',
@@ -9249,7 +9270,7 @@ function renderTikTokCampaignTable() {
 async function loadTikTokDailyData() {
     try {
         const range = dateRanges[currentRange];
-        const { startDate, endDate } = getDateRange(range);
+        const { startDate, endDate } = getTikTokDateRange();
         
         const response = await fetch('/api/tiktok/daily-performance', {
             method: 'POST',
