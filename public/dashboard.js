@@ -2836,14 +2836,18 @@ async function loadFunnelsData() {
         const params = new URLSearchParams({ startDate, endDate });
         
         // Load all platform data in parallel
-        const [metaData, googleData, bingData, metaLfs, googleLfs, bingLfs] = await Promise.all([
+        const [metaData, googleData, bingData, tiktokFunnelData, metaLfs, googleLfs, bingLfs] = await Promise.all([
             apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${startDate}","until":"${endDate}"}`),
             googleApiCall('account-performance', { startDate, endDate }).catch(() => ({})),
             bingApiCall('account-performance', { startDate, endDate }).catch(() => ({})),
+            fetch('/api/tiktok/account-performance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate, endDate }) }).then(r => r.json()).catch(() => ({})),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=meta&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=google&${params}`).then(r => r.json()).catch(() => ({ total: 0 })),
             fetch(`/api/ours-privacy/lfs-by-platform?platform=bing&${params}`).then(r => r.json()).catch(() => ({ total: 0 }))
         ]);
+        
+        // Process TikTok data for funnels
+        const tiktokSpend = parseFloat(tiktokFunnelData.spend || 0);
         
         // Process Meta data
         const meta = metaData.data?.[0] || {};
@@ -2894,7 +2898,7 @@ async function loadFunnelsData() {
             g1utm: googleSpend,   // Google
             butm: bingSpend,      // Bing
             outm: 0,              // Organic (no spend)
-            tutm: 0,              // TikTok (not integrated yet)
+            tutm: tiktokSpend,    // TikTok
             gbputm: 0,            // GBP (no spend)
             gbutm: 0              // GBP (no spend)
         };
@@ -4070,7 +4074,7 @@ async function loadSummaryData() {
             const tiktokData = await tiktokResponse.json();
             if (tiktokData && tiktokData.rows) {
                 tiktokData.rows.forEach(row => {
-                    const dateStr = row.date.split('T')[0] || row.date;
+                    const dateStr = (row.date || '').split('T')[0].split(' ')[0];
                     tiktokByDate[dateStr] = parseFloat(row.spend) || 0;
                     tiktokConvByDate[dateStr] = parseInt(row.conversions) || 0;
                 });
