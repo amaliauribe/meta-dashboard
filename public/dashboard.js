@@ -1498,8 +1498,8 @@ async function loadCampaignData() {
                 }
 
                 return `
-                    <tr>
-                        <td>${c.name}</td>
+                    <tr data-cid="${c.id}" style="cursor:pointer;" onclick="toggleAdSetBreakdown('${c.id}', this)">
+                        <td>${c.name} <span style="color:#667eea;font-size:11px;">▶</span></td>
                         <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td>$${dailyBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td title="${statusTitle}">${statusInfo.label}</td>
@@ -1513,8 +1513,8 @@ async function loadCampaignData() {
                 `;
             } else {
                 return `
-                    <tr>
-                        <td>${c.name}</td>
+                    <tr data-cid="${c.id}" style="cursor:pointer;" onclick="toggleAdSetBreakdown('${c.id}', this)">
+                        <td>${c.name} <span style="color:#667eea;font-size:11px;">▶</span></td>
                         <td>$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td>${impressions.toLocaleString()}</td>
                         <td>${clicks.toLocaleString()}</td>
@@ -9596,5 +9596,106 @@ async function loadTikTokAdsData() {
     } catch (error) {
         console.error('TikTok ads data error:', error);
         tbody.innerHTML = '<tr><td colspan="11" class="loading">Error loading TikTok ads: ' + error.message + '</td></tr>';
+    }
+}
+
+// Fetch and toggle ad set (ad group) breakdown for a campaign
+async function toggleAdSetBreakdown(campaignId, row) {
+    const existingDetail = row.nextElementSibling;
+    if (existingDetail && existingDetail.classList.contains('adset-detail-row')) {
+        existingDetail.remove();
+        row.classList.remove('expanded');
+        return;
+    }
+    
+    // Remove any other open detail rows
+    document.querySelectorAll('.adset-detail-row').forEach(r => r.remove());
+    document.querySelectorAll('#campaignBody tr.expanded').forEach(r => r.classList.remove('expanded'));
+    
+    row.classList.add('expanded');
+    const colCount = row.children.length;
+    
+    // Insert loading row
+    const loadingRow = document.createElement('tr');
+    loadingRow.className = 'adset-detail-row';
+    loadingRow.innerHTML = `<td colspan="${colCount}" style="padding:0"><div style="padding:12px 20px;color:#888;font-size:13px;">Loading ad sets...</div></td>`;
+    row.after(loadingRow);
+    
+    try {
+        const range = dateRanges[currentRange];
+        let insightsQuery;
+        if (range.custom && customStartDate && customEndDate) {
+            insightsQuery = `insights.time_range({"since":"${customStartDate}","until":"${customEndDate}"})`;
+        } else if (range.preset) {
+            insightsQuery = `insights.date_preset(${range.preset})`;
+        } else {
+            const today = getESTDate();
+            const since = new Date(today);
+            since.setDate(today.getDate() - range.days + 1);
+            insightsQuery = `insights.time_range({"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"})`;
+        }
+        
+        const adsetData = await apiCall(
+            `${ACCOUNT_ID}/adsets?fields=name,status,effective_status,campaign_id,${insightsQuery}{spend,impressions,clicks,actions}&limit=100&filtering=[{"field":"campaign_id","operator":"EQUAL","value":["${campaignId}"]}]`
+        );
+        
+        const adsets = (adsetData.data || []).filter(a => a.insights?.data?.[0]);
+        
+        if (adsets.length === 0) {
+            loadingRow.innerHTML = `<td colspan="${colCount}" style="padding:0"><div style="padding:12px 20px;color:#888;font-size:13px;">No ad set data found</div></td>`;
+            return;
+        }
+        
+        adsets.sort((a, b) => parseFloat(b.insights?.data?.[0]?.spend || 0) - parseFloat(a.insights?.data?.[0]?.spend || 0));
+        
+        const showBudget = currentRange === 'today' || currentRange === 'yesterday';
+        
+        let tableHtml = `<td colspan="${colCount}" style="padding:0">
+            <div style="background:#f8f9ff;border-left:3px solid #667eea;margin:0;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#eef0ff;color:#555;">
+                            <th style="padding:8px 12px;text-align:left;">Ad Set</th>
+                            <th style="padding:8px 12px;text-align:left;">Status</th>
+                            <th style="padding:8px 12px;text-align:right;">Spend</th>
+                            <th style="padding:8px 12px;text-align:right;">Impressions</th>
+                            <th style="padding:8px 12px;text-align:right;">Clicks</th>
+                            <th style="padding:8px 12px;text-align:right;">CTR</th>
+                            <th style="padding:8px 12px;text-align:right;">Results</th>
+                            <th style="padding:8px 12px;text-align:right;">Cost/Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        adsets.forEach(adset => {
+            const ins = adset.insights?.data?.[0] || {};
+            const spend = parseFloat(ins.spend || 0);
+            const impressions = parseInt(ins.impressions || 0);
+            const clicks = parseInt(ins.clicks || 0);
+            const results = getResults(ins.actions);
+            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + '%' : '-';
+            const cpc = clicks > 0 ? '$' + (spend / clicks).toFixed(2) : '-';
+            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            const statusDot = adset.effective_status === 'ACTIVE' ? '🟢' : '⚪';
+            
+            tableHtml += `
+                <tr style="border-top:1px solid #e2e5f1;">
+                    <td style="padding:8px 12px;">${adset.name}</td>
+                    <td style="padding:8px 12px;">${statusDot}</td>
+                    <td style="padding:8px 12px;text-align:right;">$${spend.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                    <td style="padding:8px 12px;text-align:right;">${impressions.toLocaleString()}</td>
+                    <td style="padding:8px 12px;text-align:right;">${clicks.toLocaleString()}</td>
+                    <td style="padding:8px 12px;text-align:right;">${ctr}</td>
+                    <td style="padding:8px 12px;text-align:right;">${results}</td>
+                    <td style="padding:8px 12px;text-align:right;">${costPerResult}</td>
+                </tr>`;
+        });
+        
+        tableHtml += '</tbody></table></div></td>';
+        loadingRow.innerHTML = tableHtml;
+        
+    } catch(e) {
+        console.error('Ad set breakdown error:', e);
+        loadingRow.innerHTML = `<td colspan="${colCount}" style="padding:0"><div style="padding:12px 20px;color:#e53e3e;font-size:13px;">Error loading ad sets: ${e.message}</div></td>`;
     }
 }

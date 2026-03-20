@@ -2150,3 +2150,15 @@ table.resizable-table td {
     text-align: center;
 }
 .clinic-tooltip { background: #7c3aed !important; color: white !important; border: none !important; font-weight: bold !important; padding: 6px 12px !important; border-radius: 6px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; }
+
+/* Clickable campaign rows */
+#campaignBody tr[data-cid]:hover {
+    background-color: #f0f4ff !important;
+}
+#campaignBody tr[data-cid].expanded {
+    background-color: #eef0ff !important;
+}
+#campaignBody tr[data-cid].expanded td:first-child span {
+    display: inline-block;
+    transform: rotate(90deg);
+}
