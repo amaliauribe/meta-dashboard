@@ -276,50 +276,6 @@ function showDashboard() {
 }
 
 function initializeDashboard() {
-
-// Update date inputs to reflect the currently selected preset range
-function updateDateInputsForRange(range) {
-    const startInput = document.getElementById('startDate');
-    const endInput = document.getElementById('endDate');
-    if (!startInput || !endInput) return;
-    
-    const today = getESTDate();
-    let since, until;
-    
-    switch(range) {
-        case 'today':
-            since = until = formatDateEST(today);
-            break;
-        case 'yesterday':
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
-            since = until = formatDateEST(yesterday);
-            break;
-        case '7d':
-            until = formatDateEST(today);
-            const d7 = new Date(today);
-            d7.setDate(today.getDate() - 6);
-            since = formatDateEST(d7);
-            break;
-        case '14d':
-            until = formatDateEST(today);
-            const d14 = new Date(today);
-            d14.setDate(today.getDate() - 13);
-            since = formatDateEST(d14);
-            break;
-        case '30d':
-            until = formatDateEST(today);
-            const d30 = new Date(today);
-            d30.setDate(today.getDate() - 29);
-            since = formatDateEST(d30);
-            break;
-        default:
-            return; // custom or unknown — don't touch inputs
-    }
-    
-    startInput.value = since;
-    endInput.value = until;
-}
     document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionStorage.removeItem('loggedIn');
         location.reload();
@@ -331,8 +287,6 @@ function updateDateInputsForRange(range) {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentRange = btn.dataset.range;
-            // Update calendar inputs to reflect selected range
-            updateDateInputsForRange(currentRange);
             adsDataLoaded = false; // Reset ads data when date changes
             metaGeoDataLoaded = false; // Reset meta geo data when date changes
             bingDataLoaded = false; // Reset bing data when date changes
@@ -1038,8 +992,6 @@ function updateDateInputsForRange(range) {
         refreshPlatformPlacementData();
     });
     
-    // Set date inputs to reflect default range (7d) on load
-    updateDateInputsForRange(currentRange);
     // Load summary by default
     loadSummaryData();
 }
