@@ -9639,7 +9639,7 @@ async function toggleAdSetBreakdown(campaignId, row) {
             `${ACCOUNT_ID}/adsets?fields=name,status,effective_status,campaign_id,${insightsQuery}{spend,impressions,clicks,actions}&limit=100&filtering=[{"field":"campaign_id","operator":"EQUAL","value":"${campaignId}"}]`
         );
         
-        const adsets = (adsetData.data || []).filter(a => a.insights?.data?.[0]);
+        const adsets = (adsetData.data || []).filter(a => a.effective_status === 'ACTIVE' || a.insights?.data?.[0]);
         
         if (adsets.length === 0) {
             loadingRow.innerHTML = `<td colspan="${colCount}" style="padding:0"><div style="padding:12px 20px;color:#888;font-size:13px;">No ad set data found</div></td>`;
