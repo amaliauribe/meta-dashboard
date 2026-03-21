@@ -9636,7 +9636,7 @@ async function toggleAdSetBreakdown(campaignId, row) {
         }
         
         const adsetData = await apiCall(
-            `${ACCOUNT_ID}/adsets?fields=name,status,effective_status,campaign_id,${insightsQuery}{spend,impressions,clicks,actions}&limit=100&filtering=[{"field":"campaign_id","operator":"EQUAL","value":"${campaignId}"}]`
+            `${campaignId}/adsets?fields=name,status,effective_status,campaign_id,${insightsQuery}{spend,impressions,clicks,actions}&limit=100`
         );
         
         const adsets = (adsetData.data || []).filter(a => a.effective_status === 'ACTIVE' || a.insights?.data?.[0]);
