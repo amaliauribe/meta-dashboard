@@ -9679,8 +9679,8 @@ async function toggleAdSetBreakdown(campaignId, row) {
             const statusDot = adset.effective_status === 'ACTIVE' ? '🟢' : '⚪';
             
             tableHtml += `
-                <tr style="border-top:1px solid #e2e5f1;">
-                    <td style="padding:8px 12px;">${adset.name}</td>
+                <tr class="adset-row-clickable" data-adset-id="${adset.id}" data-adset-name="${adset.name}" style="border-top:1px solid #e2e5f1;cursor:pointer;" onclick="toggleDailyBreakdown('${adset.id}', '${adset.name.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}', this)">
+                    <td style="padding:8px 12px;"><span class="expand-arrow" style="color:#42b883;margin-right:5px;">▶</span>${adset.name}</td>
                     <td style="padding:8px 12px;">${statusDot}</td>
                     <td style="padding:8px 12px;text-align:right;">$${spend.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
                     <td style="padding:8px 12px;text-align:right;">${impressions.toLocaleString()}</td>
@@ -9698,4 +9698,223 @@ async function toggleAdSetBreakdown(campaignId, row) {
         console.error('Ad set breakdown error:', e);
         loadingRow.innerHTML = `<td colspan="${colCount}" style="padding:0"><div style="padding:12px 20px;color:#e53e3e;font-size:13px;">Error loading ad sets: ${e.message}</div></td>`;
     }
+}
+
+// Toggle daily breakdown for an ad set
+async function toggleDailyBreakdown(adsetId, adsetName, row) {
+    const expandArrow = row.querySelector('.expand-arrow');
+    const existingDetail = row.nextElementSibling;
+    
+    // Check if this ad set's breakdown is already open
+    if (existingDetail && existingDetail.classList.contains('daily-breakdown-row')) {
+        existingDetail.remove();
+        expandArrow.textContent = '▶';
+        return;
+    }
+    
+    // Remove any other open daily breakdowns
+    document.querySelectorAll('.daily-breakdown-row').forEach(r => r.remove());
+    document.querySelectorAll('.adset-row-clickable .expand-arrow').forEach(arrow => arrow.textContent = '▶');
+    
+    expandArrow.textContent = '▼';
+    
+    // Insert loading row
+    const loadingRow = document.createElement('tr');
+    loadingRow.className = 'daily-breakdown-row';
+    loadingRow.innerHTML = `<td colspan="8" style="padding:0;background:#f0f8ff;"><div style="padding:15px 20px;color:#666;font-size:13px;text-align:center;">Loading daily breakdown...</div></td>`;
+    row.after(loadingRow);
+    
+    try {
+        const range = dateRanges[currentRange];
+        let timeRange;
+        if (range.custom && customStartDate && customEndDate) {
+            timeRange = `{"since":"${customStartDate}","until":"${customEndDate}"}`;
+        } else if (range.preset) {
+            // For presets, calculate the actual date range
+            const today = getESTDate();
+            let since, until;
+            
+            if (range.preset === 'yesterday') {
+                since = new Date(today);
+                since.setDate(since.getDate() - 1);
+                until = new Date(since);
+            } else if (range.days) {
+                since = new Date(today);
+                since.setDate(today.getDate() - range.days + 1);
+                until = new Date(today);
+            } else {
+                since = new Date(today);
+                until = new Date(today);
+            }
+            
+            timeRange = `{"since":"${formatDateEST(since)}","until":"${formatDateEST(until)}"}`;
+        } else {
+            const today = getESTDate();
+            const since = new Date(today);
+            since.setDate(today.getDate() - range.days + 1);
+            timeRange = `{"since":"${formatDateEST(since)}","until":"${formatDateEST(today)}"}`;
+        }
+        
+        const dailyData = await apiCall(
+            `${ACCOUNT_ID}/insights?level=adset&fields=adset_name,spend,clicks,actions&time_increment=1&filtering=[{"field":"adset.id","operator":"IN","value":["${adsetId}"]}]&time_range=${timeRange}`
+        );
+        
+        if (!dailyData.data || dailyData.data.length === 0) {
+            loadingRow.innerHTML = `<td colspan="8" style="padding:0;background:#f0f8ff;"><div style="padding:15px 20px;color:#999;font-size:13px;text-align:center;font-style:italic;">No daily data found for this ad set</div></td>`;
+            return;
+        }
+        
+        // Sort by date descending
+        const sortedData = dailyData.data.sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
+        
+        // Generate unique chart ID
+        const chartId = `daily-chart-${adsetId}`;
+        
+        let breakdownHtml = `<td colspan="8" style="padding:0;background:#f0f8ff;">
+            <div style="padding:15px 20px;">
+                <h5 style="margin:0 0 15px 0;color:#42b883;font-size:14px;border-bottom:1px solid #42b883;padding-bottom:5px;">Daily Breakdown: ${adsetName}</h5>
+                <div style="display:flex;gap:20px;align-items:flex-start;">
+                    <div style="flex:1;min-width:300px;">
+                        <table style="width:100%;border-collapse:collapse;background:white;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.1);">
+                            <thead>
+                                <tr style="background:#42b883;color:white;">
+                                    <th style="padding:10px;text-align:left;font-weight:600;font-size:13px;">Date</th>
+                                    <th style="padding:10px;text-align:right;font-weight:600;font-size:13px;">Results</th>
+                                    <th style="padding:10px;text-align:right;font-weight:600;font-size:13px;">Cost/Result</th>
+                                    <th style="padding:10px;text-align:right;font-weight:600;font-size:13px;">Spend</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+        
+        const chartData = [];
+        
+        sortedData.forEach(day => {
+            const spend = parseFloat(day.spend || 0);
+            const results = getResults(day.actions);
+            const costPerResult = results > 0 ? '$' + (spend / results).toFixed(2) : '-';
+            const date = new Date(day.date_start).toLocaleDateString();
+            
+            breakdownHtml += `
+                <tr>
+                    <td style="padding:10px;border-bottom:1px solid #f0f0f0;font-size:13px;">${date}</td>
+                    <td style="padding:10px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;">${results}</td>
+                    <td style="padding:10px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;">${costPerResult}</td>
+                    <td style="padding:10px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;">$${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                </tr>
+            `;
+            
+            // Prepare chart data (reverse order for chart)
+            chartData.unshift({
+                date: date,
+                results: results,
+                spend: spend,
+                costPerResult: results > 0 ? spend / results : 0
+            });
+        });
+        
+        breakdownHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="flex:1;min-width:300px;">
+                        <canvas id="${chartId}" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </td>`;
+        
+        loadingRow.innerHTML = breakdownHtml;
+        
+        // Create the chart
+        setTimeout(() => createDailyBreakdownChart(chartId, chartData), 100);
+        
+    } catch (e) {
+        console.error('Error loading daily breakdown:', e);
+        loadingRow.innerHTML = `<td colspan="8" style="padding:0;background:#f0f8ff;"><div style="padding:15px 20px;color:#dc3545;font-size:13px;text-align:center;">Error loading daily breakdown: ${e.message}</div></td>`;
+    }
+}
+
+// Create chart for daily breakdown
+function createDailyBreakdownChart(chartId, data) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.date),
+            datasets: [{
+                label: 'Results',
+                data: data.map(d => d.results),
+                borderColor: '#1877f2',
+                backgroundColor: 'rgba(24, 119, 242, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: 'Cost per Result',
+                data: data.map(d => d.costPerResult),
+                borderColor: '#42b883',
+                backgroundColor: 'rgba(66, 184, 131, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Date',
+                        color: '#666'
+                    },
+                    ticks: {
+                        color: '#666'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Results',
+                        color: '#1877f2'
+                    },
+                    ticks: {
+                        color: '#1877f2'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Cost per Result ($)',
+                        color: '#42b883'
+                    },
+                    ticks: {
+                        color: '#42b883'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
 }

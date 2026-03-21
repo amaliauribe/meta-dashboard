@@ -2162,3 +2162,12 @@ table.resizable-table td {
     display: inline-block;
     transform: rotate(90deg);
 }
+
+/* Ad Set Daily Breakdown Styles */
+.adset-row-clickable:hover {
+    background-color: rgba(66, 184, 131, 0.05) !important;
+}
+
+.expand-arrow {
+    transition: transform 0.2s ease;
+}
