@@ -4867,6 +4867,110 @@ function calculateCorrelation(x, y) {
     return den === 0 ? 0 : num / den;
 }
 
+// ==================== Insurance Analytics (New) ====================
+app.get('/api/looker/insurance-analytics', async (req, res) => {
+    try {
+        const { startDate, endDate, location, insuranceType, insuranceName, trackingType } = req.query;
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+
+        // Date filter (used by all queries)
+        const dateFilter = {};
+        if (startDate && endDate) {
+            dateFilter[`${v}.lead_created_date_est_date`] = `${startDate} to ${endDate}`;
+        } else if (startDate) {
+            dateFilter[`${v}.lead_created_date_est_date`] = `after ${startDate}`;
+        }
+
+        // Full filters (date + user selections) for chart queries
+        const filters = { ...dateFilter };
+        if (location) filters[`${v}.location_lead`] = location;
+        if (insuranceType) filters[`${v}.insurance_type`] = insuranceType;
+        if (insuranceName) filters[`${v}.primary_insurance`] = insuranceName;
+        if (trackingType) filters[`${v}.tracking_type`] = trackingType;
+
+        // Run all 10 queries in parallel
+        const [
+            monthlyRaw,
+            insTotal, insBooked, insVerification, insCovered, insFulfilled,
+            locOptions, insTypeOptions, insNameOptions, trackOptions
+        ] = await Promise.all([
+            // Chart 1: monthly leads by source
+            lookerQuery(v,
+                [`${v}.lead_created_date_est_month`, `${v}.tracking_type`, `${v}.count`],
+                filters,
+                [`${v}.lead_created_date_est_month asc`],
+                500
+            ),
+            // Chart 2: insurance by status (5 queries)
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`],
+                filters, [`${v}.count desc`], 100),
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`],
+                { ...filters, [`${v}.is_booked`]: '1' }, [`${v}.count desc`], 100),
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`],
+                { ...filters, [`${v}.sent_to_verification`]: '1' }, [`${v}.count desc`], 100),
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`],
+                { ...filters, [`${v}.is_booked_covered`]: '1' }, [`${v}.count desc`], 100),
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`],
+                { ...filters, [`${v}.initial_fulfilled`]: '1' }, [`${v}.count desc`], 100),
+            // Filter options (date filter only)
+            lookerQuery(v, [`${v}.location_lead`, `${v}.count`], dateFilter, [`${v}.count desc`], 50),
+            lookerQuery(v, [`${v}.insurance_type`, `${v}.count`], dateFilter, [`${v}.count desc`], 20),
+            lookerQuery(v, [`${v}.primary_insurance`, `${v}.count`], dateFilter, [`${v}.count desc`], 200),
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.count`], dateFilter, [`${v}.count desc`], 20),
+        ]);
+
+        // Transform Chart 1 data
+        const monthlyBySource = monthlyRaw.map(row => ({
+            month: row[`${v}.lead_created_date_est_month`],
+            source: row[`${v}.tracking_type`],
+            count: row[`${v}.count`] || 0
+        }));
+
+        // Transform Chart 2 data: merge 5 stage queries into per-insurance object
+        const toMap = (arr) => {
+            const m = {};
+            for (const row of arr) {
+                const name = row[`${v}.primary_insurance`];
+                if (name) m[name] = row[`${v}.count`] || 0;
+            }
+            return m;
+        };
+        const totalMap = toMap(insTotal);
+        const bookedMap = toMap(insBooked);
+        const verificationMap = toMap(insVerification);
+        const coveredMap = toMap(insCovered);
+        const fulfilledMap = toMap(insFulfilled);
+
+        const insuranceByStatus = {};
+        for (const name of Object.keys(totalMap)) {
+            insuranceByStatus[name] = {
+                total: totalMap[name] || 0,
+                booked: bookedMap[name] || 0,
+                inVerification: verificationMap[name] || 0,
+                covered: coveredMap[name] || 0,
+                fulfilled: fulfilledMap[name] || 0
+            };
+        }
+
+        // Transform filter options
+        const extractValues = (arr, field) => arr
+            .map(r => r[`${v}.${field}`])
+            .filter(Boolean);
+
+        const filterOptions = {
+            locations: extractValues(locOptions, 'location_lead'),
+            insuranceTypes: extractValues(insTypeOptions, 'insurance_type'),
+            insuranceNames: extractValues(insNameOptions, 'primary_insurance'),
+            trackingTypes: extractValues(trackOptions, 'tracking_type')
+        };
+
+        res.json({ success: true, monthlyBySource, insuranceByStatus, filterOptions });
+    } catch (error) {
+        console.error('Insurance analytics error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

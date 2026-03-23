@@ -457,138 +457,64 @@
 
         </div><!-- End Funnels View -->
 
-        <!-- Insurance Funnel View -->
+        <!-- Insurance Analytics View -->
         <div id="insuranceFunnelView" class="view-content hidden">
             <section class="content-section">
-                <h2>🏥 Insurance Funnel Analysis</h2>
-                <p class="section-subtitle" id="insuranceDateRange">Full funnel by platform and insurance type</p>
-                
-                <!-- Loading indicator -->
-                <div id="insuranceLoading" class="loading">Loading insurance data...</div>
-                
-                <!-- KPI Cards -->
-                <section class="kpi-cards" id="insuranceKpis" style="display: none;">
-                    <div class="kpi-card">
-                        <div class="kpi-label">PPO Leads</div>
-                        <div class="kpi-value" id="insurancePpoLeads">0</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label">PPO Fulfilled</div>
-                        <div class="kpi-value" id="insurancePpoFulfilled">0</div>
-                    </div>
-                    <div class="kpi-card highlight">
-                        <div class="kpi-label">PPO Rate</div>
-                        <div class="kpi-value" id="insurancePpoRate">0%</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label">HMO Leads</div>
-                        <div class="kpi-value" id="insuranceHmoLeads">0</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label">HMO Fulfilled</div>
-                        <div class="kpi-value" id="insuranceHmoFulfilled">0</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label">HMO Rate</div>
-                        <div class="kpi-value" id="insuranceHmoRate">0%</div>
-                    </div>
-                </section>
+                <h2>🏥 Insurance Analytics</h2>
 
-                <!-- Insurance by Platform Cards -->
-                <div id="insurancePlatformCards" style="display: none; margin: 20px 0;">
-                    <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <h3 style="margin-bottom: 5px;">📊 Insurance Breakdown by Platform</h3>
-                        <p style="color: #64748b; font-size: 13px; margin-bottom: 15px;">l_f_s breakdown: PPO → HMO → Medicare → Unknown (with cost per lead)</p>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
-                            <!-- Meta Insurance Card -->
-                            <div class="mini-funnel-card" style="border-left: 4px solid #1877f2;">
-                                <h4 style="color: #1877f2; margin-bottom: 10px;">📘 Meta</h4>
-                                <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span id="insMetaLfs">0</span> <span id="insMetaCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>PPO</span><span id="insMetaPpo">0</span> <span id="insMetaCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>HMO</span><span id="insMetaHmo">0</span> <span id="insMetaCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Medicare</span><span id="insMetaMedicare">0</span> <span id="insMetaCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Unknown</span><span id="insMetaUnknown">0</span> <span id="insMetaCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                            </div>
-                            
-                            <!-- Google Insurance Card -->
-                            <div class="mini-funnel-card" style="border-left: 4px solid #ea4335;">
-                                <h4 style="color: #ea4335; margin-bottom: 10px;">🔴 Google</h4>
-                                <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span id="insGoogleLfs">0</span> <span id="insGoogleCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>PPO</span><span id="insGooglePpo">0</span> <span id="insGoogleCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>HMO</span><span id="insGoogleHmo">0</span> <span id="insGoogleCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Medicare</span><span id="insGoogleMedicare">0</span> <span id="insGoogleCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Unknown</span><span id="insGoogleUnknown">0</span> <span id="insGoogleCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                            </div>
-                            
-                            <!-- Bing Insurance Card -->
-                            <div class="mini-funnel-card" style="border-left: 4px solid #00a1f1;">
-                                <h4 style="color: #00a1f1; margin-bottom: 10px;">💎 Bing</h4>
-                                <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span id="insBingLfs">0</span> <span id="insBingCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>PPO</span><span id="insBingPpo">0</span> <span id="insBingCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>HMO</span><span id="insBingHmo">0</span> <span id="insBingCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Medicare</span><span id="insBingMedicare">0</span> <span id="insBingCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Unknown</span><span id="insBingUnknown">0</span> <span id="insBingCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                            </div>
-                            
-                            <!-- TikTok Insurance Card -->
-                            <div class="mini-funnel-card" style="border-left: 4px solid #ff0050;">
-                                <h4 style="color: #ff0050; margin-bottom: 10px;">🎵 TikTok</h4>
-                                <div class="mini-funnel-row highlight"><span>l_f_s (LookerML)</span><span id="insTiktokLfs">0</span> <span id="insTiktokCostPerLfs" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>PPO</span><span id="insTiktokPpo">0</span> <span id="insTiktokCostPerPpo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>HMO</span><span id="insTiktokHmo">0</span> <span id="insTiktokCostPerHmo" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Medicare</span><span id="insTiktokMedicare">0</span> <span id="insTiktokCostPerMedicare" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                                <div class="mini-funnel-row"><span>Unknown</span><span id="insTiktokUnknown">0</span> <span id="insTiktokCostPerUnknown" style="color: #3b82f6; font-size: 12px; margin-left: 8px;"></span></div>
-                            </div>
-                        </div>
+                <!-- Filter Bar -->
+                <div id="insAnalyticsFilters" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#1e293b; padding:14px 18px; border-radius:10px; margin-bottom:18px;">
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">Start Date</label>
+                        <input type="date" id="insStartDate" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px;">
                     </div>
-                </div>
-                
-                <!-- Charts Row -->
-                <div id="insuranceCharts" style="display: none; margin: 20px 0;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                            <h3 style="margin-bottom: 15px;">📊 PPO Leads by Platform</h3>
-                            <canvas id="ppoPlatformChart"></canvas>
-                        </div>
-                        <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                            <h3 style="margin-bottom: 15px;">📊 Insurance Mix by Platform</h3>
-                            <canvas id="insuranceMixChart"></canvas>
-                        </div>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">End Date</label>
+                        <input type="date" id="insEndDate" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px;">
                     </div>
-                </div>
-                
-                <!-- Platform Comparison Table -->
-                <div id="insuranceTableContainer" style="display: none; margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px;">🔥 Platform Performance by Insurance Type</h3>
-                    <div class="table-wrapper">
-                        <table id="insuranceTable">
-                            <thead>
-                                <tr>
-                                    <th>Platform</th>
-                                    <th>Insurance</th>
-                                    <th>Leads</th>
-                                    <th>Booked</th>
-                                    <th>Book Rate</th>
-                                    <th>Verified</th>
-                                    <th>Covered</th>
-                                    <th>Fulfilled</th>
-                                    <th>Fulfill Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody id="insuranceTableBody">
-                            </tbody>
-                        </table>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">Location</label>
+                        <select id="insLocation" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px; min-width:140px;">
+                            <option value="">All Locations</option>
+                        </select>
                     </div>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">Insurance Type</label>
+                        <select id="insInsuranceType" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px; min-width:120px;">
+                            <option value="">All Types</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">Insurance Name</label>
+                        <select id="insInsuranceName" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px; min-width:160px;">
+                            <option value="">All Insurances</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label style="font-size:11px; color:#94a3b8;">Source</label>
+                        <select id="insTrackingType" style="background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:5px 8px; font-size:13px; min-width:120px;">
+                            <option value="">All Sources</option>
+                        </select>
+                    </div>
+                    <button id="insApplyFilters" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:7px 18px; font-size:13px; cursor:pointer; font-weight:600;">Apply Filters</button>
                 </div>
-                
-                <!-- Insights Section -->
-                <div id="insuranceInsights" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
-                    <h3 style="margin-bottom: 15px;">💡 Key Insights</h3>
-                    <div id="insuranceInsightsList"></div>
+
+                <!-- Loading indicator -->
+                <div id="insuranceLoading" class="loading" style="display:none;">Loading insurance analytics...</div>
+
+                <!-- Chart 1: Monthly Stacked Bar -->
+                <div id="insMonthlyChartWrap" style="display:none; background:#1e293b; padding:20px; border-radius:12px; margin-bottom:18px;">
+                    <h3 style="margin-bottom:12px; color:#e2e8f0;">📊 Monthly Leads by Source</h3>
+                    <canvas id="insMonthlyChart"></canvas>
+                </div>
+
+                <!-- Chart 2: Insurance Funnel Horizontal Stacked Bar -->
+                <div id="insFunnelChartWrap" style="display:none; background:#1e293b; padding:20px; border-radius:12px; margin-bottom:18px;">
+                    <h3 style="margin-bottom:12px; color:#e2e8f0;">🏥 Insurance Breakdown by Name (Top 25)</h3>
+                    <canvas id="insFunnelChart"></canvas>
                 </div>
             </section>
-        </div><!-- End Insurance Funnel View -->
+        </div><!-- End Insurance Analytics View -->
 
         <!-- Heatmap View -->
         <div id="heatmapView" class="view-content hidden">
