@@ -505,13 +505,17 @@
                 <!-- Chart 1: Monthly Stacked Bar -->
                 <div id="insMonthlyChartWrap" style="display:none; background:#1e293b; padding:20px; border-radius:12px; margin-bottom:18px;">
                     <h3 style="margin-bottom:12px; color:#e2e8f0;">📊 Monthly Leads by Source</h3>
-                    <canvas id="insMonthlyChart"></canvas>
+                    <div style="position:relative; height:320px;">
+                        <canvas id="insMonthlyChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- Chart 2: Insurance Funnel Horizontal Stacked Bar -->
                 <div id="insFunnelChartWrap" style="display:none; background:#1e293b; padding:20px; border-radius:12px; margin-bottom:18px;">
                     <h3 style="margin-bottom:12px; color:#e2e8f0;">🏥 Insurance Breakdown by Name (Top 25)</h3>
-                    <canvas id="insFunnelChart"></canvas>
+                    <div style="position:relative; height:500px;">
+                        <canvas id="insFunnelChart"></canvas>
+                    </div>
                 </div>
             </section>
         </div><!-- End Insurance Analytics View -->

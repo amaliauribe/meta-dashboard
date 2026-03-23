@@ -6002,6 +6002,7 @@ async function loadInsuranceAnalytics() {
             data: { labels: months.map(m => m.slice(0, 7)), datasets: monthlyDatasets },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { labels: { color: '#e2e8f0' } }
                 },
@@ -6039,6 +6040,7 @@ async function loadInsuranceAnalytics() {
             options: {
                 indexAxis: 'y',
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { labels: { color: '#e2e8f0' } },
                     tooltip: {
