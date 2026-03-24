@@ -1329,29 +1329,43 @@ app.post('/api/tiktok/daily-performance', async (req, res) => {
         const { startDate: rawStart, endDate: rawEnd } = req.body;
         const { startDate, endDate } = validateTikTokDates(rawStart, rawEnd);
         
-        const params = new URLSearchParams({
-            advertiser_id: TIKTOK_CONFIG.adAccountId,
-            start_date: startDate,
-            end_date: endDate,
-            metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc']),
-            data_level: 'AUCTION_ADVERTISER',
-            report_type: 'BASIC',
-            dimensions: JSON.stringify(['stat_time_day'])
-        });
+        // Paginate to get all daily rows (TikTok default page_size is 10)
+        let allRows = [];
+        let page = 1;
+        const pageSize = 100;
+        let totalPages = 1;
         
-        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
-            headers: {
-                'Access-Token': TIKTOK_CONFIG.accessToken
+        while (page <= totalPages) {
+            const params = new URLSearchParams({
+                advertiser_id: TIKTOK_CONFIG.adAccountId,
+                start_date: startDate,
+                end_date: endDate,
+                metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'conversion', 'ctr', 'cpc']),
+                data_level: 'AUCTION_ADVERTISER',
+                report_type: 'BASIC',
+                dimensions: JSON.stringify(['stat_time_day']),
+                page_size: String(pageSize),
+                page: String(page)
+            });
+            
+            const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`, {
+                headers: {
+                    'Access-Token': TIKTOK_CONFIG.accessToken
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.code !== 0) {
+                throw new Error(result.message);
             }
-        });
-        
-        const result = await response.json();
-        
-        if (result.code !== 0) {
-            throw new Error(result.message);
+            
+            allRows = allRows.concat(result.data?.list || []);
+            totalPages = result.data?.page_info?.total_page || 1;
+            page++;
         }
         
-        const rows = (result.data?.list || []).map(row => ({
+        const rows = allRows.map(row => ({
             date: row.dimensions.stat_time_day,
             spend: parseFloat(row.metrics.spend) || 0,
             impressions: parseInt(row.metrics.impressions) || 0,
