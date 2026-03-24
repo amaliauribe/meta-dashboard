@@ -353,6 +353,7 @@ function updateDateInputsForRange(range) {
             heatmapDataLoaded = false; // Reset heatmap data when date changes
             clinicPerfDataLoaded = false; // Reset clinic performance data when date changes
             insuranceDataLoaded = false; // Reset insurance data when date changes
+            medworkFunnelDataLoaded = false; // Reset medwork funnel data when date changes
             if (currentView === 'summary') {
                 loadSummaryData();
             } else if (currentView === 'funnels') {
@@ -507,6 +508,7 @@ function updateDateInputsForRange(range) {
             document.getElementById('tiktokAdsView').classList.toggle('hidden', currentView !== 'tiktokAds');
             document.getElementById('oursPrivacyView').classList.toggle('hidden', currentView !== 'oursPrivacy');
             document.getElementById('clinicPerformanceView').classList.toggle('hidden', currentView !== 'clinicPerformance');
+            document.getElementById('medworkFunnelView').classList.toggle('hidden', currentView !== 'medworkFunnel');
             
             // Load data for the selected view
             if (currentView === 'heatmap' && !heatmapDataLoaded) {
@@ -574,6 +576,9 @@ function updateDateInputsForRange(range) {
             }
             if (currentView === 'clinicPerformance' && !clinicPerfDataLoaded) {
                 loadClinicPerformanceData();
+            }
+            if (currentView === 'medworkFunnel' && !medworkFunnelDataLoaded) {
+                loadMedworkFunnelData();
             }
         });
     });
@@ -9756,3 +9761,225 @@ function createDailyBreakdownChart(chartId, data) {
         }
     });
 }
+
+
+// ========== MEDWORK FUNNEL ==========
+
+const TRACKING_TYPE_LABELS = {
+    'mutm': 'Facebook',
+    'outm': 'Organic/Website',
+    'tutm': 'TikTok',
+    'gbputm': 'Google Business Profile',
+    'g1utm': 'Google Ads',
+    'butm': 'Bing',
+    'igoutm': 'Instagram',
+    'pts_mutm': 'PTS Meta',
+    'gbutm': 'Google Brand',
+    '': 'Unknown',
+    'null': 'Unknown'
+};
+
+const STAGE_LABELS = {
+    'l_f_s': 'Lead Form Submissions',
+    'is_booked': 'Booked',
+    'sent_to_verification': 'Sent to Verification',
+    'is_booked_covered': 'Booked & Covered',
+    'initial_fulfilled': 'Initial Fulfilled'
+};
+
+const STAGE_COLORS = {
+    'l_f_s': '#22c55e',
+    'is_booked': '#16a34a',
+    'sent_to_verification': '#15803d',
+    'is_booked_covered': '#166534',
+    'initial_fulfilled': '#14532d'
+};
+
+let medworkFunnelDataLoaded = false;
+let medworkFiltersLoaded = false;
+
+async function loadMedworkFilterOptions() {
+    if (medworkFiltersLoaded) return;
+    try {
+        const resp = await fetch('/api/medwork/filter-options');
+        const data = await resp.json();
+        if (data.success) {
+            const locSel = document.getElementById('medworkLocationFilter');
+            const insSel = document.getElementById('medworkInsuranceFilter');
+            
+            data.locations.forEach(loc => {
+                const opt = document.createElement('option');
+                opt.value = loc;
+                opt.textContent = loc;
+                locSel.appendChild(opt);
+            });
+            
+            data.insuranceTypes.forEach(ins => {
+                const opt = document.createElement('option');
+                opt.value = ins;
+                opt.textContent = ins;
+                insSel.appendChild(opt);
+            });
+            
+            medworkFiltersLoaded = true;
+        }
+    } catch (e) {
+        console.error('Failed to load medwork filter options:', e);
+    }
+}
+
+async function loadMedworkFunnelData() {
+    const loading = document.getElementById('medworkFunnelLoading');
+    const content = document.getElementById('medworkFunnelContent');
+    const tablesDiv = document.getElementById('medworkFunnelTables');
+    
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    
+    // Load filter options in parallel
+    loadMedworkFilterOptions();
+    
+    // Get date range (same pattern as other views)
+    const range = dateRanges[currentRange];
+    let startDate, endDate;
+    
+    if (range.custom && customStartDate && customEndDate) {
+        startDate = customStartDate;
+        endDate = customEndDate;
+    } else if (range.preset === 'today' || range.preset === 'yesterday') {
+        const today = getESTDate();
+        const d = new Date(today);
+        if (range.preset === 'yesterday') d.setDate(d.getDate() - 1);
+        startDate = endDate = formatDateEST(d);
+    } else if (range.days) {
+        const today = getESTDate();
+        const start = new Date(today);
+        start.setDate(today.getDate() - range.days + 1);
+        startDate = formatDateEST(start);
+        endDate = formatDateEST(today);
+    }
+
+    const location = document.getElementById('medworkLocationFilter').value;
+    const insuranceType = document.getElementById('medworkInsuranceFilter').value;
+
+    try {
+        const resp = await fetch('/api/medwork/weekly-funnel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate, location, insuranceType })
+        });
+        const data = await resp.json();
+        
+        if (!data.success) {
+            tablesDiv.innerHTML = `<div style="color: #ef4444; padding: 20px;">Error: ${data.error}</div>`;
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            return;
+        }
+
+        const { stages, weeks, trackingTypes } = data;
+
+        // Get current week (Monday of this week)
+        const now = getESTDate();
+        const dayOfWeek = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        const currentWeek = formatDateEST(monday);
+
+        // Format week header
+        const formatWeekHeader = (weekStr) => {
+            const d = new Date(weekStr + 'T00:00:00');
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `${months[d.getMonth()]} ${d.getDate()}`;
+        };
+
+        // Build tables for each stage
+        let html = '';
+        const stageOrder = ['l_f_s', 'is_booked', 'sent_to_verification', 'is_booked_covered', 'initial_fulfilled'];
+
+        stageOrder.forEach(stage => {
+            const stageRows = stages[stage] || [];
+            const color = STAGE_COLORS[stage];
+            const label = STAGE_LABELS[stage];
+
+            // Build pivot: tracking_type -> { week -> count }
+            const pivot = {};
+            const typeTotals = {};
+            stageRows.forEach(r => {
+                if (!pivot[r.tracking_type]) pivot[r.tracking_type] = {};
+                pivot[r.tracking_type][r.week] = (pivot[r.tracking_type][r.week] || 0) + r.count;
+                typeTotals[r.tracking_type] = (typeTotals[r.tracking_type] || 0) + r.count;
+            });
+
+            // Sort tracking types by total desc
+            const sortedTypes = Object.keys(pivot).sort((a, b) => (typeTotals[b] || 0) - (typeTotals[a] || 0));
+
+            // Grand total
+            const grandTotal = Object.values(typeTotals).reduce((a, b) => a + b, 0);
+
+            html += `<section class="table-section" style="margin-bottom: 24px;">`;
+            html += `<h2 style="color: ${color}; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 12px; height: 12px; border-radius: 3px; background: ${color}; display: inline-block;"></span>
+                ${label} <span style="font-size: 14px; color: #94a3b8; font-weight: normal;">(Total: ${grandTotal.toLocaleString()})</span>
+            </h2>`;
+            html += `<div style="overflow-x: auto;">`;
+            html += `<table class="data-table" style="min-width: 100%; white-space: nowrap;">`;
+            
+            // Header row
+            html += `<thead><tr><th style="position: sticky; left: 0; background: #1e293b; z-index: 2; min-width: 140px;">Source</th>`;
+            weeks.forEach(w => {
+                const isCurrent = w === currentWeek;
+                html += `<th style="text-align: right; min-width: 70px;${isCurrent ? ' background: #1e3a5f; color: #60a5fa;' : ''}">${formatWeekHeader(w)}</th>`;
+            });
+            html += `<th style="text-align: right; min-width: 80px; font-weight: 700; border-left: 2px solid #475569;">Total</th></tr></thead>`;
+            
+            // Data rows
+            html += `<tbody>`;
+            sortedTypes.forEach(type => {
+                const friendly = TRACKING_TYPE_LABELS[type] || type || 'Unknown';
+                html += `<tr><td style="position: sticky; left: 0; background: #0f172a; z-index: 1; font-weight: 500;">${friendly}</td>`;
+                weeks.forEach(w => {
+                    const val = pivot[type][w] || 0;
+                    const isCurrent = w === currentWeek;
+                    html += `<td style="text-align: right;${isCurrent ? ' background: rgba(30,58,95,0.3);' : ''}${val === 0 ? ' color: #475569;' : ''}">${val > 0 ? val.toLocaleString() : '-'}</td>`;
+                });
+                html += `<td style="text-align: right; font-weight: 700; border-left: 2px solid #475569;">${(typeTotals[type] || 0).toLocaleString()}</td></tr>`;
+            });
+
+            // Totals row
+            html += `<tr style="font-weight: 700; border-top: 2px solid #475569; background: rgba(30,41,59,0.5);"><td style="position: sticky; left: 0; background: #1e293b; z-index: 1;">Total</td>`;
+            weeks.forEach(w => {
+                const weekTotal = sortedTypes.reduce((sum, type) => sum + (pivot[type][w] || 0), 0);
+                const isCurrent = w === currentWeek;
+                html += `<td style="text-align: right;${isCurrent ? ' background: rgba(30,58,95,0.3);' : ''}">${weekTotal > 0 ? weekTotal.toLocaleString() : '-'}</td>`;
+            });
+            html += `<td style="text-align: right; border-left: 2px solid #475569;">${grandTotal.toLocaleString()}</td></tr>`;
+            html += `</tbody></table></div></section>`;
+        });
+
+        if (weeks.length === 0) {
+            html = '<div style="color: #94a3b8; padding: 40px; text-align: center;">No data found for the selected date range.</div>';
+        }
+
+        tablesDiv.innerHTML = html;
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        medworkFunnelDataLoaded = true;
+
+    } catch (error) {
+        console.error('Medwork funnel load error:', error);
+        tablesDiv.innerHTML = `<div style="color: #ef4444; padding: 20px;">Failed to load data: ${error.message}</div>`;
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    }
+}
+
+// Wire up medwork filter dropdowns
+document.getElementById('medworkLocationFilter')?.addEventListener('change', () => {
+    medworkFunnelDataLoaded = false;
+    loadMedworkFunnelData();
+});
+document.getElementById('medworkInsuranceFilter')?.addEventListener('change', () => {
+    medworkFunnelDataLoaded = false;
+    loadMedworkFunnelData();
+});

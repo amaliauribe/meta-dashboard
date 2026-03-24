@@ -98,6 +98,7 @@
             </nav>
             
                 <div class="nav-section">
+                    <button class="nav-item nav-item-main" data-view="medworkFunnel">📋 Medwork Funnel</button>
                     <button class="nav-item nav-item-main" data-view="oursPrivacy">🔒 Ours Privacy</button>
                     <button class="nav-item nav-item-main" data-view="clinicPerformance">🏥 Clinic Performance</button>
                 </div>
@@ -2308,12 +2309,38 @@
             </section>
         </div><!-- End Clinic Performance View -->
 
+        <!-- Medwork Funnel View -->
+        <div id="medworkFunnelView" class="view-content hidden">
+            <h1>📋 Medwork Funnel</h1>
+            <p class="section-subtitle">Weekly lead funnel breakdown by source</p>
+            
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Location</label>
+                    <select id="medworkLocationFilter" style="background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 13px;">
+                        <option value="all">All Locations</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Insurance Type</label>
+                    <select id="medworkInsuranceFilter" style="background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 13px;">
+                        <option value="all">All Insurance Types</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="medworkFunnelLoading" class="loading">Loading funnel data...</div>
+            <div id="medworkFunnelContent" style="display: none;">
+                <div id="medworkFunnelTables"></div>
+            </div>
+        </div><!-- End Medwork Funnel View -->
+
             <footer>
                 <p>Last updated: <span id="lastUpdate">-</span></p>
                 <p>Data source: Meta, Microsoft & Google Advertising APIs</p>
             </footer>
         </main><!-- End Main Content -->
     </div>
-    <script src="dashboard.js?v=1773237626"></script>
+    <script src="dashboard.js?v=1774367431"></script>
 </body>
 </html>

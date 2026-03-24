@@ -4985,6 +4985,271 @@ app.get('/api/looker/insurance-analytics', async (req, res) => {
     }
 });
 
+
+// ========== MEDWORK FUNNEL (with SQLite caching) ==========
+
+db.exec(`
+    CREATE TABLE IF NOT EXISTS medwork_cache (
+        week TEXT NOT NULL,
+        tracking_type TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        location_filter TEXT NOT NULL DEFAULT 'all',
+        insurance_filter TEXT NOT NULL DEFAULT 'all',
+        count INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (week, tracking_type, stage, location_filter, insurance_filter)
+    );
+    CREATE INDEX IF NOT EXISTS idx_medwork_cache_week ON medwork_cache(week);
+    CREATE INDEX IF NOT EXISTS idx_medwork_cache_filters ON medwork_cache(location_filter, insurance_filter);
+`);
+
+const upsertMedworkStmt = db.prepare(`
+    INSERT OR REPLACE INTO medwork_cache (week, tracking_type, stage, location_filter, insurance_filter, count, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+`);
+
+const getMedworkCacheStmt = db.prepare(`
+    SELECT * FROM medwork_cache 
+    WHERE week >= ? AND week <= ? AND location_filter = ? AND insurance_filter = ?
+    ORDER BY week, tracking_type, stage
+`);
+
+const getMedworkCachedWeeksStmt = db.prepare(`
+    SELECT DISTINCT week FROM medwork_cache 
+    WHERE week >= ? AND week <= ? AND location_filter = ? AND insurance_filter = ?
+`);
+
+// Fetch medwork funnel data from Looker for a given date range and filters
+async function fetchMedworkFromLooker(startDate, endDate, location, insuranceType) {
+    const v = 'fct_leads_funnel_marketing_phi_exclude';
+    const fields = [`${v}.tracking_type`, `${v}.lead_created_date_est_week`, `${v}.count`];
+    const sorts = [`${v}.tracking_type`];
+    
+    const dateFilter = {
+        [`${v}.lead_created_date_est_date`]: startDate === endDate ? startDate : `${startDate} to ${endDate}`
+    };
+    
+    const optionalFilters = {};
+    if (location && location !== 'all') {
+        optionalFilters[`${v}.location_lead`] = location;
+    }
+    if (insuranceType && insuranceType !== 'all') {
+        optionalFilters[`${v}.insurance_type`] = insuranceType;
+    }
+
+    const baseFilters = { ...dateFilter, [`${v}.event`]: 'l_f_s', ...optionalFilters };
+
+    const [lfs, isBooked, sentToVerification, isBookedCovered, initialFulfilled] = await Promise.all([
+        lookerQuery(v, fields, baseFilters, sorts, 5000),
+        lookerQuery(v, fields, { ...baseFilters, [`${v}.is_booked`]: '1' }, sorts, 5000),
+        lookerQuery(v, fields, { ...baseFilters, [`${v}.sent_to_verification`]: '1' }, sorts, 5000),
+        lookerQuery(v, fields, { ...baseFilters, [`${v}.is_booked_covered`]: '1' }, sorts, 5000),
+        lookerQuery(v, fields, { ...baseFilters, [`${v}.initial_fulfilled`]: '1' }, sorts, 5000)
+    ]);
+
+    const normalize = (arr) => arr.map(row => ({
+        tracking_type: row[`${v}.tracking_type`] || '',
+        week: row[`${v}.lead_created_date_est_week`] || '',
+        count: parseInt(row[`${v}.count`]) || 0
+    }));
+
+    return {
+        l_f_s: normalize(lfs),
+        is_booked: normalize(isBooked),
+        sent_to_verification: normalize(sentToVerification),
+        is_booked_covered: normalize(isBookedCovered),
+        initial_fulfilled: normalize(initialFulfilled)
+    };
+}
+
+// Save fetched medwork data into SQLite cache
+function cacheMedworkData(stages, locationFilter, insuranceFilter) {
+    const upsertMany = db.transaction((rows) => {
+        for (const row of rows) {
+            upsertMedworkStmt.run(row.week, row.tracking_type, row.stage, row.location_filter, row.insurance_filter, row.count);
+        }
+    });
+
+    const rows = [];
+    for (const [stage, entries] of Object.entries(stages)) {
+        for (const entry of entries) {
+            if (entry.week) {
+                rows.push({
+                    week: entry.week,
+                    tracking_type: entry.tracking_type,
+                    stage,
+                    location_filter: locationFilter || 'all',
+                    insurance_filter: insuranceFilter || 'all',
+                    count: entry.count
+                });
+            }
+        }
+    }
+    if (rows.length > 0) {
+        upsertMany(rows);
+        console.log(`[MedworkCache] Cached ${rows.length} rows (loc=${locationFilter}, ins=${insuranceFilter})`);
+    }
+}
+
+// Read medwork cache and build stages object
+function readMedworkCache(startWeek, endWeek, locationFilter, insuranceFilter) {
+    const rows = getMedworkCacheStmt.all(startWeek, endWeek, locationFilter, insuranceFilter);
+    const stages = {
+        l_f_s: [], is_booked: [], sent_to_verification: [], is_booked_covered: [], initial_fulfilled: []
+    };
+    for (const row of rows) {
+        if (stages[row.stage]) {
+            stages[row.stage].push({
+                tracking_type: row.tracking_type,
+                week: row.week,
+                count: row.count
+            });
+        }
+    }
+    return stages;
+}
+
+// Get Monday of a given date's week (ISO week, Mon=start)
+function getWeekMonday(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay();
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+    d.setDate(diff);
+    return d.toISOString().split('T')[0];
+}
+
+app.post('/api/medwork/weekly-funnel', async (req, res) => {
+    try {
+        const { startDate, endDate, location, insuranceType } = req.body;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, error: 'startDate and endDate are required' });
+        }
+
+        const locFilter = location || 'all';
+        const insFilter = insuranceType || 'all';
+
+        // Calculate week boundaries
+        const startWeek = getWeekMonday(startDate);
+        // endWeek: the Monday of the week containing endDate
+        const endWeek = getWeekMonday(endDate);
+
+        // Current week Monday (for determining what's "recent")
+        const today = new Date().toISOString().split('T')[0];
+        const currentWeekMonday = getWeekMonday(today);
+        // Previous week Monday
+        const prevWeekDate = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+        const prevWeekMonday = getWeekMonday(prevWeekDate);
+
+        // Check what weeks we have cached
+        const cachedWeeks = new Set(
+            getMedworkCachedWeeksStmt.all(startWeek, endWeek, locFilter, insFilter)
+                .map(r => r.week)
+        );
+
+        // Determine which weeks need fresh data:
+        // - Any week not in cache
+        // - Current week (always refresh)
+        // - Previous week (refresh in case of late data)
+        const allWeeks = [];
+        let w = new Date(startWeek + 'T12:00:00');
+        const wEnd = new Date(endWeek + 'T12:00:00');
+        while (w <= wEnd) {
+            allWeeks.push(w.toISOString().split('T')[0]);
+            w.setDate(w.getDate() + 7);
+        }
+
+        const weeksToFetch = allWeeks.filter(wk => 
+            !cachedWeeks.has(wk) || wk === currentWeekMonday || wk === prevWeekMonday
+        );
+
+        // Read existing cache
+        let stages = readMedworkCache(startWeek, endWeek, locFilter, insFilter);
+
+        if (weeksToFetch.length > 0) {
+            // Determine contiguous date range to fetch
+            const fetchStart = weeksToFetch[0]; // earliest Monday
+            const lastFetchWeek = weeksToFetch[weeksToFetch.length - 1];
+            // End of last week to fetch = that Monday + 6 days, but cap at endDate
+            const lastWeekEnd = new Date(lastFetchWeek + 'T12:00:00');
+            lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
+            const fetchEnd = lastWeekEnd.toISOString().split('T')[0] < endDate 
+                ? lastWeekEnd.toISOString().split('T')[0] 
+                : endDate;
+
+            console.log(`[MedworkCache] Fetching ${weeksToFetch.length} weeks from Looker (${fetchStart} to ${fetchEnd})`);
+            
+            try {
+                const freshStages = await fetchMedworkFromLooker(fetchStart, fetchEnd, locFilter, insFilter);
+                
+                // Cache the fresh data
+                cacheMedworkData(freshStages, locFilter, insFilter);
+
+                // Re-read full cache to get merged data
+                stages = readMedworkCache(startWeek, endWeek, locFilter, insFilter);
+            } catch (apiErr) {
+                console.error('[MedworkCache] Looker fetch failed, serving stale cache:', apiErr.message);
+                // We'll serve whatever cache we have
+            }
+        } else {
+            console.log(`[MedworkCache] All ${allWeeks.length} weeks served from cache`);
+        }
+
+        // Collect all unique weeks and tracking types from the result
+        const weeksSet = new Set();
+        const typesSet = new Set();
+        Object.values(stages).forEach(rows => {
+            rows.forEach(r => {
+                if (r.week) weeksSet.add(r.week);
+                typesSet.add(r.tracking_type);
+            });
+        });
+
+        const weeks = Array.from(weeksSet).sort();
+        const trackingTypes = Array.from(typesSet).sort();
+
+        res.json({ success: true, stages, weeks, trackingTypes, cached: weeksToFetch.length === 0 });
+    } catch (error) {
+        console.error('Medwork weekly funnel error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/medwork/filter-options', async (req, res) => {
+    try {
+        const v = 'fct_leads_funnel_marketing_phi_exclude';
+        
+        const [locations, insuranceTypes] = await Promise.all([
+            lookerQuery(v, [`${v}.location_lead`], { [`${v}.event`]: 'l_f_s' }, [`${v}.location_lead`], 500),
+            lookerQuery(v, [`${v}.insurance_type`], { [`${v}.event`]: 'l_f_s' }, [`${v}.insurance_type`], 500)
+        ]);
+
+        const locationValues = locations
+            .map(r => r[`${v}.location_lead`] || '')
+            .filter(v => v)
+            .sort();
+        const insuranceTypeValues = insuranceTypes
+            .map(r => r[`${v}.insurance_type`] || '')
+            .filter(v => v)
+            .sort();
+
+        res.json({ success: true, locations: locationValues, insuranceTypes: insuranceTypeValues });
+    } catch (error) {
+        console.error('Medwork filter options error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/medwork/cache-status', (req, res) => {
+    const stats = db.prepare(`
+        SELECT COUNT(DISTINCT week) as weeks, MIN(week) as earliest, MAX(week) as latest,
+               COUNT(*) as rows, MAX(updated_at) as last_updated
+        FROM medwork_cache
+    `).get();
+    res.json({ success: true, ...stats });
+});
+
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
