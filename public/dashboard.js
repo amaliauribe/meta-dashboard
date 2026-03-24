@@ -1886,8 +1886,9 @@ function filterAdSearchHandler(query) {
     const labels = document.querySelectorAll('#filterAdOptions label');
     const q = query.toLowerCase();
     labels.forEach(label => {
-        const text = label.textContent.toLowerCase();
-        label.style.display = text.includes(q) ? 'flex' : 'none';
+        const checkbox = label.querySelector('input[type="checkbox"]');
+        const fullName = (checkbox ? checkbox.value : label.textContent).toLowerCase();
+        label.style.display = fullName.includes(q) ? 'flex' : 'none';
     });
 }
 
