@@ -1014,7 +1014,20 @@ function updateDateInputsForRange(range) {
     filterAdBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         filterAdDropdown.style.display = filterAdDropdown.style.display === 'none' ? 'block' : 'none';
+        if (filterAdDropdown.style.display === 'block') {
+            const searchInput = document.getElementById('filterAdSearch');
+            if (searchInput) { searchInput.value = ''; filterAdSearchHandler(''); searchInput.focus(); }
+        }
     });
+    
+    // Ad search bar filtering
+    const filterAdSearchInput = document.getElementById('filterAdSearch');
+    if (filterAdSearchInput) {
+        filterAdSearchInput.addEventListener('input', (e) => {
+            filterAdSearchHandler(e.target.value);
+        });
+        filterAdSearchInput.addEventListener('click', (e) => e.stopPropagation());
+    }
     
     document.addEventListener('click', (e) => {
         if (!filterAdDropdown.contains(e.target) && e.target !== filterAdBtn) {
@@ -1867,6 +1880,15 @@ function updateAdDropdown() {
         filterAds = filterAds.filter(ad => ads.includes(ad));
         updateFilterAdLabel();
     }
+}
+
+function filterAdSearchHandler(query) {
+    const labels = document.querySelectorAll('#filterAdOptions label');
+    const q = query.toLowerCase();
+    labels.forEach(label => {
+        const text = label.textContent.toLowerCase();
+        label.style.display = text.includes(q) ? 'flex' : 'none';
+    });
 }
 
 function updateFilterAdsFromCheckboxes() {
