@@ -3462,17 +3462,22 @@ app.post('/api/summary/daily', async (req, res) => {
     const cached = { meta: [], google: [], bing: [] };
     const uncached = [];
 
+    const yesterdayDate = new Date(today + 'T00:00:00');
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = yesterdayDate.toISOString().slice(0, 10);
+
     for (const date of allDates) {
         if (date === today && todaySpendCache.date === today && Date.now() - todaySpendCache.ts < 5*60*1000) {
             cached.meta.push(todaySpendCache.data.meta);
             cached.google.push(todaySpendCache.data.google);
             cached.bing.push(todaySpendCache.data.bing);
-        } else if (date !== today) {
+        } else if (date === today || date === yesterday) {
+            // Always fetch today and yesterday fresh from APIs
+            uncached.push(date);
+        } else {
             const c = readSpendCache(date);
             if (c) { cached.meta.push(c.meta); cached.google.push(c.google); cached.bing.push(c.bing); }
             else uncached.push(date);
-        } else {
-            uncached.push(date);
         }
     }
 
