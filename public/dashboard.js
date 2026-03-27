@@ -3249,61 +3249,39 @@ async function loadFunnelsData() {
 async function fetchPlatformSpend(startDate, endDate, idx) {
     const result = { meta: 0, google: 0, bing: 0, tiktok: 0 };
     
-    try {
-        // Fetch Meta spend
-        const metaUrl = `${BASE_URL}/${API_VERSION}/${ACCOUNT_ID}/insights?fields=spend&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${ACCESS_TOKEN}`;
-        const metaRes = await fetch(metaUrl);
-        const metaData = await metaRes.json();
-        if (metaData.data && metaData.data[0]) {
-            result.meta = parseFloat(metaData.data[0].spend) || 0;
-        }
-    } catch (e) {
-        console.error('Meta spend error:', e);
-    }
+    // Use cached server endpoints for all platforms (much faster)
+    const fetchOpts = (body) => ({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
     
     try {
-        // Fetch Google spend
-        const googleRes = await fetch('/api/google/account-performance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate })
-        });
-        const googleData = await googleRes.json();
-        if (googleData && !googleData.error) {
-            result.google = parseFloat(googleData.spend) || 0;
+        const [metaRes, googleRes, bingRes, tiktokRes] = await Promise.all([
+            fetch('/api/meta/account-performance', fetchOpts({ startDate, endDate })).catch(() => null),
+            fetch('/api/google/account-performance', fetchOpts({ startDate, endDate })).catch(() => null),
+            fetch('/api/bing/account-performance', fetchOpts({ startDate, endDate })).catch(() => null),
+            fetch('/api/tiktok/account-performance', fetchOpts({ startDate, endDate })).catch(() => null)
+        ]);
+        
+        if (metaRes) {
+            const d = await metaRes.json().catch(() => ({}));
+            result.meta = parseFloat(d.spend) || 0;
+        }
+        if (googleRes) {
+            const d = await googleRes.json().catch(() => ({}));
+            if (!d.error) result.google = parseFloat(d.spend) || 0;
+        }
+        if (bingRes) {
+            const d = await bingRes.json().catch(() => ({}));
+            if (!d.error) result.bing = parseFloat(d.spend) || 0;
+        }
+        if (tiktokRes) {
+            const d = await tiktokRes.json().catch(() => ({}));
+            if (!d.error) result.tiktok = parseFloat(d.spend) || 0;
         }
     } catch (e) {
-        console.error('Google spend error:', e);
-    }
-    
-    try {
-        // Fetch Bing spend
-        const bingRes = await fetch('/api/bing/account-performance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate })
-        });
-        const bingData = await bingRes.json();
-        if (bingData && !bingData.error) {
-            result.bing = parseFloat(bingData.spend) || 0;
-        }
-    } catch (e) {
-        console.error('Bing spend error:', e);
-    }
-    
-    try {
-        // Fetch TikTok spend
-        const tiktokRes = await fetch('/api/tiktok/account-performance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate })
-        });
-        const tiktokData = await tiktokRes.json();
-        if (tiktokData && !tiktokData.error) {
-            result.tiktok = parseFloat(tiktokData.spend) || 0;
-        }
-    } catch (e) {
-        console.error('TikTok spend error:', e);
+        console.error('Platform spend error:', e);
     }
     
     return result;
