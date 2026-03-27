@@ -976,7 +976,15 @@ app.get("/api/db/stats", (req, res) => {
     });
 });
 
-app.use(express.static('public'));
+app.use(express.static('public', {
+    maxAge: 0,
+    etag: false,
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js') || filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+    }
+}));
 
 // Google Ads API Configuration
 const GOOGLE_ADS_CONFIG = {
