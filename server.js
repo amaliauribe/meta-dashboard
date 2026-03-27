@@ -41,6 +41,74 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_webhooks_event ON webhooks(event_name);
     CREATE INDEX IF NOT EXISTS idx_webhooks_source ON webhooks(source);
     CREATE INDEX IF NOT EXISTS idx_webhooks_visitor ON webhooks(visitor_id);
+    
+    -- Platform cache tables for improved performance
+    CREATE TABLE IF NOT EXISTS platform_daily_cache (
+        platform TEXT NOT NULL,
+        date TEXT NOT NULL,
+        spend REAL DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        clicks INTEGER DEFAULT 0,
+        conversions REAL DEFAULT 0,
+        conversion_value REAL DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (platform, date)
+    );
+    
+    CREATE TABLE IF NOT EXISTS campaign_daily_cache (
+        platform TEXT NOT NULL,
+        campaign_id TEXT NOT NULL,
+        campaign_name TEXT NOT NULL,
+        date TEXT NOT NULL,
+        spend REAL DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        clicks INTEGER DEFAULT 0,
+        conversions REAL DEFAULT 0,
+        conversion_value REAL DEFAULT 0,
+        status TEXT DEFAULT '',
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (platform, campaign_id, date)
+    );
+    
+    CREATE TABLE IF NOT EXISTS ad_daily_cache (
+        platform TEXT NOT NULL,
+        ad_id TEXT NOT NULL,
+        ad_name TEXT NOT NULL,
+        campaign_id TEXT NOT NULL,
+        campaign_name TEXT NOT NULL,
+        date TEXT NOT NULL,
+        spend REAL DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        clicks INTEGER DEFAULT 0,
+        conversions REAL DEFAULT 0,
+        conversion_value REAL DEFAULT 0,
+        creative_url TEXT DEFAULT '',
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (platform, ad_id, date)
+    );
+    
+    CREATE TABLE IF NOT EXISTS keyword_daily_cache (
+        platform TEXT NOT NULL,
+        keyword TEXT NOT NULL,
+        campaign_id TEXT NOT NULL,
+        campaign_name TEXT NOT NULL,
+        ad_group_id TEXT DEFAULT '',
+        ad_group_name TEXT DEFAULT '',
+        date TEXT NOT NULL,
+        spend REAL DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        clicks INTEGER DEFAULT 0,
+        conversions REAL DEFAULT 0,
+        conversion_value REAL DEFAULT 0,
+        quality_score INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (platform, keyword, campaign_id, ad_group_id, date)
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_platform_daily_platform_date ON platform_daily_cache(platform, date);
+    CREATE INDEX IF NOT EXISTS idx_campaign_daily_platform_date ON campaign_daily_cache(platform, date);
+    CREATE INDEX IF NOT EXISTS idx_ad_daily_platform_date ON ad_daily_cache(platform, date);
+    CREATE INDEX IF NOT EXISTS idx_keyword_daily_platform_date ON keyword_daily_cache(platform, date);
 `);
 
 // Prepared statements for performance
@@ -50,6 +118,47 @@ const insertStmt = db.prepare(`
 `);
 
 const countStmt = db.prepare('SELECT COUNT(*) as count FROM webhooks');
+
+// Cache prepared statements
+const platformCacheSelectStmt = db.prepare(`
+    SELECT * FROM platform_daily_cache WHERE platform = ? AND date = ?
+`);
+
+const platformCacheInsertStmt = db.prepare(`
+    INSERT OR REPLACE INTO platform_daily_cache 
+    (platform, date, spend, impressions, clicks, conversions, conversion_value)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+const campaignCacheSelectStmt = db.prepare(`
+    SELECT * FROM campaign_daily_cache WHERE platform = ? AND date = ?
+`);
+
+const campaignCacheInsertStmt = db.prepare(`
+    INSERT OR REPLACE INTO campaign_daily_cache 
+    (platform, campaign_id, campaign_name, date, spend, impressions, clicks, conversions, conversion_value, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const adCacheSelectStmt = db.prepare(`
+    SELECT * FROM ad_daily_cache WHERE platform = ? AND date = ?
+`);
+
+const adCacheInsertStmt = db.prepare(`
+    INSERT OR REPLACE INTO ad_daily_cache 
+    (platform, ad_id, ad_name, campaign_id, campaign_name, date, spend, impressions, clicks, conversions, conversion_value, creative_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const keywordCacheSelectStmt = db.prepare(`
+    SELECT * FROM keyword_daily_cache WHERE platform = ? AND date = ?
+`);
+
+const keywordCacheInsertStmt = db.prepare(`
+    INSERT OR REPLACE INTO keyword_daily_cache 
+    (platform, keyword, campaign_id, campaign_name, ad_group_id, ad_group_name, date, spend, impressions, clicks, conversions, conversion_value, quality_score)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
 
 // Save webhook to SQLite
 function saveWebhookToDb(entry) {
@@ -111,6 +220,638 @@ function migrateJsonToDb() {
 // Run migration
 migrateJsonToDb();
 
+// ==================== Cache Management Functions ====================
+
+// Helper function to get date range array
+function getDateRangeArray(startDate, endDate) {
+    const dates = [];
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
+    while (start <= end) {
+        dates.push(start.toISOString().slice(0, 10));
+        start.setDate(start.getDate() + 1);
+    }
+    return dates;
+}
+
+// Helper function to get dates that need fresh API calls (today + yesterday)
+function getCacheableAndFreshDates(allDates, today) {
+    const yesterday = new Date(today + 'T00:00:00');
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    
+    const cacheableDates = allDates.filter(date => date !== today && date !== yesterdayStr);
+    const alwaysFreshDates = allDates.filter(date => date === today || date === yesterdayStr);
+    
+    return { cacheableDates, freshDates: alwaysFreshDates };
+}
+
+// Cache functions for platform data
+function getCachedPlatformData(platform, dates) {
+    const cached = [];
+    const uncached = [];
+    
+    for (const date of dates) {
+        const row = platformCacheSelectStmt.get(platform, date);
+        if (row) {
+            cached.push({
+                date: row.date,
+                spend: row.spend,
+                impressions: row.impressions,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                conversion_value: row.conversion_value
+            });
+        } else {
+            uncached.push(date);
+        }
+    }
+    
+    return { cached, uncached };
+}
+
+function cachePlatformData(platform, data) {
+    const insert = db.transaction((rows) => {
+        for (const row of rows) {
+            platformCacheInsertStmt.run(
+                platform,
+                row.date,
+                row.spend || 0,
+                row.impressions || 0,
+                row.clicks || 0,
+                row.conversions || 0,
+                row.conversion_value || 0
+            );
+        }
+    });
+    
+    insert(data);
+}
+
+// Cache functions for campaign data
+function getCachedCampaignData(platform, dates) {
+    const cached = [];
+    const uncached = [];
+    
+    for (const date of dates) {
+        const rows = campaignCacheSelectStmt.all(platform, date);
+        if (rows.length > 0) {
+            cached.push(...rows.map(row => ({
+                date: row.date,
+                campaign_id: row.campaign_id,
+                campaign_name: row.campaign_name,
+                spend: row.spend,
+                impressions: row.impressions,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                conversion_value: row.conversion_value,
+                status: row.status
+            })));
+        } else {
+            uncached.push(date);
+        }
+    }
+    
+    return { cached, uncached };
+}
+
+function cacheCampaignData(platform, data) {
+    const insert = db.transaction((rows) => {
+        for (const row of rows) {
+            campaignCacheInsertStmt.run(
+                platform,
+                row.campaign_id || '',
+                row.campaign_name || '',
+                row.date,
+                row.spend || 0,
+                row.impressions || 0,
+                row.clicks || 0,
+                row.conversions || 0,
+                row.conversion_value || 0,
+                row.status || ''
+            );
+        }
+    });
+    
+    insert(data);
+}
+
+// Cache functions for ad data  
+function getCachedAdData(platform, dates) {
+    const cached = [];
+    const uncached = [];
+    
+    for (const date of dates) {
+        const rows = adCacheSelectStmt.all(platform, date);
+        if (rows.length > 0) {
+            cached.push(...rows.map(row => ({
+                date: row.date,
+                ad_id: row.ad_id,
+                ad_name: row.ad_name,
+                campaign_id: row.campaign_id,
+                campaign_name: row.campaign_name,
+                spend: row.spend,
+                impressions: row.impressions,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                conversion_value: row.conversion_value,
+                creative_url: row.creative_url
+            })));
+        } else {
+            uncached.push(date);
+        }
+    }
+    
+    return { cached, uncached };
+}
+
+function cacheAdData(platform, data) {
+    const insert = db.transaction((rows) => {
+        for (const row of rows) {
+            adCacheInsertStmt.run(
+                platform,
+                row.ad_id || '',
+                row.ad_name || '',
+                row.campaign_id || '',
+                row.campaign_name || '',
+                row.date,
+                row.spend || 0,
+                row.impressions || 0,
+                row.clicks || 0,
+                row.conversions || 0,
+                row.conversion_value || 0,
+                row.creative_url || ''
+            );
+        }
+    });
+    
+    insert(data);
+}
+
+// Cache functions for keyword data
+function getCachedKeywordData(platform, dates) {
+    const cached = [];
+    const uncached = [];
+    
+    for (const date of dates) {
+        const rows = keywordCacheSelectStmt.all(platform, date);
+        if (rows.length > 0) {
+            cached.push(...rows.map(row => ({
+                date: row.date,
+                keyword: row.keyword,
+                campaign_id: row.campaign_id,
+                campaign_name: row.campaign_name,
+                ad_group_id: row.ad_group_id,
+                ad_group_name: row.ad_group_name,
+                spend: row.spend,
+                impressions: row.impressions,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                conversion_value: row.conversion_value,
+                quality_score: row.quality_score
+            })));
+        } else {
+            uncached.push(date);
+        }
+    }
+    
+    return { cached, uncached };
+}
+
+function cacheKeywordData(platform, data) {
+    const insert = db.transaction((rows) => {
+        for (const row of rows) {
+            keywordCacheInsertStmt.run(
+                platform,
+                row.keyword || '',
+                row.campaign_id || '',
+                row.campaign_name || '',
+                row.ad_group_id || '',
+                row.ad_group_name || '',
+                row.date,
+                row.spend || 0,
+                row.impressions || 0,
+                row.clicks || 0,
+                row.conversions || 0,
+                row.conversion_value || 0,
+                row.quality_score || 0
+            );
+        }
+    });
+    
+    insert(data);
+}
+
+// Helper to parse Meta results (conversions)
+function parseMetaResults(actions) {
+    if (!actions || !Array.isArray(actions)) return 0;
+    return actions
+        .filter(action => action.action_type && action.action_type.includes('offsite_conversion.fb_pixel_custom'))
+        .reduce((total, action) => total + (parseInt(action.value) || 0), 0);
+}
+
+// ==================== New Meta API Endpoints with Caching ====================
+
+// Meta account performance with cache
+app.post('/api/meta/account-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const token = process.env.META_ACCESS_TOKEN;
+        const accountId = process.env.META_ACCOUNT_ID;
+
+        if (!token || !accountId) {
+            return res.status(503).json({ error: 'Meta API not configured' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data for cacheable dates (2+ days ago)
+        const { cached, uncached } = getCachedPlatformData('meta', cacheableDates);
+
+        // Need to fetch: today/yesterday (always fresh) + any uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[meta-cache] account-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates (${fetchStartStr} to ${fetchEndStr})`);
+
+                const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${fetchStartStr}","until":"${fetchEndStr}"}&time_increment=1&access_token=${token}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.data) {
+                    freshData = data.data.map(row => ({
+                        date: row.date_start,
+                        spend: parseFloat(row.spend) || 0,
+                        impressions: parseInt(row.impressions) || 0,
+                        clicks: parseInt(row.clicks) || 0,
+                        conversions: parseMetaResults(row.actions),
+                        conversion_value: 0
+                    }));
+
+                    // Cache everything except today (yesterday is OK to cache, will be refreshed next load)
+                    const dataToCache = freshData.filter(d => d.date !== today);
+                    if (dataToCache.length > 0) {
+                        cachePlatformData('meta', dataToCache);
+                    }
+                }
+            } catch (error) {
+                console.error('Meta API error:', error);
+            }
+        } else {
+            console.log(`[meta-cache] account-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine cached and fresh data
+        const allData = [...cached, ...freshData];
+        
+        // Calculate totals
+        const totals = allData.reduce((acc, row) => ({
+            spend: acc.spend + row.spend,
+            impressions: acc.impressions + row.impressions,
+            clicks: acc.clicks + row.clicks,
+            conversions: acc.conversions + row.conversions,
+            conversion_value: acc.conversion_value + (row.conversion_value || 0)
+        }), { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversion_value: 0 });
+
+        res.json(totals);
+    } catch (error) {
+        console.error('Meta account performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Meta daily performance with cache
+app.post('/api/meta/daily-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const token = process.env.META_ACCESS_TOKEN;
+        const accountId = process.env.META_ACCOUNT_ID;
+
+        if (!token || !accountId) {
+            return res.status(503).json({ error: 'Meta API not configured' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data for cacheable dates (2+ days ago)
+        const { cached, uncached } = getCachedPlatformData('meta', cacheableDates);
+
+        // Need to fetch: today/yesterday (always fresh) + any uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[meta-cache] daily-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates (${fetchStartStr} to ${fetchEndStr})`);
+
+                const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${fetchStartStr}","until":"${fetchEndStr}"}&time_increment=1&access_token=${token}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.data) {
+                    freshData = data.data.map(row => ({
+                        date: row.date_start,
+                        spend: parseFloat(row.spend) || 0,
+                        impressions: parseInt(row.impressions) || 0,
+                        clicks: parseInt(row.clicks) || 0,
+                        conversions: parseMetaResults(row.actions),
+                        conversion_value: 0
+                    }));
+
+                    // Cache everything except today
+                    const dataToCache = freshData.filter(d => d.date !== today);
+                    if (dataToCache.length > 0) {
+                        cachePlatformData('meta', dataToCache);
+                    }
+                }
+            } catch (error) {
+                console.error('Meta API error:', error);
+            }
+        } else {
+            console.log(`[meta-cache] daily-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine and format for response
+        const allData = [...cached, ...freshData];
+        const rows = allData.map(row => {
+            const spend = row.spend || 0;
+            const impressions = row.impressions || 0;
+            const clicks = row.clicks || 0;
+            const conversions = row.conversions || 0;
+
+            return {
+                date: row.date,
+                spend,
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpc: clicks > 0 ? spend / clicks : 0,
+                conversions
+            };
+        });
+
+        // Sort by date descending
+        rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        res.json({ rows });
+    } catch (error) {
+        console.error('Meta daily performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Meta campaign performance with cache
+app.post('/api/meta/campaign-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const token = process.env.META_ACCESS_TOKEN;
+        const accountId = process.env.META_ACCOUNT_ID;
+
+        if (!token || !accountId) {
+            return res.status(503).json({ error: 'Meta API not configured' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data
+        const { cached } = getCachedCampaignData('meta', cacheableDates);
+
+        // Fetch fresh data
+        let freshData = [];
+        if (freshDates.length > 0) {
+            try {
+                const fetchStart = Math.min(...freshDates.map(d => new Date(d)));
+                const fetchEnd = Math.max(...freshDates.map(d => new Date(d)));
+                const fetchStartStr = fetchStart.toISOString().slice(0, 10);
+                const fetchEndStr = fetchEnd.toISOString().slice(0, 10);
+
+                const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/campaigns?fields=id,name,effective_status,insights.time_range({"since":"${fetchStartStr}","until":"${fetchEndStr}"}){spend,impressions,clicks,actions}&access_token=${token}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.data) {
+                    for (const campaign of data.data) {
+                        if (campaign.insights && campaign.insights.data) {
+                            for (const insight of campaign.insights.data) {
+                                freshData.push({
+                                    date: insight.date_start || fetchStartStr,
+                                    campaign_id: campaign.id,
+                                    campaign_name: campaign.name,
+                                    spend: parseFloat(insight.spend) || 0,
+                                    impressions: parseInt(insight.impressions) || 0,
+                                    clicks: parseInt(insight.clicks) || 0,
+                                    conversions: parseMetaResults(insight.actions),
+                                    conversion_value: 0,
+                                    status: campaign.effective_status || ''
+                                });
+                            }
+                        }
+                    }
+
+                    // Cache fresh data (excluding today)
+                    const dataToCache = freshData.filter(d => d.date !== today);
+                    if (dataToCache.length > 0) {
+                        cacheCampaignData('meta', dataToCache);
+                    }
+                }
+            } catch (error) {
+                console.error('Meta campaigns API error:', error);
+            }
+        }
+
+        // Combine and aggregate by campaign
+        const allData = [...cached, ...freshData];
+        const campaignMap = new Map();
+
+        allData.forEach(row => {
+            const key = row.campaign_id;
+            if (!campaignMap.has(key)) {
+                campaignMap.set(key, {
+                    campaign_id: row.campaign_id,
+                    campaign_name: row.campaign_name,
+                    spend: 0,
+                    impressions: 0,
+                    clicks: 0,
+                    conversions: 0,
+                    conversion_value: 0,
+                    status: row.status
+                });
+            }
+            const campaign = campaignMap.get(key);
+            campaign.spend += row.spend || 0;
+            campaign.impressions += row.impressions || 0;
+            campaign.clicks += row.clicks || 0;
+            campaign.conversions += row.conversions || 0;
+            campaign.conversion_value += row.conversion_value || 0;
+        });
+
+        const campaigns = Array.from(campaignMap.values()).map(campaign => ({
+            name: campaign.campaign_name,
+            status: campaign.status,
+            spend: campaign.spend,
+            impressions: campaign.impressions,
+            clicks: campaign.clicks,
+            ctr: campaign.impressions > 0 ? (campaign.clicks / campaign.impressions) * 100 : 0,
+            cpc: campaign.clicks > 0 ? campaign.spend / campaign.clicks : 0,
+            conversions: campaign.conversions,
+            conversion_value: campaign.conversion_value
+        }));
+
+        res.json({ campaigns });
+    } catch (error) {
+        console.error('Meta campaign performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Meta ad performance with cache
+app.post('/api/meta/ad-performance', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const token = process.env.META_ACCESS_TOKEN;
+        const accountId = process.env.META_ACCOUNT_ID;
+
+        if (!token || !accountId) {
+            return res.status(503).json({ error: 'Meta API not configured' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data
+        const { cached } = getCachedAdData('meta', cacheableDates);
+
+        // Fetch fresh data
+        let freshData = [];
+        if (freshDates.length > 0) {
+            try {
+                const fetchStart = Math.min(...freshDates.map(d => new Date(d)));
+                const fetchEnd = Math.max(...freshDates.map(d => new Date(d)));
+                const fetchStartStr = fetchStart.toISOString().slice(0, 10);
+                const fetchEndStr = fetchEnd.toISOString().slice(0, 10);
+
+                const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/ads?fields=id,name,campaign{id,name},creative{id,thumbnail_url},insights.time_range({"since":"${fetchStartStr}","until":"${fetchEndStr}"}){spend,impressions,clicks,actions}&access_token=${token}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.data) {
+                    for (const ad of data.data) {
+                        if (ad.insights && ad.insights.data) {
+                            for (const insight of ad.insights.data) {
+                                freshData.push({
+                                    date: insight.date_start || fetchStartStr,
+                                    ad_id: ad.id,
+                                    ad_name: ad.name,
+                                    campaign_id: ad.campaign?.id || '',
+                                    campaign_name: ad.campaign?.name || '',
+                                    spend: parseFloat(insight.spend) || 0,
+                                    impressions: parseInt(insight.impressions) || 0,
+                                    clicks: parseInt(insight.clicks) || 0,
+                                    conversions: parseMetaResults(insight.actions),
+                                    conversion_value: 0,
+                                    creative_url: ad.creative?.thumbnail_url || ''
+                                });
+                            }
+                        }
+                    }
+
+                    // Cache fresh data (excluding today)
+                    const dataToCache = freshData.filter(d => d.date !== today);
+                    if (dataToCache.length > 0) {
+                        cacheAdData('meta', dataToCache);
+                    }
+                }
+            } catch (error) {
+                console.error('Meta ads API error:', error);
+            }
+        }
+
+        // Combine and aggregate by ad
+        const allData = [...cached, ...freshData];
+        const adMap = new Map();
+
+        allData.forEach(row => {
+            const key = row.ad_id;
+            if (!adMap.has(key)) {
+                adMap.set(key, {
+                    ad_id: row.ad_id,
+                    ad_name: row.ad_name,
+                    campaign_id: row.campaign_id,
+                    campaign_name: row.campaign_name,
+                    spend: 0,
+                    impressions: 0,
+                    clicks: 0,
+                    conversions: 0,
+                    conversion_value: 0,
+                    creative_url: row.creative_url
+                });
+            }
+            const ad = adMap.get(key);
+            ad.spend += row.spend || 0;
+            ad.impressions += row.impressions || 0;
+            ad.clicks += row.clicks || 0;
+            ad.conversions += row.conversions || 0;
+            ad.conversion_value += row.conversion_value || 0;
+        });
+
+        const ads = Array.from(adMap.values()).map(ad => ({
+            ad_id: ad.ad_id,
+            name: ad.ad_name,
+            campaign_name: ad.campaign_name,
+            spend: ad.spend,
+            impressions: ad.impressions,
+            clicks: ad.clicks,
+            ctr: ad.impressions > 0 ? (ad.clicks / ad.impressions) * 100 : 0,
+            cpc: ad.clicks > 0 ? ad.spend / ad.clicks : 0,
+            conversions: ad.conversions,
+            conversion_value: ad.conversion_value,
+            creative_url: ad.creative_url
+        }));
+
+        res.json({ ads });
+    } catch (error) {
+        console.error('Meta ad performance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== Daily Metrics Cache ====================
 db.exec(`
     CREATE TABLE IF NOT EXISTS daily_cache (
@@ -166,6 +907,7 @@ function saveWebhookData(data) {
 }
 
 // Initialize global webhook data from file
+// Load webhook data from JSON
 global.webhookData = loadWebhookData();
 console.log("[WEBHOOK] Loaded", global.webhookData.length, "historical events from JSON storage");
 console.log("[DB] SQLite database:", DB_FILE, "- Events:", countStmt.get().count);
@@ -287,7 +1029,10 @@ async function googleAdsApiRequest(query) {
         refresh_token: GOOGLE_ADS_CONFIG.refreshToken
     });
     
-    const results = await customer.query(query);
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Google Ads API timeout (10s)')), 10000)
+    );
+    const results = await Promise.race([customer.query(query), timeoutPromise]);
     console.log('Google Ads API success, results:', results?.length || 0);
     return results || [];
 }
@@ -869,19 +1614,62 @@ app.post('/api/bing/account-performance', async (req, res) => {
     
     try {
         const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data for dates that can be cached
+        const { cached, uncached } = getCachedPlatformData('bing', cacheableDates);
+
+        // Fetch: today/yesterday (always fresh) + any uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[bing-cache] account-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates`);
+
+                const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Conversions', 'Revenue'];
+                const report = await submitAndDownloadReport('account', fetchStartStr, fetchEndStr, columns);
+                
+                freshData = report.rows.map(row => ({
+                    date: row.TimePeriod,
+                    spend: parseFloat(row.Spend) || 0,
+                    impressions: parseInt(row.Impressions) || 0,
+                    clicks: parseInt(row.Clicks) || 0,
+                    conversions: parseFloat(row.Conversions) || 0,
+                    conversion_value: parseFloat(row.Revenue) || 0
+                }));
+
+                const dataToCache = freshData.filter(d => d.date !== today);
+                if (dataToCache.length > 0) {
+                    cachePlatformData('bing', dataToCache);
+                }
+            } catch (error) {
+                console.error('Bing API error:', error);
+            }
+        } else {
+            console.log(`[bing-cache] account-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine cached and fresh data
+        const allData = [...cached, ...freshData];
         
-        const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
-        const report = await submitAndDownloadReport('account', startDate, endDate, columns);
-        
-        let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 };
-        
-        report.rows.forEach(row => {
-            totals.spend += parseFloat(row.Spend) || 0;
-            totals.impressions += parseInt(row.Impressions) || 0;
-            totals.clicks += parseInt(row.Clicks) || 0;
-            totals.conversions += parseFloat(row.Conversions) || 0;
-            totals.revenue += parseFloat(row.Revenue) || 0;
-        });
+        // Calculate totals
+        const totals = allData.reduce((acc, row) => ({
+            spend: acc.spend + row.spend,
+            impressions: acc.impressions + row.impressions,
+            clicks: acc.clicks + row.clicks,
+            conversions: acc.conversions + row.conversions,
+            revenue: acc.revenue + (row.conversion_value || 0)
+        }), { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 });
         
         res.json(totals);
     } catch (error) {
@@ -898,20 +1686,73 @@ app.post('/api/bing/daily-performance', async (req, res) => {
     
     try {
         const { startDate, endDate } = req.body;
-        
-        const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
-        const report = await submitAndDownloadReport('account', startDate, endDate, columns);
-        
-        const rows = report.rows.map(row => ({
-            date: row.TimePeriod,
-            spend: parseFloat(row.Spend) || 0,
-            impressions: parseInt(row.Impressions) || 0,
-            clicks: parseInt(row.Clicks) || 0,
-            ctr: parseFloat(row.Ctr) || 0,
-            cpc: parseFloat(row.AverageCpc) || 0,
-            conversions: parseFloat(row.Conversions) || 0,
-            revenue: parseFloat(row.Revenue) || 0
-        }));
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data
+        const { cached, uncached } = getCachedPlatformData('bing', cacheableDates);
+
+        // Fetch: today/yesterday + uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[bing-cache] daily-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates`);
+
+                const columns = ['TimePeriod', 'Spend', 'Impressions', 'Clicks', 'Ctr', 'AverageCpc', 'Conversions', 'Revenue'];
+                const report = await submitAndDownloadReport('account', fetchStartStr, fetchEndStr, columns);
+                
+                freshData = report.rows.map(row => ({
+                    date: row.TimePeriod,
+                    spend: parseFloat(row.Spend) || 0,
+                    impressions: parseInt(row.Impressions) || 0,
+                    clicks: parseInt(row.Clicks) || 0,
+                    conversions: parseFloat(row.Conversions) || 0,
+                    conversion_value: parseFloat(row.Revenue) || 0
+                }));
+
+                const dataToCache = freshData.filter(d => d.date !== today);
+                if (dataToCache.length > 0) {
+                    cachePlatformData('bing', dataToCache);
+                }
+            } catch (error) {
+                console.error('Bing API error:', error);
+            }
+        } else {
+            console.log(`[bing-cache] daily-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine and format for response
+        const allData = [...cached, ...freshData];
+        const rows = allData.map(row => {
+            const spend = row.spend || 0;
+            const impressions = row.impressions || 0;
+            const clicks = row.clicks || 0;
+            const conversions = row.conversions || 0;
+            
+            return {
+                date: row.date,
+                spend,
+                impressions,
+                clicks,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpc: clicks > 0 ? spend / clicks : 0,
+                conversions,
+                revenue: row.conversion_value || 0
+            };
+        });
+
+        // Sort by date descending
+        rows.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         res.json({ rows });
     } catch (error) {
@@ -1470,30 +2311,77 @@ app.post('/api/google/account-performance', async (req, res) => {
     
     try {
         const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data for dates that can be cached
+        const { cached, uncached } = getCachedPlatformData('google', cacheableDates);
+
+        // Fetch: today/yesterday + uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[google-cache] account-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates`);
+
+                const query = `
+                    SELECT 
+                        segments.date,
+                        metrics.cost_micros,
+                        metrics.impressions,
+                        metrics.clicks,
+                        metrics.conversions,
+                        metrics.conversions_value
+                    FROM customer
+                    WHERE segments.date BETWEEN '${fetchStartStr}' AND '${fetchEndStr}'
+                `;
+                
+                const results = await googleAdsApiRequest(query);
+                
+                freshData = results.map(row => {
+                    const metrics = row.metrics || {};
+                    const segments = row.segments || {};
+                    return {
+                        date: segments.date,
+                        spend: (parseInt(metrics.cost_micros) || 0) / 1000000,
+                        impressions: parseInt(metrics.impressions) || 0,
+                        clicks: parseInt(metrics.clicks) || 0,
+                        conversions: parseFloat(metrics.conversions) || 0,
+                        conversion_value: parseFloat(metrics.conversions_value) || 0
+                    };
+                });
+
+                const dataToCache = freshData.filter(d => d.date !== today);
+                if (dataToCache.length > 0) {
+                    cachePlatformData('google', dataToCache);
+                }
+            } catch (error) {
+                console.error('Google API error:', error);
+            }
+        } else {
+            console.log(`[google-cache] account-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine cached and fresh data
+        const allData = [...cached, ...freshData];
         
-        const query = `
-            SELECT 
-                metrics.cost_micros,
-                metrics.impressions,
-                metrics.clicks,
-                metrics.conversions,
-                metrics.conversions_value
-            FROM customer
-            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-        `;
-        
-        const results = await googleAdsApiRequest(query);
-        
-        let totals = { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
-        
-        results.forEach(row => {
-            const metrics = row.metrics || {};
-            totals.spend += (parseInt(metrics.cost_micros) || 0) / 1000000;
-            totals.impressions += parseInt(metrics.impressions) || 0;
-            totals.clicks += parseInt(metrics.clicks) || 0;
-            totals.conversions += parseFloat(metrics.conversions) || 0;
-            totals.conversionValue += parseFloat(metrics.conversions_value) || 0;
-        });
+        // Calculate totals
+        const totals = allData.reduce((acc, row) => ({
+            spend: acc.spend + row.spend,
+            impressions: acc.impressions + row.impressions,
+            clicks: acc.clicks + row.clicks,
+            conversions: acc.conversions + row.conversions,
+            conversionValue: acc.conversionValue + row.conversion_value
+        }), { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 });
         
         res.json(totals);
     } catch (error) {
@@ -1510,31 +2398,76 @@ app.post('/api/google/daily-performance', async (req, res) => {
     
     try {
         const { startDate, endDate } = req.body;
-        
-        const query = `
-            SELECT 
-                segments.date,
-                metrics.cost_micros,
-                metrics.impressions,
-                metrics.clicks,
-                metrics.conversions
-            FROM customer
-            WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-            ORDER BY segments.date DESC
-        `;
-        
-        const results = await googleAdsApiRequest(query);
-        
-        const rows = results.map(row => {
-            const metrics = row.metrics || {};
-            const segments = row.segments || {};
-            const spend = (parseInt(metrics.cost_micros) || 0) / 1000000;
-            const impressions = parseInt(metrics.impressions) || 0;
-            const clicks = parseInt(metrics.clicks) || 0;
-            const conversions = parseFloat(metrics.conversions) || 0;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Missing startDate or endDate' });
+        }
+
+        const allDates = getDateRangeArray(startDate, endDate);
+        const today = getTodayEST();
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
+
+        // Get cached data
+        const { cached, uncached } = getCachedPlatformData('google', cacheableDates);
+
+        // Fetch: today/yesterday + uncached historical dates
+        const datesToFetch = [...freshDates, ...uncached];
+        let freshData = [];
+        if (datesToFetch.length > 0) {
+            try {
+                const sortedDates = datesToFetch.sort();
+                const fetchStartStr = sortedDates[0];
+                const fetchEndStr = sortedDates[sortedDates.length - 1];
+
+                console.log(`[google-cache] daily-perf: ${cached.length} cached, fetching ${datesToFetch.length} dates`);
+
+                const query = `
+                    SELECT 
+                        segments.date,
+                        metrics.cost_micros,
+                        metrics.impressions,
+                        metrics.clicks,
+                        metrics.conversions,
+                        metrics.conversions_value
+                    FROM customer
+                    WHERE segments.date BETWEEN '${fetchStartStr}' AND '${fetchEndStr}'
+                `;
+                
+                const results = await googleAdsApiRequest(query);
+                
+                freshData = results.map(row => {
+                    const metrics = row.metrics || {};
+                    const segments = row.segments || {};
+                    return {
+                        date: segments.date,
+                        spend: (parseInt(metrics.cost_micros) || 0) / 1000000,
+                        impressions: parseInt(metrics.impressions) || 0,
+                        clicks: parseInt(metrics.clicks) || 0,
+                        conversions: parseFloat(metrics.conversions) || 0,
+                        conversion_value: parseFloat(metrics.conversions_value) || 0
+                    };
+                });
+
+                const dataToCache = freshData.filter(d => d.date !== today);
+                if (dataToCache.length > 0) {
+                    cachePlatformData('google', dataToCache);
+                }
+            } catch (error) {
+                console.error('Google API error:', error);
+            }
+        } else {
+            console.log(`[google-cache] daily-perf: ALL ${cached.length} dates from cache → instant`);
+        }
+
+        // Combine and format for response
+        const allData = [...cached, ...freshData];
+        const rows = allData.map(row => {
+            const spend = row.spend || 0;
+            const impressions = row.impressions || 0;
+            const clicks = row.clicks || 0;
+            const conversions = row.conversions || 0;
             
             return {
-                date: segments.date,
+                date: row.date,
                 spend,
                 impressions,
                 clicks,
@@ -1543,6 +2476,9 @@ app.post('/api/google/daily-performance', async (req, res) => {
                 conversions
             };
         });
+
+        // Sort by date descending
+        rows.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         res.json({ rows });
     } catch (error) {
@@ -2490,72 +3426,109 @@ app.get('/api/meta-geo', async (req, res) => {
 // ==================== Summary API ====================
 
 // Summary: Get daily spend data for all platforms
+// ===== Persistent daily spend cache =====
+const SPEND_CACHE_DIR = path.join(__dirname, 'data', 'spend-cache');
+try { require('fs').mkdirSync(SPEND_CACHE_DIR, { recursive: true }); } catch(e) {}
+
+function getSpendCachePath(date) { return path.join(SPEND_CACHE_DIR, date + '.json'); }
+
+function readSpendCache(date) {
+    try { return JSON.parse(require('fs').readFileSync(getSpendCachePath(date), 'utf8')); }
+    catch { return null; }
+}
+
+function writeSpendCache(date, data) {
+    try { require('fs').writeFileSync(getSpendCachePath(date), JSON.stringify(data)); }
+    catch(e) { console.error('Cache write error:', e.message); }
+}
+
+function getDateRange(start, end) {
+    const dates = []; const d = new Date(start + 'T00:00:00'); const e = new Date(end + 'T00:00:00');
+    while (d <= e) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    return dates;
+}
+
+function getTodayEST() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).toISOString().slice(0,10);
+}
+
+let todaySpendCache = { date: '', ts: 0, data: null };
+
 app.post('/api/summary/daily', async (req, res) => {
     const { startDate, endDate } = req.body;
-    
-    const results = {
-        meta: [],
-        google: [],
-        bing: []
-    };
-    
-    // Fetch Meta daily data
+    const allDates = getDateRange(startDate, endDate);
+    const today = getTodayEST();
+
+    const cached = { meta: [], google: [], bing: [] };
+    const uncached = [];
+
+    for (const date of allDates) {
+        if (date === today && todaySpendCache.date === today && Date.now() - todaySpendCache.ts < 5*60*1000) {
+            cached.meta.push(todaySpendCache.data.meta);
+            cached.google.push(todaySpendCache.data.google);
+            cached.bing.push(todaySpendCache.data.bing);
+        } else if (date !== today) {
+            const c = readSpendCache(date);
+            if (c) { cached.meta.push(c.meta); cached.google.push(c.google); cached.bing.push(c.bing); }
+            else uncached.push(date);
+        } else {
+            uncached.push(date);
+        }
+    }
+
+    if (uncached.length === 0) {
+        console.log(`[spend-cache] All ${allDates.length} days cached → instant`);
+        return res.json(cached);
+    }
+
+    console.log(`[spend-cache] ${allDates.length - uncached.length} cached, fetching ${uncached.length} from APIs`);
+    const fetchStart = uncached[0], fetchEnd = uncached[uncached.length-1];
+
+    const fresh = { meta: [], google: [], bing: [] };
+
     try {
-        const metaUrl = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v19.0'}/act_${process.env.META_ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${startDate}","until":"${endDate}"}&time_increment=1&access_token=${process.env.META_ACCESS_TOKEN}`;
-        const metaResponse = await fetch(metaUrl);
-        const metaData = await metaResponse.json();
-        
+        const metaUrl = `https://graph.facebook.com/${process.env.META_API_VERSION||'v19.0'}/act_${process.env.META_ACCOUNT_ID}/insights?fields=spend,actions&time_range={"since":"${fetchStart}","until":"${fetchEnd}"}&time_increment=1&access_token=${process.env.META_ACCESS_TOKEN}`;
+        const metaData = await (await fetch(metaUrl)).json();
         if (metaData.data) {
-            results.meta = metaData.data.map(row => ({
+            fresh.meta = metaData.data.map(row => ({
                 date: row.date_start,
-                spend: parseFloat(row.spend) || 0,
-                conversions: row.actions?.filter(a => a.action_type?.includes('offsite_conversion.fb_pixel_custom')).reduce((s, a) => s + parseInt(a.value || 0), 0) || 0
+                spend: parseFloat(row.spend)||0,
+                conversions: row.actions?.filter(a => a.action_type?.includes('offsite_conversion.fb_pixel_custom')).reduce((s,a) => s + parseInt(a.value||0), 0)||0
             }));
         }
-    } catch (e) {
-        console.error('Meta summary error:', e.message);
-    }
-    
-    // Fetch Google daily data
+    } catch(e) { console.error('Meta summary error:', e.message); }
+
     if (isGoogleAdsConfigured()) {
         try {
-            const googleData = await googleAdsApiRequest(`
-                SELECT 
-                    segments.date,
-                    metrics.cost_micros,
-                    metrics.conversions
-                FROM customer
-                WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-                ORDER BY segments.date DESC
-            `);
-            
-            results.google = googleData.map(row => ({
-                date: row.segments?.date,
-                spend: (parseInt(row.metrics?.cost_micros) || 0) / 1000000,
-                conversions: parseFloat(row.metrics?.conversions) || 0
-            }));
-        } catch (e) {
-            console.error('Google summary error:', e.message);
-        }
+            const gd = await googleAdsApiRequest(`SELECT segments.date, metrics.cost_micros, metrics.conversions FROM customer WHERE segments.date BETWEEN '${fetchStart}' AND '${fetchEnd}' ORDER BY segments.date DESC`);
+            fresh.google = gd.map(row => ({ date: row.segments?.date, spend: (parseInt(row.metrics?.cost_micros)||0)/1000000, conversions: parseFloat(row.metrics?.conversions)||0 }));
+        } catch(e) { console.error('Google summary error:', e.message); }
     }
-    
-    // Fetch Bing daily data
+
     if (isBingConfigured()) {
         try {
-            const columns = ['TimePeriod', 'Spend', 'Conversions'];
-            const report = await submitAndDownloadReport('account', startDate, endDate, columns);
-            
-            results.bing = report.rows.map(row => ({
-                date: row.TimePeriod,
-                spend: parseFloat(row.Spend) || 0,
-                conversions: parseFloat(row.Conversions) || 0
-            }));
-        } catch (e) {
-            console.error('Bing summary error:', e.message);
+            const report = await submitAndDownloadReport('account', fetchStart, fetchEnd, ['TimePeriod','Spend','Conversions']);
+            fresh.bing = report.rows.map(row => ({ date: row.TimePeriod, spend: parseFloat(row.Spend)||0, conversions: parseFloat(row.Conversions)||0 }));
+        } catch(e) { console.error('Bing summary error:', e.message); }
+    }
+
+    // Store each day to persistent cache
+    for (const date of uncached) {
+        const dm = fresh.meta.find(d => d.date===date) || {date, spend:0, conversions:0};
+        const dg = fresh.google.find(d => d.date===date) || {date, spend:0, conversions:0};
+        const db = fresh.bing.find(d => d.date===date) || {date, spend:0, conversions:0};
+        if (date === today) {
+            todaySpendCache = { date: today, ts: Date.now(), data: { meta: dm, google: dg, bing: db } };
+        } else {
+            writeSpendCache(date, { meta: dm, google: dg, bing: db });
         }
     }
-    
-    res.json(results);
+
+    res.json({
+        meta: [...cached.meta, ...fresh.meta].filter(d => d?.date),
+        google: [...cached.google, ...fresh.google].filter(d => d?.date),
+        bing: [...cached.bing, ...fresh.bing].filter(d => d?.date)
+    });
 });
 
 // Summary: Get aggregated spend for periods (weekly/monthly)
@@ -2567,6 +3540,7 @@ app.post('/api/summary/aggregated', async (req, res) => {
     }
     
     const results = [];
+    const today = getTodayEST();
     
     for (const period of periods) {
         // Skip periods with missing dates
@@ -2583,41 +3557,84 @@ app.post('/api/summary/aggregated', async (req, res) => {
             tiktok: 0
         };
         
-        // Fetch Google
-        if (isGoogleAdsConfigured()) {
-            try {
-                const googleData = await googleAdsApiRequest(`
-                    SELECT metrics.cost_micros
-                    FROM customer
-                    WHERE segments.date BETWEEN '${period.startDate}' AND '${period.endDate}'
-                `);
-                
-                googleData.forEach(row => {
-                    periodData.google += (parseInt(row.metrics?.cost_micros) || 0) / 1000000;
-                });
-            } catch (e) {
-                console.error('Google aggregated error:', e.message);
-            }
-        }
+        const allDates = getDateRangeArray(period.startDate, period.endDate);
+        const { cacheableDates, freshDates } = getCacheableAndFreshDates(allDates, today);
         
-        // Fetch Bing
-        if (isBingConfigured() && period.startDate && period.endDate) {
-            try {
-                const columns = ['TimePeriod', 'Spend'];
-                const report = await submitAndDownloadReport('account', period.startDate, period.endDate, columns);
-                
-                if (report && report.rows) {
-                    report.rows.forEach(row => {
-                        periodData.bing += parseFloat(row.Spend) || 0;
-                    });
+        // Get cached data for Meta, Google, and Bing
+        const metaCached = getCachedPlatformData('meta', cacheableDates);
+        const googleCached = getCachedPlatformData('google', cacheableDates);
+        const bingCached = getCachedPlatformData('bing', cacheableDates);
+        
+        // Calculate spend from cached data
+        periodData.meta += metaCached.cached.reduce((sum, row) => sum + (row.spend || 0), 0);
+        periodData.google += googleCached.cached.reduce((sum, row) => sum + (row.spend || 0), 0);
+        periodData.bing += bingCached.cached.reduce((sum, row) => sum + (row.spend || 0), 0);
+        
+        // Dates to fetch: today/yesterday + any uncached historical dates (union across all platforms)
+        const allUncached = [...new Set([...metaCached.uncached, ...googleCached.uncached, ...bingCached.uncached])];
+        const datesToFetch = [...new Set([...freshDates, ...allUncached])].sort();
+        
+        if (datesToFetch.length > 0) {
+            const fetchStartStr = datesToFetch[0];
+            const fetchEndStr = datesToFetch[datesToFetch.length - 1];
+            
+            // Fetch Meta fresh data
+            if (process.env.META_ACCESS_TOKEN && process.env.META_ACCOUNT_ID) {
+                try {
+                    const apiVersion = process.env.META_API_VERSION || 'v19.0';
+                    const token = process.env.META_ACCESS_TOKEN;
+                    const accountId = process.env.META_ACCOUNT_ID;
+                    
+                    const url = `https://graph.facebook.com/${apiVersion}/act_${accountId}/insights?fields=spend&time_range={"since":"${fetchStartStr}","until":"${fetchEndStr}"}&time_increment=1&access_token=${token}`;
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data.data) {
+                        data.data.forEach(row => {
+                            periodData.meta += parseFloat(row.spend) || 0;
+                        });
+                    }
+                } catch (e) {
+                    console.error('Meta aggregated error:', e.message);
                 }
-            } catch (e) {
-                console.error('Bing aggregated error:', e.message);
+            }
+            
+            // Fetch Google fresh data
+            if (isGoogleAdsConfigured()) {
+                try {
+                    const googleData = await googleAdsApiRequest(`
+                        SELECT metrics.cost_micros
+                        FROM customer
+                        WHERE segments.date BETWEEN '${fetchStartStr}' AND '${fetchEndStr}'
+                    `);
+                    
+                    googleData.forEach(row => {
+                        periodData.google += (parseInt(row.metrics?.cost_micros) || 0) / 1000000;
+                    });
+                } catch (e) {
+                    console.error('Google aggregated error:', e.message);
+                }
+            }
+            
+            // Fetch Bing fresh data
+            if (isBingConfigured()) {
+                try {
+                    const columns = ['TimePeriod', 'Spend'];
+                    const report = await submitAndDownloadReport('account', fetchStartStr, fetchEndStr, columns);
+                    
+                    if (report && report.rows) {
+                        report.rows.forEach(row => {
+                            periodData.bing += parseFloat(row.Spend) || 0;
+                        });
+                    }
+                } catch (e) {
+                    console.error('Bing aggregated error:', e.message);
+                }
             }
         }
         
-        // Fetch TikTok
-        if (isTikTokConfigured() && period.startDate && period.endDate) {
+        // Fetch TikTok (always fresh, no cache implementation yet)
+        if (isTikTokConfigured()) {
             try {
                 const ttParams = new URLSearchParams({
                     advertiser_id: TIKTOK_CONFIG.adAccountId,
@@ -2648,6 +3665,125 @@ app.post('/api/summary/aggregated', async (req, res) => {
     res.json(results);
 });
 
+
+// ===== State-level spend for insurance page =====
+const META_STATE_ACCOUNTS = {
+    'CA': '1151591609552634',
+    'NY': ['1494663471476338', '7200144256714286'], // NY + LI
+    'NJ': '3175094602799544',
+    'TX': '1900481344131830',
+    'CT': '2979710872232006',
+    'MD': '409210661685307'
+};
+
+const stateSpendCache = new Map();
+
+app.post('/api/spend-by-states', async (req, res) => {
+    const { startDate, endDate, states } = req.body; // states = ['CA', 'NY', ...]
+    if (!startDate || !endDate || !states || !states.length) return res.json({});
+
+    const cacheKey = `${startDate}_${endDate}_${states.sort().join(',')}`;
+    const cached = stateSpendCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return res.json(cached.data);
+
+    try {
+        const apiVersion = process.env.META_API_VERSION || 'v19.0';
+        const token = process.env.META_ACCESS_TOKEN;
+        let metaSpend = 0, googleSpend = 0, bingSpend = 0;
+
+        // Meta: Get region breakdown from ALL accounts, filter by state
+        const stateFullNames = { CA: 'California', NY: 'New York', NJ: 'New Jersey', TX: 'Texas', CT: 'Connecticut', MD: 'Maryland' };
+        const targetRegions = states.map(s => stateFullNames[s]).filter(Boolean);
+
+        if (targetRegions.length > 0 && token) {
+            // Query all VTC accounts for region breakdown
+            const allRegionData = await Promise.all(META_VTC_ACCOUNTS.map(async acct => {
+                try {
+                    const url = `https://graph.facebook.com/${apiVersion}/act_${acct.id}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${token}`;
+                    const data = await (await fetch(url)).json();
+                    return data.data || [];
+                } catch { return []; }
+            }));
+
+            for (const accountData of allRegionData) {
+                for (const r of accountData) {
+                    const region = r.region || '';
+                    if (targetRegions.some(tr => region.includes(tr))) {
+                        metaSpend += parseFloat(r.spend) || 0;
+                    }
+                }
+            }
+        }
+
+        // Google: Use geographic_view, resolve geo names, filter by state
+        if (isGoogleAdsConfigured()) {
+            try {
+                const stateFullNames = { CA: 'California', NY: 'New York', NJ: 'New Jersey', TX: 'Texas', CT: 'Connecticut', MD: 'Maryland' };
+                const targetStateNames = states.map(s => stateFullNames[s]).filter(Boolean);
+                
+                const gData = await googleAdsApiRequest(`
+                    SELECT segments.geo_target_region, metrics.cost_micros
+                    FROM geographic_view
+                    WHERE segments.date BETWEEN '${startDate}' AND '${endDate}' AND metrics.impressions > 0
+                    LIMIT 1000
+                `);
+                
+                // Get geo IDs and resolve names
+                const geoIds = [...new Set(gData.map(r => {
+                    const m = (r.segments?.geo_target_region || '').match(/geoTargetConstants\/(\d+)/);
+                    return m ? m[1] : null;
+                }).filter(Boolean))];
+                
+                // Look up geo names (reuse existing cache)
+                const uncachedIds = geoIds.filter(id => !geoNameCache[id]);
+                if (uncachedIds.length > 0) {
+                    try {
+                        const geoQuery = `SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.canonical_name, geo_target_constant.target_type FROM geo_target_constant WHERE geo_target_constant.id IN (${uncachedIds.join(',')})`;
+                        const geoResults = await googleAdsApiRequest(geoQuery);
+                        for (const gr of geoResults) {
+                            const g = gr.geo_target_constant || {};
+                            if (g.id) geoNameCache[g.id] = { name: g.name, canonicalName: g.canonical_name, targetType: g.target_type };
+                        }
+                    } catch(e) { /* ignore geo lookup errors */ }
+                }
+                
+                // Sum spend for matching states
+                for (const r of gData) {
+                    const m = (r.segments?.geo_target_region || '').match(/geoTargetConstants\/(\d+)/);
+                    if (!m) continue;
+                    const geoInfo = geoNameCache[m[1]];
+                    const geoName = geoInfo ? (geoInfo.canonicalName || geoInfo.name || '') : '';
+                    if (targetStateNames.some(sn => geoName.includes(sn))) {
+                        googleSpend += (parseInt(r.metrics?.cost_micros) || 0) / 1000000;
+                    }
+                }
+            } catch(e) { console.error('Google state spend error:', e.message); }
+        }
+
+        // Bing: Use geographic report filtered by state
+        if (isBingConfigured()) {
+            try {
+                const stateNames = { CA: 'California', NY: 'New York', NJ: 'New Jersey', TX: 'Texas', CT: 'Connecticut', MD: 'Maryland' };
+                const columns = ['State', 'Spend'];
+                const report = await submitAndDownloadReport('geographic', startDate, endDate, columns);
+                for (const row of report.rows) {
+                    const rowState = row.State || '';
+                    if (states.some(s => rowState.includes(stateNames[s] || s))) {
+                        bingSpend += parseFloat(row.Spend) || 0;
+                    }
+                }
+            } catch(e) { console.error('Bing state spend error:', e.message); }
+        }
+
+        const result = { meta: metaSpend, google: googleSpend, bing: bingSpend, tiktok: 0, total: metaSpend + googleSpend + bingSpend };
+        stateSpendCache.set(cacheKey, { ts: Date.now(), data: result });
+        if (stateSpendCache.size > 30) stateSpendCache.delete(stateSpendCache.keys().next().value);
+        res.json(result);
+    } catch(e) {
+        console.error('State spend error:', e);
+        res.json({ meta: 0, google: 0, bing: 0, tiktok: 0, total: 0 });
+    }
+});
 
 // API endpoint for webhook data (must be before catch-all)
 app.get("/api/webhooks", (req, res) => {
@@ -4882,9 +6018,20 @@ function calculateCorrelation(x, y) {
 }
 
 // ==================== Insurance Analytics (New) ====================
+// Simple cache for insurance analytics (TTL 5 min)
+const insAnalyticsCache = new Map();
+const INS_CACHE_TTL = 5 * 60 * 1000;
+
 app.get('/api/looker/insurance-analytics', async (req, res) => {
     try {
         const { startDate, endDate, location, insuranceType, insuranceName, trackingType } = req.query;
+        
+        // Check cache
+        const cacheKey = JSON.stringify(req.query);
+        const cached = insAnalyticsCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < INS_CACHE_TTL) {
+            return res.json(cached.data);
+        }
         const v = 'fct_leads_funnel_marketing_phi_exclude';
 
         // Date filter (used by all queries)
@@ -4966,6 +6113,66 @@ app.get('/api/looker/insurance-analytics', async (req, res) => {
             };
         }
 
+        // ===== Per-platform/source funnel (Meta, Google, Bing, TikTok columns) =====
+        const platformTypes = ['mutm', 'g1utm', 'butm', 'tutm'];
+        
+        // Query totals per platform AND per insurance type in grouped queries
+        const [
+            platformTotalsByType,
+            platformBookedByType,
+            platformVerifByType,
+            platformCoveredByType,
+            platformFulfilledByType
+        ] = await Promise.all([
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.insurance_type`, `${v}.count`], filters, [], 500).catch(() => []),
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.insurance_type`, `${v}.count`], { ...filters, [`${v}.is_booked`]: '1' }, [], 500).catch(() => []),
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.insurance_type`, `${v}.count`], { ...filters, [`${v}.sent_to_verification`]: '1' }, [], 500).catch(() => []),
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.insurance_type`, `${v}.count`], { ...filters, [`${v}.is_booked_covered`]: '1' }, [], 500).catch(() => []),
+            lookerQuery(v, [`${v}.tracking_type`, `${v}.insurance_type`, `${v}.count`], { ...filters, [`${v}.initial_fulfilled`]: '1' }, [], 500).catch(() => []),
+        ]);
+
+        // Helper to aggregate grouped query results
+        function aggregateByPlatformAndType(rows) {
+            const result = {};
+            for (const row of rows) {
+                const pt = row[`${v}.tracking_type`];
+                const it = row[`${v}.insurance_type`];
+                const count = row[`${v}.count`] || 0;
+                if (!pt) continue;
+                if (!result[pt]) result[pt] = { _total: 0 };
+                result[pt]._total += count;
+                if (it) result[pt][it] = (result[pt][it] || 0) + count;
+            }
+            return result;
+        }
+
+        const totalsByPT = aggregateByPlatformAndType(platformTotalsByType);
+        const bookedByPT = aggregateByPlatformAndType(platformBookedByType);
+        const verifByPT = aggregateByPlatformAndType(platformVerifByType);
+        const coveredByPT = aggregateByPlatformAndType(platformCoveredByType);
+        const fulfilledByPT = aggregateByPlatformAndType(platformFulfilledByType);
+
+        const platformFunnel = {};
+        platformTypes.forEach(pt => {
+            const t = totalsByPT[pt] || { _total: 0 };
+            const b = bookedByPT[pt] || { _total: 0 };
+            const vr = verifByPT[pt] || { _total: 0 };
+            const c = coveredByPT[pt] || { _total: 0 };
+            const f = fulfilledByPT[pt] || { _total: 0 };
+            platformFunnel[pt] = {
+                total: t._total,
+                booked: b._total,
+                inVerification: vr._total,
+                covered: c._total,
+                fulfilled: f._total,
+                byType: {
+                    PPO: { total: t.PPO || 0, booked: b.PPO || 0, inVerification: vr.PPO || 0, covered: c.PPO || 0, fulfilled: f.PPO || 0 },
+                    HMO: { total: t.HMO || 0, booked: b.HMO || 0, inVerification: vr.HMO || 0, covered: c.HMO || 0, fulfilled: f.HMO || 0 },
+                    Medicare: { total: t.Medicare || 0, booked: b.Medicare || 0, inVerification: vr.Medicare || 0, covered: c.Medicare || 0, fulfilled: f.Medicare || 0 }
+                }
+            };
+        });
+
         // Transform filter options
         const extractValues = (arr, field) => arr
             .map(r => r[`${v}.${field}`])
@@ -4978,7 +6185,14 @@ app.get('/api/looker/insurance-analytics', async (req, res) => {
             trackingTypes: extractValues(trackOptions, 'tracking_type')
         };
 
-        res.json({ success: true, monthlyBySource, insuranceByStatus, filterOptions });
+        const responseData = { success: true, monthlyBySource, insuranceByStatus, filterOptions, platformFunnel };
+        insAnalyticsCache.set(cacheKey, { ts: Date.now(), data: responseData });
+        // Limit cache size
+        if (insAnalyticsCache.size > 50) {
+            const oldest = insAnalyticsCache.keys().next().value;
+            insAnalyticsCache.delete(oldest);
+        }
+        res.json(responseData);
     } catch (error) {
         console.error('Insurance analytics error:', error);
         res.status(500).json({ success: false, error: error.message });

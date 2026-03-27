@@ -510,6 +510,10 @@ function updateDateInputsForRange(range) {
             document.getElementById('clinicPerformanceView').classList.toggle('hidden', currentView !== 'clinicPerformance');
             document.getElementById('medworkFunnelView').classList.toggle('hidden', currentView !== 'medworkFunnel');
             
+            // Hide global date bar on Insurance page (has its own date filters)
+            const topBar = document.querySelector('.top-bar');
+            if (topBar) topBar.style.display = currentView === 'insuranceFunnel' ? 'none' : '';
+            
             // Load data for the selected view
             if (currentView === 'heatmap' && !heatmapDataLoaded) {
                 loadHeatmapData();
@@ -1106,19 +1110,66 @@ function updateLastUpdated() {
     document.getElementById('lastUpdateTop').textContent = now;
 }
 
+// Helper function to convert frontend date range to server format
+function getDateRangeForServer(range) {
+    let startDate, endDate;
+    
+    if (range.custom && customStartDate && customEndDate) {
+        startDate = customStartDate;
+        endDate = customEndDate;
+    } else {
+        const today = getESTDate();
+        const end = new Date(today);
+        const start = new Date(today);
+        
+        if (range.preset === 'yesterday') {
+            start.setDate(today.getDate() - 1);
+            end.setDate(today.getDate() - 1);
+        } else if (range.preset === 'last_7d') {
+            start.setDate(today.getDate() - 6);
+        } else if (range.preset === 'last_14d') {
+            start.setDate(today.getDate() - 13);
+        } else if (range.preset === 'last_30d') {
+            start.setDate(today.getDate() - 29);
+        } else if (range.preset === 'this_month') {
+            start.setDate(1);
+        } else if (range.preset === 'last_month') {
+            const lastMonth = new Date(today);
+            lastMonth.setMonth(today.getMonth() - 1);
+            start.setMonth(lastMonth.getMonth());
+            start.setDate(1);
+            end.setMonth(lastMonth.getMonth() + 1);
+            end.setDate(0);
+        } else {
+            // Default to last 7 days
+            start.setDate(today.getDate() - 6);
+        }
+        
+        startDate = start.toISOString().slice(0, 10);
+        endDate = end.toISOString().slice(0, 10);
+    }
+    
+    return { startDate, endDate };
+}
+
 async function loadKPIs() {
     const range = dateRanges[currentRange];
     try {
-        const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}`
-        );
+        // Use new server endpoint instead of direct API call
+        const { startDate, endDate } = getDateRangeForServer(range);
+        const response = await fetch('/api/meta/account-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const data = await response.json();
         
-        if (data.data?.[0]) {
-            const d = data.data[0];
-            const spend = parseFloat(d.spend || 0);
-            const impressions = parseInt(d.impressions || 0);
-            const clicks = parseInt(d.clicks || 0);
-            const results = getResults(d.actions);
+        if (data) {
+            // Server response format: { spend, impressions, clicks, conversions, conversionValue }
+            const spend = parseFloat(data.spend || 0);
+            const impressions = parseInt(data.impressions || 0);
+            const clicks = parseInt(data.clicks || 0);
+            const results = parseInt(data.conversions || 0);
 
             document.getElementById('totalSpend').textContent = '$' + spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             document.getElementById('totalResults').textContent = results.toLocaleString();
@@ -1237,17 +1288,23 @@ async function loadChartData() {
     const days = range.custom ? getDaysArrayCustom(customStartDate, customEndDate) : getDaysArray(numDays);
 
     try {
-        const data = await apiCall(
-            `${ACCOUNT_ID}/insights?fields=spend,actions&${getDateRange(range)}&time_increment=1`
-        );
+        // Use new server endpoint instead of direct API call
+        const { startDate, endDate } = getDateRangeForServer(range);
+        const response = await fetch('/api/meta/daily-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate })
+        });
+        const data = await response.json();
         
         const dailySpend = new Array(numDays).fill(0);
         const dailyResults = new Array(numDays).fill(0);
 
-        if (data.data) {
+        if (data.rows) {
+            // Server response format: { rows: [{date, spend, impressions, clicks, conversions, ctr, cpc}] }
             const dataByDate = {};
-            data.data.forEach(day => {
-                dataByDate[day.date_start] = day;
+            data.rows.forEach(row => {
+                dataByDate[row.date] = row;
             });
             
             if (range.custom && customStartDate && customEndDate) {
@@ -1260,7 +1317,7 @@ async function loadChartData() {
                     
                     if (dataByDate[dateStr]) {
                         dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
-                        dailyResults[i] = getResults(dataByDate[dateStr].actions);
+                        dailyResults[i] = parseInt(dataByDate[dateStr].conversions || 0);
                     }
                 }
             } else {
@@ -1273,7 +1330,7 @@ async function loadChartData() {
                     
                     if (dataByDate[dateStr]) {
                         dailySpend[i] = parseFloat(dataByDate[dateStr].spend || 0);
-                        dailyResults[i] = getResults(dataByDate[dateStr].actions);
+                        dailyResults[i] = parseInt(dataByDate[dateStr].conversions || 0);
                     }
                 }
             }
@@ -1573,9 +1630,13 @@ async function loadDailyData() {
             endDate = formatDateEST(end);
         }
         
-        // Fetch Meta data, Looker l_f_s, and Ours Privacy l_f_s in parallel
-        const [data, lfsResponse, oursLfsResponse] = await Promise.all([
-            apiCall(`${ACCOUNT_ID}/insights?fields=spend,impressions,clicks,actions&${getDateRange(range)}&time_increment=1`),
+        // Fetch Meta data from server (cached), Looker l_f_s, and Ours Privacy l_f_s in parallel
+        const [metaDailyResponse, lfsResponse, oursLfsResponse] = await Promise.all([
+            fetch('/api/meta/daily-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            }).then(r => r.json()),
             fetch(`/api/ours-privacy/lfs-by-date?platform=meta&startDate=${startDate}&endDate=${endDate}`).then(r => r.json()),
             fetch(`/api/ours-privacy/lfs-daily-breakdown?startDate=${startDate}&endDate=${endDate}`).then(r => r.json())
         ]);
@@ -1585,21 +1646,23 @@ async function loadDailyData() {
 
         const tbody = document.getElementById('dailyBody');
         
-        if (!data.data || data.data.length === 0) {
+        // Server returns { rows: [{date, spend, impressions, clicks, conversions}] }
+        const dailyData = metaDailyResponse.rows || metaDailyResponse.daily || metaDailyResponse;
+        if (!dailyData || !Array.isArray(dailyData) || dailyData.length === 0) {
             tbody.innerHTML = '<tr><td colspan="13" class="loading">No daily data for this period</td></tr>';
             return;
         }
 
         // Sort by date descending
-        const sortedData = data.data.sort((a, b) => new Date(b.date_start) - new Date(a.date_start));
+        const sortedData = dailyData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         tbody.innerHTML = sortedData.map(day => {
             const spend = parseFloat(day.spend || 0);
             const impressions = parseInt(day.impressions || 0);
             const clicks = parseInt(day.clicks || 0);
-            const results = getResults(day.actions);
-            const lfs = lfsByDate[day.date_start] || 0;
-            const oursLfsDay = oursLfsByDate[day.date_start];
+            const results = parseInt(day.conversions || 0);
+            const lfs = lfsByDate[day.date] || 0;
+            const oursLfsDay = oursLfsByDate[day.date];
             const oursLfs = oursLfsDay ? (oursLfsDay.meta || 0) : 0;
             
             const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '-';
@@ -1609,7 +1672,7 @@ async function loadDailyData() {
             const costPerOursLfs = oursLfs > 0 ? '$' + (spend / oursLfs).toFixed(2) : '-';
             
             // Parse date - create from parts to avoid timezone issues
-            const dateParts = day.date_start.split('-');
+            const dateParts = day.date.split('-');
             const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 12, 0, 0);
             const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
             const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
@@ -5918,6 +5981,8 @@ function updateQsHistoryChart(chartData) {
 let insMonthlyChart = null;
 let insFunnelChart = null;
 let insAnalyticsInitialized = false;
+let insSelectedLocations = []; // Multi-select locations
+let insAllLocations = []; // All available locations
 
 const SOURCE_FRIENDLY = {
     mutm: 'Meta (Facebook)',
@@ -5941,18 +6006,387 @@ const SOURCE_COLORS = {
     pts_mutm: '#14b8a6'
 };
 
+// ===== Multi-select Location Helpers =====
+function toggleLocationDropdown() {
+    const dd = document.getElementById('insLocationDropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+    if (dd.style.display === 'block') {
+        document.getElementById('insLocationSearch').focus();
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const multi = document.getElementById('insLocationMulti');
+    if (multi && !multi.contains(e.target)) {
+        document.getElementById('insLocationDropdown').style.display = 'none';
+    }
+});
+
+function filterLocationOptions() {
+    const query = document.getElementById('insLocationSearch').value.toLowerCase().trim();
+    renderLocationOptions(query);
+}
+
+function getStatePrefix(loc) {
+    const match = loc.match(/^([A-Z]{2})\s*-/);
+    return match ? match[1] : null;
+}
+
+function toggleStateSelection(state) {
+    const stateLocs = insAllLocations.filter(l => getStatePrefix(l) === state);
+    const allSelected = stateLocs.every(l => insSelectedLocations.includes(l));
+    if (allSelected) {
+        // Deselect all from this state
+        stateLocs.forEach(l => {
+            const idx = insSelectedLocations.indexOf(l);
+            if (idx >= 0) insSelectedLocations.splice(idx, 1);
+        });
+    } else {
+        // Select all from this state
+        stateLocs.forEach(l => {
+            if (!insSelectedLocations.includes(l)) insSelectedLocations.push(l);
+        });
+    }
+    updateLocationDisplay();
+    renderLocationOptions(document.getElementById('insLocationSearch').value.toLowerCase().trim());
+    document.getElementById('insLocation').value = insSelectedLocations.join(',');
+}
+
+function toggleLocationSelection(loc) {
+    const idx = insSelectedLocations.indexOf(loc);
+    if (idx >= 0) {
+        insSelectedLocations.splice(idx, 1);
+    } else {
+        insSelectedLocations.push(loc);
+    }
+    updateLocationDisplay();
+    renderLocationOptions(document.getElementById('insLocationSearch').value.toLowerCase().trim());
+    document.getElementById('insLocation').value = insSelectedLocations.join(',');
+}
+
+function removeLocation(loc, e) {
+    e.stopPropagation();
+    const idx = insSelectedLocations.indexOf(loc);
+    if (idx >= 0) insSelectedLocations.splice(idx, 1);
+    updateLocationDisplay();
+    renderLocationOptions(document.getElementById('insLocationSearch').value.toLowerCase().trim());
+    document.getElementById('insLocation').value = insSelectedLocations.join(',');
+}
+
+function clearAllLocations(e) {
+    e.stopPropagation();
+    insSelectedLocations = [];
+    updateLocationDisplay();
+    renderLocationOptions(document.getElementById('insLocationSearch').value.toLowerCase().trim());
+    document.getElementById('insLocation').value = '';
+}
+
+function updateLocationDisplay() {
+    const display = document.getElementById('insLocationDisplay');
+    const placeholder = document.getElementById('insLocationPlaceholder');
+    display.querySelectorAll('.loc-tag').forEach(t => t.remove());
+    if (insSelectedLocations.length === 0) {
+        placeholder.style.display = 'inline';
+        placeholder.textContent = 'All Locations';
+    } else if (insSelectedLocations.length <= 2) {
+        placeholder.style.display = 'none';
+        insSelectedLocations.forEach(loc => {
+            const tag = document.createElement('span');
+            tag.className = 'loc-tag';
+            tag.style.cssText = 'background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:11px; display:inline-flex; align-items:center; gap:3px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            tag.innerHTML = `${loc}<span onclick="removeLocation('${loc.replace(/'/g, "\\'")}', event)" style="cursor:pointer; font-weight:bold; font-size:12px; line-height:1;">&times;</span>`;
+            display.appendChild(tag);
+        });
+    } else {
+        // Compact: show count + clear button
+        placeholder.style.display = 'inline';
+        placeholder.textContent = `${insSelectedLocations.length} locations selected`;
+        const clearBtn = document.createElement('span');
+        clearBtn.className = 'loc-tag';
+        clearBtn.style.cssText = 'background:#fee2e2; color:#dc2626; padding:2px 6px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600;';
+        clearBtn.textContent = '✕ Clear';
+        clearBtn.onclick = clearAllLocations;
+        display.appendChild(clearBtn);
+    }
+}
+
+function renderLocationOptions(query) {
+    query = query || '';
+    const container = document.getElementById('insLocationOptions');
+    container.innerHTML = '';
+
+    // Filter locations by query
+    const filtered = insAllLocations.filter(l => l.toLowerCase().includes(query));
+
+    // Detect state groups in filtered results
+    const stateGroups = {};
+    filtered.forEach(loc => {
+        const state = getStatePrefix(loc);
+        if (state) {
+            if (!stateGroups[state]) stateGroups[state] = [];
+            stateGroups[state].push(loc);
+        }
+    });
+
+    // Add "Select All [STATE]" buttons for states with 2+ visible locations
+    const shownStates = new Set();
+    Object.entries(stateGroups).forEach(([state, locs]) => {
+        if (locs.length >= 2) {
+            shownStates.add(state);
+            const allSelected = locs.every(l => insSelectedLocations.includes(l));
+            const someSelected = locs.some(l => insSelectedLocations.includes(l));
+            const div = document.createElement('div');
+            div.className = 'loc-state-group';
+            div.style.cssText = 'padding:6px 8px; cursor:pointer; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; border-radius:4px; background:#f0f4ff; margin-bottom:2px; color:#3b82f6; border-left:3px solid #3b82f6;';
+            div.onmouseenter = () => div.style.background = '#dbeafe';
+            div.onmouseleave = () => div.style.background = '#f0f4ff';
+            div.onclick = () => toggleStateSelection(state);
+            const cb = allSelected ? 'checked' : (someSelected ? 'indeterminate' : '');
+            div.innerHTML = `<input type="checkbox" ${allSelected ? 'checked' : ''} style="pointer-events:none; accent-color:#3b82f6;"> Select all ${state} (${locs.length})`;
+            if (someSelected && !allSelected) {
+                const cbEl = div.querySelector('input');
+                setTimeout(() => { if (cbEl) cbEl.indeterminate = true; }, 0);
+            }
+            container.appendChild(div);
+        }
+    });
+
+    // Render individual locations
+    filtered.forEach(loc => {
+        const checked = insSelectedLocations.includes(loc);
+        const div = document.createElement('div');
+        div.className = 'loc-option';
+        div.setAttribute('data-loc', loc);
+        div.style.cssText = 'padding:5px 8px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px; border-radius:4px;';
+        div.onmouseenter = () => div.style.background = '#f1f5f9';
+        div.onmouseleave = () => div.style.background = 'transparent';
+        div.onclick = () => toggleLocationSelection(loc);
+        div.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} style="pointer-events:none; accent-color:#3b82f6;"> <span>${loc}</span>`;
+        container.appendChild(div);
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div style="padding:8px; color:#94a3b8; font-size:12px; text-align:center;">No locations found</div>';
+    }
+}
+
 function initInsuranceFilters() {
     if (insAnalyticsInitialized) return;
     insAnalyticsInitialized = true;
     const today = new Date();
-    const nineMonthsAgo = new Date(today);
-    nineMonthsAgo.setMonth(today.getMonth() - 9);
-    document.getElementById('insStartDate').value = nineMonthsAgo.toISOString().slice(0, 10);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    document.getElementById('insStartDate').value = thirtyDaysAgo.toISOString().slice(0, 10);
     document.getElementById('insEndDate').value = today.toISOString().slice(0, 10);
     document.getElementById('insApplyFilters').addEventListener('click', () => {
         insuranceDataLoaded = false;
         loadInsuranceAnalytics();
     });
+}
+
+// Cache cost data to avoid re-fetching when only filters change
+let insCostCache = { key: '', data: null };
+let insStateCostCache = { key: '', data: null };
+
+async function loadStateSpend(startDate, endDate, states) {
+    if (!states || !states.length) return await loadInsuranceCostData(startDate, endDate);
+    const cacheKey = `${startDate}_${endDate}_${[...states].sort().join(',')}`;
+    if (insStateCostCache.key === cacheKey && insStateCostCache.data) return insStateCostCache.data;
+
+    try {
+        const resp = await fetch('/api/spend-by-states', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate, states })
+        });
+        if (!resp.ok) return await loadInsuranceCostData(startDate, endDate); // fallback
+        const data = await resp.json();
+        insStateCostCache = { key: cacheKey, data: data };
+        return data;
+    } catch {
+        return await loadInsuranceCostData(startDate, endDate); // fallback
+    }
+}
+
+async function loadInsuranceCostData(startDate, endDate) {
+    try {
+        const cacheKey = `${startDate}_${endDate}`;
+        if (insCostCache.key === cacheKey && insCostCache.data) {
+            return insCostCache.data;
+        }
+
+        const safeFetch = (url, opts) => fetch(url, opts).then(r => {
+            if (!r.ok) return {};
+            return r.json().catch(() => ({}));
+        }).catch(() => ({}));
+
+        // Check if date range is > 30 days (TikTok API limit)
+        const daysDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000);
+        const tiktokPromise = daysDiff <= 30
+            ? safeFetch('/api/tiktok/account-performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            })
+            : Promise.resolve({ spend: 0 });
+
+        const [summaryData, tiktokRes] = await Promise.all([
+            safeFetch('/api/summary/daily', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            }),
+            tiktokPromise
+        ]);
+
+        const metaSpend = (summaryData.meta || []).reduce((s, d) => s + (d.spend || 0), 0);
+        const googleSpend = (summaryData.google || []).reduce((s, d) => s + (d.spend || 0), 0);
+        const bingSpend = (summaryData.bing || []).reduce((s, d) => s + (d.spend || 0), 0);
+        const tiktokSpend = tiktokRes.spend || 0;
+        const totalSpend = metaSpend + googleSpend + bingSpend + tiktokSpend;
+
+        const result = { meta: metaSpend, google: googleSpend, bing: bingSpend, tiktok: tiktokSpend, total: totalSpend };
+        insCostCache = { key: cacheKey, data: result };
+        return result;
+    } catch (e) {
+        console.error('Cost data error:', e);
+        return null;
+    }
+}
+
+function renderInsuranceTypeFunnels(costData, insuranceTypeFunnel) {
+    const section = document.getElementById('insCostSection');
+    const container = document.getElementById('insCostCards');
+    if (!costData || !insuranceTypeFunnel) {
+        section.style.display = 'none';
+        return;
+    }
+
+    const fmtMoney = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtNum = n => n.toLocaleString('en-US');
+    const costPer = (spend, count) => count > 0 ? fmtMoney(spend / count) : '-';
+
+    // Get the current insurance type filter to set dynamic label
+    const insTypeFilter = document.getElementById('insInsuranceType').value;
+    const leadLabel = insTypeFilter ? `${insTypeFilter} Leads` : 'Insurance Leads';
+
+    // Calculate total leads across all types to allocate cost proportionally
+    const totalLeadsAll = Object.values(insuranceTypeFunnel).reduce((s, d) => s + (d.total || 0), 0);
+    const totalSpend = costData.total || 0;
+
+    const types = [
+        { key: 'PPO', name: 'PPO', color: '#3b82f6', icon: '🔵' },
+        { key: 'HMO', name: 'HMO', color: '#f59e0b', icon: '🟡' },
+        { key: 'Medicare', name: 'Medicare', color: '#10b981', icon: '🟢' }
+    ];
+
+    // Calculate totals for the sum column
+    const totals = { total: 0, booked: 0, inVerification: 0, covered: 0, fulfilled: 0 };
+    types.forEach(t => {
+        const d = insuranceTypeFunnel[t.key] || { total: 0, booked: 0, inVerification: 0, covered: 0, fulfilled: 0 };
+        totals.total += d.total;
+        totals.booked += d.booked;
+        totals.inVerification += d.inVerification;
+        totals.covered += d.covered;
+        totals.fulfilled += d.fulfilled;
+    });
+
+    const buildCard = (name, color, icon, d, allocatedCost) => `
+        <div class="funnel-card" style="flex:1; min-width:210px; background:#f8f9fa; border-radius:12px; padding:15px; border-top:4px solid ${color};">
+            <h3 style="margin:0 0 12px 0; color:${color};">${icon} ${name}</h3>
+            <div class="mini-funnel">
+                <div class="mini-funnel-row spend"><span>Cost (allocated)</span><span>${fmtMoney(allocatedCost)}</span></div>
+                <div class="mini-funnel-row highlight"><span>${leadLabel}</span><span>${fmtNum(d.total)}</span></div>
+                <div class="mini-funnel-row"><span>Is Booked</span><span>${fmtNum(d.booked)}</span></div>
+                <div class="mini-funnel-row"><span>Sent to Verif.</span><span>${fmtNum(d.inVerification)}</span></div>
+                <div class="mini-funnel-row"><span>Booked Covered</span><span>${fmtNum(d.covered)}</span></div>
+                <div class="mini-funnel-row" style="background:#d4edda;"><span>Fulfilled</span><span>${fmtNum(d.fulfilled)}</span></div>
+                <div class="mini-funnel-row cost" style="margin-top:10px; border-top:1px solid #ddd; padding-top:10px;"><span>Cost/Lead</span><span>${costPer(allocatedCost, d.total)}</span></div>
+                <div class="mini-funnel-row cost"><span>Cost/Fulfilled</span><span>${costPer(allocatedCost, d.fulfilled)}</span></div>
+            </div>
+        </div>`;
+
+    container.innerHTML = `
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            ${types.map(t => {
+                const d = insuranceTypeFunnel[t.key] || { total: 0, booked: 0, inVerification: 0, covered: 0, fulfilled: 0 };
+                const allocatedCost = totalLeadsAll > 0 ? totalSpend * (d.total / totalLeadsAll) : 0;
+                return buildCard(t.name, t.color, t.icon, d, allocatedCost);
+            }).join('')}
+            ${buildCard('Total', '#1e293b', '📊', totals, totalSpend)}
+        </div>
+        <div style="margin-top:8px; font-size:11px; color:#94a3b8;">💡 Cost allocated proportionally by lead volume. Total spend: ${fmtMoney(totalSpend)}</div>
+    `;
+    section.style.display = 'block';
+}
+
+function renderSourceFunnels(costData, platformFunnel) {
+    const section = document.getElementById('insSourceFunnelSection');
+    const container = document.getElementById('insSourceFunnelCards');
+    if (!section || !costData || !platformFunnel) {
+        if (section) section.style.display = 'none';
+        return;
+    }
+
+    const fmtMoney = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtNum = n => n.toLocaleString('en-US');
+    const costPer = (spend, count) => count > 0 ? fmtMoney(spend / count) : '-';
+
+    const insTypeFilter = document.getElementById('insInsuranceType').value;
+    const leadLabel = insTypeFilter ? `${insTypeFilter} Leads` : 'Insurance Leads';
+
+    const platforms = [
+        { key: 'mutm', name: 'Meta', color: '#4267B2', icon: '📘', spend: costData.meta },
+        { key: 'g1utm', name: 'Google', color: '#EA4335', icon: '🔴', spend: costData.google },
+        { key: 'butm', name: 'Bing', color: '#00A4EF', icon: '🔷', spend: costData.bing },
+        { key: 'tutm', name: 'TikTok', color: '#000000', icon: '🎵', spend: costData.tiktok }
+    ];
+
+    const pf = platformFunnel || {};
+    const showAllTypes = !insTypeFilter; // Show 3 rows when no type filtered
+
+    const typeColors = { PPO: '#3b82f6', HMO: '#f59e0b', Medicare: '#10b981' };
+
+    container.innerHTML = `
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            ${platforms.map(p => {
+                const d = pf[p.key] || { total: 0, booked: 0, inVerification: 0, covered: 0, fulfilled: 0, byType: {} };
+                const spend = p.spend || 0;
+                const bt = d.byType || {};
+
+                // Build the leads row(s)
+                let leadsRows;
+                if (showAllTypes) {
+                    leadsRows = ['PPO', 'HMO', 'Medicare'].map(t => {
+                        const val = bt[t] ? bt[t].total : 0;
+                        return `<div class="mini-funnel-row highlight" style="background:${typeColors[t]}20; border-left:3px solid ${typeColors[t]}; color:#1e293b;"><span style="padding-left:4px; color:#1e293b;">${t} Leads</span><span style="color:#1e293b;">${fmtNum(val)}</span></div>`;
+                    }).join('');
+                } else {
+                    leadsRows = `<div class="mini-funnel-row highlight"><span>${leadLabel}</span><span>${fmtNum(d.total)}</span></div>`;
+                }
+
+                const stageRow = (label, count, bg) => {
+                    const cp = spend > 0 && count > 0 ? ` <span style="color:#6b7280; font-size:11px;">(${costPer(spend, count)})</span>` : '';
+                    return `<div class="mini-funnel-row"${bg ? ` style="background:${bg};"` : ''}><span>${label}</span><span>${fmtNum(count)}${cp}</span></div>`;
+                };
+
+                return `
+                <div class="funnel-card" style="flex:1; min-width:210px; background:#f8f9fa; border-radius:12px; padding:15px; border-top:4px solid ${p.color};">
+                    <h3 style="margin:0 0 12px 0; color:${p.color};">${p.icon} ${p.name}</h3>
+                    <div class="mini-funnel">
+                        <div class="mini-funnel-row spend"><span>Cost</span><span>${fmtMoney(spend)}</span></div>
+                        ${leadsRows}
+                        ${stageRow('Is Booked', d.booked)}
+                        ${stageRow('Sent to Verif.', d.inVerification)}
+                        ${stageRow('Booked Covered', d.covered)}
+                        ${stageRow('Fulfilled', d.fulfilled, '#d4edda')}
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>
+    `;
+    section.style.display = 'block';
 }
 
 async function loadInsuranceAnalytics() {
@@ -5961,11 +6395,12 @@ async function loadInsuranceAnalytics() {
     loading.style.display = 'block';
     document.getElementById('insMonthlyChartWrap').style.display = 'none';
     document.getElementById('insFunnelChartWrap').style.display = 'none';
+    document.getElementById('insSourceFunnelSection').style.display = 'none';
 
     try {
         const startDate = document.getElementById('insStartDate').value;
         const endDate = document.getElementById('insEndDate').value;
-        const location = document.getElementById('insLocation').value;
+        const location = insSelectedLocations.length > 0 ? insSelectedLocations.join(',') : '';
         const insType = document.getElementById('insInsuranceType').value;
         const insName = document.getElementById('insInsuranceName').value;
         const trackType = document.getElementById('insTrackingType').value;
@@ -5978,11 +6413,29 @@ async function loadInsuranceAnalytics() {
         if (insName) params.set('insuranceName', insName);
         if (trackType) params.set('trackingType', trackType);
 
-        const response = await fetch('/api/looker/insurance-analytics?' + params.toString());
+        // Extract states from selected locations for state-level spend
+        const stateMap = { 'NYC': 'NY', 'LI': 'NY' }; // Map NYC/LI to NY
+        const selectedStates = [...new Set(insSelectedLocations.map(l => {
+            const m = l.match(/^([A-Z]{2,3})\s*-/);
+            if (!m) return null;
+            return stateMap[m[1]] || m[1];
+        }).filter(Boolean))];
+
+        // Fetch insurance data and cost data in parallel
+        const [response, costData] = await Promise.all([
+            fetch('/api/looker/insurance-analytics?' + params.toString()),
+            selectedStates.length > 0
+                ? loadStateSpend(startDate, endDate, selectedStates)
+                : loadInsuranceCostData(startDate, endDate)
+        ]);
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
         const result = await response.json();
         if (!result.success) throw new Error(result.error || 'Failed to load data');
 
-        const { monthlyBySource, insuranceByStatus, filterOptions } = result;
+        const { monthlyBySource, insuranceByStatus, filterOptions, platformFunnel } = result;
+
+        // Render source funnel (Meta/Google/Bing/TikTok)
+        renderSourceFunnels(costData, platformFunnel);
 
         // Populate filter dropdowns (preserve current selection)
         function populateSelect(id, options, current) {
@@ -5999,13 +6452,15 @@ async function loadInsuranceAnalytics() {
                 sel.appendChild(o);
             }
         }
-        populateSelect('insLocation', filterOptions.locations);
+        // Update multi-select locations
+        insAllLocations = filterOptions.locations || [];
+        renderLocationOptions();
+        
         populateSelect('insInsuranceType', filterOptions.insuranceTypes);
         populateSelect('insInsuranceName', filterOptions.insuranceNames);
         populateSelect('insTrackingType', filterOptions.trackingTypes);
 
         // ===== Chart 1: Monthly Stacked Bar =====
-        // Group data by month then by source
         const monthMap = {};
         const allSources = new Set();
         for (const row of monthlyBySource) {
@@ -6032,11 +6487,11 @@ async function loadInsuranceAnalytics() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#e2e8f0' } }
+                    legend: { labels: { color: '#334155' } }
                 },
                 scales: {
-                    x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                    y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    x: { stacked: true, ticks: { color: '#475569' }, grid: { color: '#e2e8f0' } },
+                    y: { stacked: true, beginAtZero: true, ticks: { color: '#475569' }, grid: { color: '#e2e8f0' } }
                 }
             }
         });
@@ -6048,7 +6503,6 @@ async function loadInsuranceAnalytics() {
             .slice(0, 25);
 
         const insLabels = sorted.map(([name]) => name.replace(/^\*/, ''));
-        // Use clean non-overlapping segments: Not Booked | Booked (not fulfilled) | Fulfilled
         const notBooked = sorted.map(([, s]) => Math.max(0, s.total - s.booked));
         const bookedNotFulfilled = sorted.map(([, s]) => Math.max(0, s.booked - s.fulfilled));
         const fulfilled = sorted.map(([, s]) => s.fulfilled);
@@ -6070,7 +6524,7 @@ async function loadInsuranceAnalytics() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#e2e8f0' } },
+                    legend: { labels: { color: '#334155' } },
                     tooltip: {
                         callbacks: {
                             afterBody: function(items) {
@@ -6082,8 +6536,8 @@ async function loadInsuranceAnalytics() {
                     }
                 },
                 scales: {
-                    x: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                    y: { stacked: true, ticks: { color: '#e2e8f0', font: { size: 11 } }, grid: { display: false } }
+                    x: { stacked: true, beginAtZero: true, ticks: { color: '#475569' }, grid: { color: '#e2e8f0' } },
+                    y: { stacked: true, ticks: { color: '#1e293b', font: { size: 11 } }, grid: { display: false } }
                 }
             }
         });
@@ -9474,10 +9928,7 @@ async function toggleAdSetBreakdown(campaignId, row) {
         return;
     }
     
-    // Remove any other open detail rows
-    document.querySelectorAll('.adset-detail-row').forEach(r => r.remove());
-    document.querySelectorAll('#campaignBody tr.expanded').forEach(r => r.classList.remove('expanded'));
-    
+    // Allow multiple campaigns open at once (no auto-close)
     row.classList.add('expanded');
     const colCount = row.children.length;
     
