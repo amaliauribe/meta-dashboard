@@ -4103,59 +4103,71 @@ app.get("/api/ours-privacy/lfs-by-platform", async (req, res) => {
 
 // Get l_f_s daily breakdown with platform counts
 app.get("/api/ours-privacy/lfs-daily-breakdown", (req, res) => {
-    const data = global.webhookData || [];
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
-    const allData = data.filter(d => 
-        d.headers && d.headers["user-agent"] && 
-        d.headers["user-agent"].includes("ours-privacy")
-    );
-    
-    // Build visitor platform mapping
-    const visitorPlatform = {};
-    allData.forEach(d => {
-        const event = d.body?.event?.event || "";
-        const visitorId = d.body?.visitor?.visitor_id;
-        if (!visitorId) return;
+    try {
+        // Use SQLite DB for full historical data (JSON file may be incomplete)
+        const startFilter = startDate || '2020-01-01';
+        const endFilter = (endDate || '2099-12-31') + 'T23:59:59';
         
-        if (event.startsWith("mutm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "meta";
-        if (event.startsWith("g1utm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "google";
-        if (event.startsWith("butm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "bing";
-        if (event.startsWith("tutm_") && !visitorPlatform[visitorId]) visitorPlatform[visitorId] = "tiktok";
-    });
-    
-    // Filter l_f_s events
-    let lfsData = allData.filter(d => d.body?.event?.event === "l_f_s");
-    
-    if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) >= start);
-    }
-    if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        lfsData = lfsData.filter(d => new Date(d.timestamp) <= end);
-    }
-    
-    // Group by date with platform breakdown
-    const byDate = {};
-    lfsData.forEach(d => {
-        const date = d.timestamp.split("T")[0];
-        const visitorId = d.body?.visitor?.visitor_id;
-        const source = (d.body?.visitor?.utm_source || "").toLowerCase();
+        // Get all l_f_s events with their visitor IDs
+        const lfsEvents = db.prepare(
+            "SELECT visitor_id, timestamp FROM webhooks WHERE event_name = 'l_f_s' AND timestamp >= ? AND timestamp <= ?"
+        ).all(startFilter, endFilter);
         
-        // Determine platform
-        let platform = visitorPlatform[visitorId] || "other";
-        if (platform === "other") {
-            if (source === "facebook" || source === "fb") platform = "meta";
-            else if (source === "google") platform = "google";
-            else if (source === "bing") platform = "bing";
-            else if (source === "tiktok") platform = "tiktok";
+        // Get unique visitor IDs from l_f_s events
+        const visitorIds = [...new Set(lfsEvents.map(e => e.visitor_id).filter(Boolean))];
+        
+        // Build visitor platform mapping from DB
+        const visitorPlatform = {};
+        if (visitorIds.length > 0) {
+            // Process in batches to avoid SQL parameter limits
+            const batchSize = 500;
+            for (let i = 0; i < visitorIds.length; i += batchSize) {
+                const batch = visitorIds.slice(i, i + batchSize);
+                const placeholders = batch.map(() => '?').join(',');
+                
+                // Check for platform prefix events for these visitors
+                const platformEvents = db.prepare(
+                    "SELECT DISTINCT visitor_id, event_name FROM webhooks WHERE visitor_id IN (" + placeholders + ") AND (event_name LIKE 'mutm_%' OR event_name LIKE 'g1utm_%' OR event_name LIKE 'butm_%' OR event_name LIKE 'tutm_%')"
+                ).all(...batch);
+                
+                platformEvents.forEach(e => {
+                    if (visitorPlatform[e.visitor_id]) return; // first match wins
+                    if (e.event_name.startsWith('mutm_')) visitorPlatform[e.visitor_id] = 'meta';
+                    else if (e.event_name.startsWith('g1utm_')) visitorPlatform[e.visitor_id] = 'google';
+                    else if (e.event_name.startsWith('butm_')) visitorPlatform[e.visitor_id] = 'bing';
+                    else if (e.event_name.startsWith('tutm_')) visitorPlatform[e.visitor_id] = 'tiktok';
+                });
+            }
+            
+            // Also check utm_source for visitors without platform prefix events
+            for (let i = 0; i < visitorIds.length; i += batchSize) {
+                const batch = visitorIds.slice(i, i + batchSize).filter(v => !visitorPlatform[v]);
+                if (batch.length === 0) continue;
+                const placeholders = batch.map(() => '?').join(',');
+                const utmEvents = db.prepare(
+                    "SELECT visitor_id, utm_source FROM webhooks WHERE visitor_id IN (" + placeholders + ") AND utm_source IS NOT NULL AND utm_source != '' LIMIT " + batch.length
+                ).all(...batch);
+                utmEvents.forEach(e => {
+                    if (visitorPlatform[e.visitor_id]) return;
+                    const src = (e.utm_source || '').toLowerCase();
+                    if (src === 'facebook' || src === 'fb' || src === 'instagram') visitorPlatform[e.visitor_id] = 'meta';
+                    else if (src === 'google') visitorPlatform[e.visitor_id] = 'google';
+                    else if (src === 'bing') visitorPlatform[e.visitor_id] = 'bing';
+                    else if (src === 'tiktok') visitorPlatform[e.visitor_id] = 'tiktok';
+                });
+            }
         }
         
-        if (!byDate[date]) {
+        // Group by date with platform breakdown
+        const byDate = {};
+        lfsEvents.forEach(d => {
+            const date = d.timestamp.split("T")[0];
+            const platform = visitorPlatform[d.visitor_id] || "other";
+        
+            if (!byDate[date]) {
             byDate[date] = { total: 0, meta: 0, google: 0, bing: 0, tiktok: 0, other: 0 };
         }
         byDate[date].total++;
@@ -4163,6 +4175,10 @@ app.get("/api/ours-privacy/lfs-daily-breakdown", (req, res) => {
     });
     
     res.json({ byDate });
+    } catch (error) {
+        console.error('lfs-daily-breakdown DB error:', error);
+        res.status(500).json({ error: error.message, byDate: {} });
+    }
 });
 
 // Get l_f_s events by platform grouped by date
