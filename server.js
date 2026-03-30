@@ -3526,6 +3526,11 @@ app.post('/api/summary/daily', async (req, res) => {
     }
 
     // Store each day to persistent cache
+    // Only cache if we actually got data from APIs (don't cache zeros from timeouts)
+    const gotMeta = fresh.meta.length > 0;
+    const gotGoogle = fresh.google.length > 0;
+    const gotBing = fresh.bing.length > 0;
+    
     for (const date of uncached) {
         const dm = fresh.meta.find(d => d.date===date) || {date, spend:0, conversions:0};
         const dg = fresh.google.find(d => d.date===date) || {date, spend:0, conversions:0};
@@ -3533,7 +3538,13 @@ app.post('/api/summary/daily', async (req, res) => {
         if (date === today) {
             todaySpendCache = { date: today, ts: Date.now(), data: { meta: dm, google: dg, bing: db } };
         } else {
-            writeSpendCache(date, { meta: dm, google: dg, bing: db });
+            // Only write to persistent cache if ALL platforms returned data
+            // Otherwise, zeros from API timeouts get permanently cached
+            if (gotMeta && gotGoogle && gotBing) {
+                writeSpendCache(date, { meta: dm, google: dg, bing: db });
+            } else {
+                console.log('[spend-cache] Skipping cache for ' + date + ' - missing platform data (meta:' + gotMeta + ' google:' + gotGoogle + ' bing:' + gotBing + ')');
+            }
         }
     }
 
