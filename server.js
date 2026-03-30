@@ -4295,46 +4295,72 @@ app.get("/api/ours-privacy/invoca-by-platform", (req, res) => {
 
 // Ours Privacy l_f_s from RAW WEBHOOKS (not Looker) - for the "Ours P" rows
 app.get("/api/ours-privacy/lfs-raw-by-platform", (req, res) => {
-    const data = global.webhookData || [];
     const platform = (req.query.platform || "").toLowerCase();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
-    // Map platform to utm_source patterns
-    const platformPatterns = {
-        meta: ['facebook', 'fb', 'meta', 'ig', 'instagram'],
-        google: ['google', 'gclid'],
-        bing: ['bing', 'msclkid', 'microsoft'],
-        tiktok: ['tiktok', 'tt']
-    };
-    
-    let oursData = data.filter(d => 
-        d.headers?.["user-agent"]?.includes("ours-privacy") &&
-        d.body?.event?.event === "l_f_s"
-    );
-    
-    // Date filter
-    if (startDate) {
-        const start = new Date(startDate); start.setHours(0, 0, 0, 0);
-        oursData = oursData.filter(d => new Date(d.timestamp) >= start);
+    try {
+        const startFilter = startDate || '2020-01-01';
+        const endFilter = (endDate || '2099-12-31') + 'T23:59:59';
+        
+        // Get all l_f_s events from DB
+        const lfsEvents = db.prepare(
+            "SELECT visitor_id, timestamp, utm_source FROM webhooks WHERE event_name = 'l_f_s' AND timestamp >= ? AND timestamp <= ?"
+        ).all(startFilter, endFilter);
+        
+        // Get unique visitor IDs
+        const visitorIds = [...new Set(lfsEvents.map(e => e.visitor_id).filter(Boolean))];
+        
+        // Build visitor platform mapping from event prefixes
+        const visitorPlatform = {};
+        if (visitorIds.length > 0) {
+            const batchSize = 500;
+            for (let i = 0; i < visitorIds.length; i += batchSize) {
+                const batch = visitorIds.slice(i, i + batchSize);
+                const placeholders = batch.map(() => '?').join(',');
+                const platformEvents = db.prepare(
+                    "SELECT DISTINCT visitor_id, event_name FROM webhooks WHERE visitor_id IN (" + placeholders + ") AND (event_name LIKE 'mutm_%' OR event_name LIKE 'g1utm_%' OR event_name LIKE 'butm_%' OR event_name LIKE 'tutm_%')"
+                ).all(...batch);
+                platformEvents.forEach(e => {
+                    if (visitorPlatform[e.visitor_id]) return;
+                    if (e.event_name.startsWith('mutm_')) visitorPlatform[e.visitor_id] = 'meta';
+                    else if (e.event_name.startsWith('g1utm_')) visitorPlatform[e.visitor_id] = 'google';
+                    else if (e.event_name.startsWith('butm_')) visitorPlatform[e.visitor_id] = 'bing';
+                    else if (e.event_name.startsWith('tutm_')) visitorPlatform[e.visitor_id] = 'tiktok';
+                });
+            }
+            // Fallback: check utm_source for unmatched visitors
+            for (let i = 0; i < visitorIds.length; i += batchSize) {
+                const batch = visitorIds.slice(i, i + batchSize).filter(v => !visitorPlatform[v]);
+                if (batch.length === 0) continue;
+                const placeholders = batch.map(() => '?').join(',');
+                const utmEvents = db.prepare(
+                    "SELECT visitor_id, utm_source FROM webhooks WHERE visitor_id IN (" + placeholders + ") AND utm_source IS NOT NULL AND utm_source != '' LIMIT " + batch.length
+                ).all(...batch);
+                utmEvents.forEach(e => {
+                    if (visitorPlatform[e.visitor_id]) return;
+                    const src = (e.utm_source || '').toLowerCase();
+                    if (src === 'facebook' || src === 'fb' || src === 'instagram') visitorPlatform[e.visitor_id] = 'meta';
+                    else if (src === 'google') visitorPlatform[e.visitor_id] = 'google';
+                    else if (src === 'bing') visitorPlatform[e.visitor_id] = 'bing';
+                    else if (src === 'tiktok') visitorPlatform[e.visitor_id] = 'tiktok';
+                });
+            }
+        }
+        
+        // Filter by platform
+        let total;
+        if (platform) {
+            total = lfsEvents.filter(e => (visitorPlatform[e.visitor_id] || 'other') === platform).length;
+        } else {
+            total = lfsEvents.length;
+        }
+        
+        res.json({ platform, total, source: "db" });
+    } catch (error) {
+        console.error('lfs-raw-by-platform DB error:', error);
+        res.json({ platform, total: 0, source: "error", error: error.message });
     }
-    if (endDate) {
-        const end = new Date(endDate); end.setHours(23, 59, 59, 999);
-        oursData = oursData.filter(d => new Date(d.timestamp) <= end);
-    }
-    
-    // Platform filter
-    if (platform && platformPatterns[platform]) {
-        const patterns = platformPatterns[platform];
-        oursData = oursData.filter(d => {
-            const source = (d.body.visitor?.utm_source || "").toLowerCase();
-            const medium = (d.body.visitor?.utm_medium || "").toLowerCase();
-            const url = (d.body.event?.url || "").toLowerCase();
-            return patterns.some(p => source.includes(p) || medium.includes(p) || url.includes(p));
-        });
-    }
-    
-    res.json({ platform, total: oursData.length, source: "webhooks" });
 });
 
 app.get("/api/ours-privacy/lfs", (req, res) => {
