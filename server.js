@@ -908,8 +908,24 @@ function saveWebhookData(data) {
 
 // Initialize global webhook data from file
 // Load webhook data from JSON
-global.webhookData = loadWebhookData();
-console.log("[WEBHOOK] Loaded", global.webhookData.length, "historical events from JSON storage");
+// Skip loading JSON into memory - use SQLite instead (memory optimization)
+global.webhookData = [];
+console.log("[WEBHOOK] Using SQLite for webhook queries (memory-optimized mode)");
+
+// Helper: get all webhook data from SQLite as parsed objects
+function getWebhookDataFromDB(limit) {
+    const query = limit 
+        ? db.prepare("SELECT body, timestamp FROM webhooks ORDER BY id DESC LIMIT ?")
+        : db.prepare("SELECT body, timestamp FROM webhooks ORDER BY id ASC");
+    const rows = limit ? query.all(limit) : query.all();
+    return rows.map(r => {
+        try {
+            const parsed = JSON.parse(r.body);
+            parsed._db_timestamp = r.timestamp;
+            return parsed;
+        } catch(e) { return null; }
+    }).filter(Boolean);
+}
 console.log("[DB] SQLite database:", DB_FILE, "- Events:", countStmt.get().count);
 
 // Override webhook handler to persist data
@@ -930,7 +946,7 @@ app.post("/webhook", express.json(), (req, res) => {
     saveWebhookToDb(entry);
     
     // Save to JSON file (legacy, async to not block response)
-    setImmediate(() => saveWebhookData(global.webhookData));
+    // JSON save disabled - using SQLite only
     
     res.json({ success: true, message: "Data received", timestamp });
 });
@@ -953,7 +969,7 @@ app.post("/", express.json(), (req, res) => {
     saveWebhookToDb(entry);
     
     // Save to JSON file (legacy)
-    setImmediate(() => saveWebhookData(global.webhookData));
+    // JSON save disabled - using SQLite only
     
     res.json({ success: true, message: "Data received", timestamp });
 });
@@ -3811,14 +3827,16 @@ app.post('/api/spend-by-states', async (req, res) => {
 
 // API endpoint for webhook data (must be before catch-all)
 app.get("/api/webhooks", (req, res) => {
-    res.json({ count: global.webhookData?.length || 0, data: (global.webhookData || []).slice(-20) });
+    const totalCount = db.prepare("SELECT COUNT(*) as count FROM webhooks").get().count;
+    const recent = getWebhookDataFromDB(20);
+    res.json({ count: totalCount, data: recent });
 });
 
 // ==================== Ours Privacy API ====================
 
 // Get aggregated event counts
 app.get("/api/ours-privacy/events", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     
     // Filter only ours-privacy data (has user-agent with ours-privacy)
     const oursData = data.filter(d => 
@@ -3861,7 +3879,7 @@ app.get("/api/ours-privacy/events", (req, res) => {
 // Get raw webhook data (last N entries)
 app.get("/api/ours-privacy/raw", (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     
     const oursData = data
         .filter(d => d.headers && d.headers["user-agent"] && d.headers["user-agent"].includes("ours-privacy"))
@@ -3874,7 +3892,7 @@ app.get("/api/ours-privacy/raw", (req, res) => {
 
 // Get aggregated event counts with pivot by source
 app.get("/api/ours-privacy/pivot", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     
     const oursData = data.filter(d => 
         d.headers && d.headers["user-agent"] && 
@@ -3926,7 +3944,7 @@ app.get("/api/ours-privacy/pivot", (req, res) => {
 
 // Get events grouped by source prefix (all visitor events under primary source)
 app.get("/api/ours-privacy/by-source", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
@@ -4252,7 +4270,7 @@ app.get("/api/ours-privacy/lfs-by-date", async (req, res) => {
 // Get l_f_s events grouped by source
 // Invoca calls from raw webhooks by platform
 app.get("/api/ours-privacy/invoca-by-platform", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
@@ -4364,7 +4382,7 @@ app.get("/api/ours-privacy/lfs-raw-by-platform", (req, res) => {
 });
 
 app.get("/api/ours-privacy/lfs", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
@@ -4406,7 +4424,7 @@ app.get("/api/ours-privacy/lfs", (req, res) => {
 
 // Cross-attribution analysis - visitors who entered via one platform but converted with another
 app.get("/api/ours-privacy/cross-attribution", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
@@ -5318,7 +5336,7 @@ app.get('/api/looker/daily-cost-trends', async (req, res) => {
 
 // Get visitor journey - all events for a specific visitor ID
 app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const visitorId = req.params.visitorId;
     
     const events = data.filter(d => 
@@ -5343,7 +5361,7 @@ app.get("/api/ours-privacy/visitor-journey/:visitorId", (req, res) => {
 
 // Get list of visitors who converted (for dropdown selection)
 app.get("/api/ours-privacy/converted-visitors", (req, res) => {
-    const data = global.webhookData || [];
+    const data = getWebhookDataFromDB();
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     
@@ -5964,7 +5982,7 @@ app.get('/api/clinic-performance', async (req, res) => {
         end.setHours(23, 59, 59, 999);
         
         // Get all webhook events in date range
-        const webhookData = global.webhookData || [];
+        const webhookData = getWebhookDataFromDB();
         
         // Get booked events
         const bookedEvents = webhookData.filter(e => 
