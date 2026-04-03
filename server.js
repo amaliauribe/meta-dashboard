@@ -651,8 +651,8 @@ app.post('/api/meta/campaign-performance', async (req, res) => {
         let freshData = [];
         if (freshDates.length > 0) {
             try {
-                const fetchStart = Math.min(...freshDates.map(d => new Date(d)));
-                const fetchEnd = Math.max(...freshDates.map(d => new Date(d)));
+                const fetchStart = new Date(Math.min(...freshDates.map(d => new Date(d))));
+                const fetchEnd = new Date(Math.max(...freshDates.map(d => new Date(d))));
                 const fetchStartStr = fetchStart.toISOString().slice(0, 10);
                 const fetchEndStr = fetchEnd.toISOString().slice(0, 10);
 
@@ -762,8 +762,8 @@ app.post('/api/meta/ad-performance', async (req, res) => {
         let freshData = [];
         if (freshDates.length > 0) {
             try {
-                const fetchStart = Math.min(...freshDates.map(d => new Date(d)));
-                const fetchEnd = Math.max(...freshDates.map(d => new Date(d)));
+                const fetchStart = new Date(Math.min(...freshDates.map(d => new Date(d))));
+                const fetchEnd = new Date(Math.max(...freshDates.map(d => new Date(d))));
                 const fetchStartStr = fetchStart.toISOString().slice(0, 10);
                 const fetchEndStr = fetchEnd.toISOString().slice(0, 10);
 
@@ -1038,7 +1038,7 @@ async function googleAdsApiRequest(query) {
     });
     
     const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Google Ads API timeout (10s)')), 10000)
+        setTimeout(() => reject(new Error('Google Ads API timeout (45s)')), 45000)
     );
     const results = await Promise.race([customer.query(query), timeoutPromise]);
     console.log('Google Ads API success, results:', results?.length || 0);
